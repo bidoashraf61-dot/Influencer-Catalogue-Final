@@ -233,7 +233,7 @@ def _from_other(qid, text):
     if qid == "market":
         import re
         t = " " + " ".join(str(text).lower().split()) + " "
-        for cc, words in fit.PLACE_WORDS.items():
+        for cc, words in fit.COUNTRY_WORDS.items():
             if any(re.search(r"(?<![a-z])" + re.escape(w) + r"(?![a-z])", t) for w in words):
                 return cc                           # Kuwait, Qatar...: the scorer knows them (audit 273)
         return None
@@ -420,13 +420,11 @@ def guess(text):
     plats = [p for p, words in _PLATFORM_WORDS.items() if any(_says(t, w) for w in words)]
     if plats:
         raw["platforms"] = plats
-    for cc, words in fit.PLACE_WORDS.items():
+    for cc, words in fit.COUNTRY_WORDS.items():         # countries only, no cities (item 274)
         if any(re.search(r"(?<![a-z])" + re.escape(w) + r"(?![a-z])", t) for w in words):
             if cc in {o[0] for o in _BY_ID["market"]["options"]}:
                 raw["market"] = cc
                 break
-    if "market" not in raw and any(w in t for w in ("السعودية", "الرياض", "جدة")):
-        raw["market"] = "SA"
     cats = []
     for value, _label in _BY_ID["category"]["options"]:
         words = _EXTRA_CATEGORY.get(value, []) + [value]
@@ -640,6 +638,43 @@ AUD_MATCH_WEIGHT = 1.05    # a measured audience that meets the brief
 SUSPICIOUS_WEIGHT = 0.85   # views or engagement over 3x the typical top: ranked after clean creators
 
 
+def size_of(followers):
+    """The brief's creator size for a follower count: the bands the "Which creator sizes?" question names."""
+    import intl_benchmarks
+    return intl_benchmarks.band_of(followers)
+
+
+def why_empty(brief):
+    """When a strict shortlist finds nobody: the requirement that left no one, in words for the client."""
+    wanted = [p for p in brief.get("platforms", []) if p in PLATFORMS]
+    cr = [c for c in db.list_creators(active_only=True) if not wanted or set(analysis.creator_platforms(c)) & set(wanted)]
+    if not cr:
+        return "No creators on %s yet. Try another platform." % " or ".join(wanted)
+    if brief.get("size"):
+        cr = [c for c in cr if size_of(c["followers"]) in brief["size"]]
+        if not cr:
+            return "No creators of that size on %s. Try another size." % (" or ".join(wanted) or "these platforms")
+    cats = [x for x in str(brief["target"].get("category") or "").split("|") if x and x.lower() != "any"]
+    if cats:
+        cr = [c for c in cr if _tagged(c, cats)]
+        if not cr:
+            return "No %s creators on %s yet. Try another platform or product space." % (
+                " or ".join(answer_label("category", x).lower() for x in cats), " or ".join(wanted) or "these platforms")
+    want_cc = fit.target_list(brief["target"].get("country")) or [fit.DEFAULT_TARGET["country"]]
+    import discover
+    docs = discover._load()
+
+    def aud_there(code):
+        return any(sum(v for k, v in (x.get("countries") or {}).items() if str(k).upper() in want_cc) >= AUD_COUNTRY_MIN
+                   for x in docs.get(code, []) if not wanted or x["platform"] in wanted)
+    if not any(_based_in(c, want_cc) or aud_there(c["code"]) for c in cr):
+        return "None of them are based in %s or have most of their audience there yet. Try adding a country." % fit.country_names(want_cc)
+    if brief.get("max_fake") or brief.get("min_engagement"):
+        return "Nobody passed the fake-follower or engagement limits. Try a looser limit."
+    return "None of the matching creators have enough public numbers on %s to score yet. Try another platform." % (
+        " or ".join(wanted) or "these platforms")
+
+
 def _based_in(c, want):
     """True when the roster places the creator in one of the ``want`` countries."""
     _, hits = fit._place_mark(c, "|".join(want))
@@ -667,7 +702,9 @@ def score_all(brief, exclude=(), only=None, strict=False):
     if wanted:
         creators = [c for c in creators if set(analysis.creator_platforms(c)) & set(wanted)]
     if brief.get("size"):
-        creators = [c for c in creators if metrics.band_of(c["followers"]) in brief["size"]]
+        # The sizes as the question states them (Nano under 20k, Micro 20k-100k, Mid 100k-500k); metrics.band_of
+        # uses older 10k/50k cut-offs, so "Micro" returned 10k-50k creators (deep test, item 274).
+        creators = [c for c in creators if size_of(c["followers"]) in brief["size"]]
     cats = [x for x in str(target.get("category") or "").split("|") if x and x.lower() != "any"]
     want_cc = fit.target_list(target.get("country")) or [fit.DEFAULT_TARGET["country"]]
     based = {}
@@ -734,7 +771,7 @@ def score_all(brief, exclude=(), only=None, strict=False):
             "strengths": (s.get("strengths") or [])[:3], "watchouts": notes + (s.get("watchouts") or [])[:2],
             "followers": c["followers"] or 0, "audience_level": aud_lvl,
             "audience_in_market": bool(home is not None and home >= AUD_COUNTRY_MIN),
-            "band": metrics.band_of(c["followers"]),
+            "band": size_of(c["followers"]),
         })
         if s.get("fit"):
             items[-1].update(perf=s.get("perf"), fit=s["fit"]["score"], chips=s["fit"]["chips"], fit_items=s["fit"]["items"])

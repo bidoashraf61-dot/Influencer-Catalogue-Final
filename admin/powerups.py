@@ -33,8 +33,6 @@ TYPE_OPTIONS = [
     ("mua", "Makeup artist"), ("reviewer", "Beauty reviewer"), ("fitness", "Fitness coach"), ("foodie", "Foodie"),
     ("fashion", "Fashion"), ("comedy", "Comedy"), ("lifestyle", "Lifestyle"),
 ]
-CITY_OPTIONS = [("Riyadh", "Riyadh"), ("Jeddah", "Jeddah"), ("Dammam", "Dammam / Khobar"), ("Makkah", "Makkah"),
-                ("Madinah", "Madinah"), ("Dubai", "Dubai"), ("Abu Dhabi", "Abu Dhabi"), ("Cairo", "Cairo")]
 TONE_OPTIONS = [("educational", "Educational"), ("fun", "Fun"), ("emotional", "Emotional"), ("premium", "Premium"),
                 ("everyday", "Everyday")]
 
@@ -47,7 +45,6 @@ QUESTIONS = [
     {"id": "regulated", "type": "one", "tier": "power", "label": "Health claim", "options": [("yes", "Yes"), ("no", "No")]},
     {"id": "licence", "type": "one", "tier": "power", "label": "Mawthooq licence",
      "options": [("preferred", "Preferred"), ("not_needed", "Not needed")]},
-    {"id": "aud_city", "type": "many", "tier": "power", "label": "Audience city", "options": CITY_OPTIONS},
     {"id": "content_lang", "type": "one", "tier": "power", "label": "Content language",
      "options": [("ar", "Arabic"), ("en", "English"), ("both", "Both")]},
     {"id": "lookalikes", "type": "codes", "tier": "power", "label": "Creators like these", "max": 3},
@@ -64,7 +61,6 @@ CARDS = [
     {"id": "licence", "label": "Mawthooq licence", "hint": "Lift creators who hold a media licence.", "fields": ["licence"]},
     {"id": "age", "label": "Audience age", "hint": "Who their followers are, by age.", "fields": ["age"]},
     {"id": "gender", "label": "Audience gender", "hint": "Mostly women, mostly men, or both.", "fields": ["gender"]},
-    {"id": "city", "label": "Audience city", "hint": "Where their followers live.", "fields": ["aud_city"]},
     {"id": "lang", "label": "Content language", "hint": "The language they post in.", "fields": ["content_lang"]},
     {"id": "like", "label": "Creators like these", "hint": "Pick up to 3 you love. Helvi finds their twins.", "fields": ["lookalikes"]},
     {"id": "fresh", "label": "Fresh or proven", "hint": "New to ads, or experienced with brands.", "fields": ["collab"]},
@@ -78,8 +74,9 @@ TOP3 = {
     "skincare": ["type", "age", "gender"],
     "beauty": ["gender", "age", "like"], "hair care": ["gender", "age", "like"],
     "fragrance": ["gender", "age", "like"], "fashion": ["gender", "age", "like"],
-    "mother & baby": ["type", "age", "city"],
-    "food": ["city", "tone", "like"], "travel": ["city", "tone", "like"], "lifestyle": ["city", "tone", "like"],
+    # No Audience city card since 2026-10-29 (item 274): city data is too thin to rank on.
+    "mother & baby": ["type", "age", "gender"],
+    "food": ["tone", "lang", "like"], "travel": ["tone", "lang", "like"], "lifestyle": ["tone", "lang", "like"],
     "fitness": ["type", "age", "gender"],
     "technology": ["gender", "lang", "tone"], "automotive": ["gender", "lang", "tone"],
     "finance": ["gender", "lang", "tone"], "gaming": ["gender", "lang", "tone"],
@@ -164,7 +161,7 @@ def from_answers(answers):
     a = [x for x in a if x in AGE_NAMES]
     if a:
         p["age"] = a
-    for k in ("creator_type", "aud_city", "tone", "lookalikes", "claim_tags"):
+    for k in ("creator_type", "tone", "lookalikes", "claim_tags"):     # aud_city retired (item 274)
         if answers.get(k):
             p[k] = list(answers[k])
     if answers.get("content_lang"):
@@ -453,11 +450,6 @@ def fit_for(c, p, platform=None):
         v = _share(lst, "ages", names)
         am = None if v is None else _percentile("ages", names, v)
         items.append(("age", am, "Audience age", None))
-    if p.get("aud_city"):
-        names = [n for x in p["aud_city"] for n in ([x, "Khobar", "Al Khobar"] if x == "Dammam" else [x])]
-        v = _share(lst, "cities", names)
-        items.append(("city", None if v is None else _percentile("cities", names, v), "Audience city",
-                      "%s audience" % p["aud_city"][0] if len(p["aud_city"]) == 1 else "Right cities"))
     if p.get("content_lang"):
         have = _langs(lst)
         if not have:

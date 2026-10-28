@@ -65,6 +65,33 @@ _score_cache = {}          # brief id -> (time, scores) for the catalogue's fit 
 _pending = {}
 _pending_lock = threading.Lock()
 PENDING_SECONDS = 600
+# Item 274 (Bido, 2026-10-29): every AI shortlist's preparation time is kept on its brief, and the team is
+# told when one takes longer than this (setting ``brief_slow_seconds``), at most once per SLOW_ALERT_GAP.
+BRIEF_SLOW_SECONDS = 20
+SLOW_ALERT_GAP = 1800
+_slow_alert = {"at": 0.0}
+
+
+def _brief_timing(brief_id, rank_s, total_s, picks, pool, who, text):
+    """Store how long the shortlist took on its brief row; alert the team when it was slow."""
+    try:
+        with db.connect() as conn:
+            row = conn.execute("SELECT result FROM briefs WHERE id = ?", (brief_id,)).fetchone()
+            res = json.loads(row["result"] or "{}") if row else {}
+            res["timing"] = {"rank_s": round(rank_s, 2), "total_s": round(total_s, 2), "picks": picks, "pool": pool}
+            conn.execute("UPDATE briefs SET result = ? WHERE id = ?", (json.dumps(res), brief_id))
+    except Exception:
+        pass
+    limit = db.setting("brief_slow_seconds", BRIEF_SLOW_SECONDS) or BRIEF_SLOW_SECONDS
+    try:
+        limit = float(limit)
+    except (TypeError, ValueError):
+        limit = BRIEF_SLOW_SECONDS
+    if total_s > limit and time.time() - _slow_alert["at"] > SLOW_ALERT_GAP:
+        _slow_alert["at"] = time.time()
+        notify.send("brief_slow", ["An AI shortlist took %.0f seconds to prepare (the limit is %.0f)." % (total_s, limit),
+                                   "Brief %s by %s: %s" % (brief_id, who, text[:120]),
+                                   "Ranking took %.1f s of it; %d creators were scored." % (rank_s, pool)])
 
 
 def _sweep_pending():
@@ -1792,6 +1819,7 @@ class PortalMixin(connect_api.ConnectMixin):
         if not who:
             return
         cid, user, kind = who
+        t_start = time.time()
         b = self.json_body()
         answers, missing = matcher.clean_answers(b.get("answers"))
         if missing:
@@ -1815,13 +1843,18 @@ class PortalMixin(connect_api.ConnectMixin):
             return self._no_credits(cid, "search")
         try:
             brief = matcher.to_brief(answers)
+            t_rank = time.time()
             result = matcher.rank(brief)
+            rank_s = time.time() - t_rank
             self._redact(cid, result["picks"])
             self._redact(cid, result["alternates"])
             if not result["picks"]:
                 portal.refund(cid, cost, "no creators matched")
-                return self.send_json(200, {"ok": True, "empty": True, "message":
-                                            "No creators matched. Try fewer filters or another platform.",
+                try:
+                    why = matcher.why_empty(brief)       # the requirement that left nobody (item 274)
+                except Exception:
+                    why = "No creators matched. Try fewer filters or another platform."
+                return self.send_json(200, {"ok": True, "empty": True, "message": why,
                                             "credits": portal.balance(cid)}, self.cors())
             summary, reasons, narrated = "", {}, False
             defer = bool(b.get("defer_reasons")) and kind_paid == "brief"
@@ -1873,6 +1906,8 @@ class PortalMixin(connect_api.ConnectMixin):
                         mine[real] = it["score"]
             except Exception:
                 continue
+        _brief_timing(brief_id, rank_s, time.time() - t_start, len(codes), result["pool"],
+                      (user["company"] or user["email"]) if user else "admin", text)
         return self.send_json(200, {
             "ok": True, "token": token, "name": name, "summary": summary, "narrated": narrated, "brief": text, "brief_id": brief_id,
             "reasons_pending": defer,

@@ -30,7 +30,7 @@ import powerups
 GROUPS = [
     ("campaign", "Campaign", ["goal", "platforms", "market", "category", "deliverable", "timing"]),
     ("creators", "Creators", ["mix", "creator_size", "count", "creator_type", "collab", "licence", "max_fake", "min_engagement"]),
-    ("audience", "Audience", ["gender", "age", "aud_city", "content_lang"]),
+    ("audience", "Audience", ["gender", "age", "content_lang"]),       # no Audience city since item 274
     ("product", "Product", ["product", "claim", "regulated", "tone"]),
 ]
 REQUIRED = ("goal", "platforms", "market", "category")      # what a selection's own brief needs (matcher)
@@ -333,15 +333,6 @@ def suggest(sels):
     if ages:
         lab = dict(matcher._BY_ID["age"]["options"])
         out["age"] = {"value": ages if len(ages) > 1 else ages[0], "why": "Most of their followers are %s%s." % (" and ".join(lab[a] for a in ages), basis)}
-    cities = []
-    for v_, label in powerups.CITY_OPTIONS:
-        names = [v_, "Khobar", "Al Khobar"] if v_ == "Dammam" else [v_]
-        v, m = _avg_share(lst_by, "cities", names)
-        if v is not None and v >= 10:
-            cities.append((v, v_, label))
-    if cities:
-        cities = sorted(cities, reverse=True)[:3]
-        out["aud_city"] = {"value": [v for _s, v, _l in cities], "why": "Their followers cluster in %s%s." % (", ".join(l for _s, _v, l in cities), basis)}
     ar = en = lang_n = 0
     for l in lst_by:
         have = powerups._langs(l)

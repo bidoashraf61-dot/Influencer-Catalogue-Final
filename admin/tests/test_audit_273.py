@@ -44,9 +44,11 @@ class Places(unittest.TestCase):
     def test_placeholder_countries_are_read(self):
         self.assertEqual(fit._place_mark(row(city="UAE Not Specified yet"), "AE"), (1.0, {"AE"}))
         self.assertEqual(fit._place_mark(row(city="Iraq Not Specified yet"), "SA")[1], {"IQ"})
-        self.assertEqual(fit._place_mark(row(city="woman in Cairo"), "EG")[1], {"EG"})   # "oman" inside "woman" is not Oman
-        self.assertTrue(matcher._based_in(row(city="Cairo"), ["EG"]))
-        self.assertFalse(matcher._based_in(row(city="Riyadh"), ["EG"]))
+        self.assertEqual(fit._place_mark(row(city="woman from Egypt"), "EG")[1], {"EG"})   # "oman" inside "woman" is not Oman
+        # Countries only, never cities (item 274)
+        self.assertIsNone(fit._place_mark(row(city="Cairo"), "EG")[1])
+        self.assertFalse(matcher._based_in(row(city="Riyadh"), ["SA"]))
+        self.assertTrue(matcher._based_in(row(city="Riyadh", nationality="Saudi"), ["SA"]))
 
 
 class FreeText(unittest.TestCase):

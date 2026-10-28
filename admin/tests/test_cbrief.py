@@ -31,7 +31,7 @@ class CampaignBrief(tb.Board):
         self.assertEqual(s, 200, b)
         ids = [q["id"] for g in b["questions"] for q in g["items"]]
         for qid in ("goal", "platforms", "market", "category", "mix", "creator_size", "count", "deliverable", "timing",
-                    "gender", "age", "creator_type", "product", "claim", "licence", "aud_city", "content_lang", "collab", "tone"):
+                    "gender", "age", "creator_type", "product", "claim", "licence", "content_lang", "collab", "tone"):
             self.assertIn(qid, ids)
         self.assertNotIn("budget", ids)                          # the card never talks prices
         self.assertTrue(all(q["options"] for g in b["questions"] for q in g["items"] if q["type"] != "text"))

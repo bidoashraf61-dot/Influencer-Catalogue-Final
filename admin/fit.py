@@ -235,8 +235,10 @@ CATEGORY_WORDS = {
     "health": ["health", "medical", "wellness", "fitness", "nutrition", "pharma", "doctor", "diet", "vitamin", "supplement"],
     "mother & baby": ["baby", "mother", "child", "kids", "family", "parent", "toys"],
     "food": ["food", "restaurant", "cooking", "recipe", "drink", "coffee", "cafe"],
-    "lifestyle": ["lifestyle", "fashion", "shopping", "travel", "home", "friends"],
-    "fashion": ["fashion", "clothes", "shoes", "accessor", "style", "shopping"],
+    # Item 274: a space is its own tag. Lifestyle no longer takes every fashion or travel creator, and
+    # "shopping" (E-commerce & Shopping) no longer makes a fashion creator.
+    "lifestyle": ["lifestyle", "daily life", "vlog"],
+    "fashion": ["fashion", "clothes", "shoes", "accessor", "abaya", "modest"],
     "technology": ["tech", "gadget", "electronic", "gaming", "software", "phone"],
     "automotive": ["car", "auto", "vehicle", "motor"],
     "travel": ["travel", "tourism", "hotel", "holiday"],
@@ -403,15 +405,27 @@ PLACE_WORDS = {
 }
 
 
+# Country names only (Bido, 2026-10-29, item 274): the roster's city data is too thin to rely on, so a
+# creator is placed by the country their roster entry names, never by a city ("Riyadh", "Cairo").
+COUNTRY_WORDS = {
+    "SA": ["ksa", "saudi", "saudi arabia", "saudia", "سعودي", "السعودية"],
+    "AE": ["uae", "emirates", "emirati", "united arab emirates", "الإمارات", "اماراتي"],
+    "EG": ["egypt", "egyptian", "مصر", "مصري"],
+    "KW": ["kuwait", "kuwaiti", "الكويت"], "QA": ["qatar", "qatari", "قطر"], "BH": ["bahrain", "bahraini", "البحرين"],
+    "OM": ["oman", "omani", "عمان"], "JO": ["jordan", "jordanian", "الأردن"], "LB": ["lebanon", "lebanese", "لبنان"],
+    "IQ": ["iraq", "iraqi", "العراق"], "MA": ["morocco", "moroccan", "المغرب"],
+}
+
+
 def _place_mark(creator, target_cc):
-    """1.0 when the roster places the creator in the target country (any of them, when several
-    are asked for), 0.2 when it places them elsewhere, 0.5 when it says nothing useful."""
+    """1.0 when the roster names the creator's country as the target country (any of them, when several
+    are asked for), 0.2 when it names another, 0.5 when it names none. Countries only, no cities."""
     def tokens(text):
         t = str(text or "").lower()
         return [x.strip() for x in re.split(r"[,/|;&+]|\band\b", t) if x.strip()]
     hits = set()
     for raw in tokens(creator["city"] if creator is not None else "") + tokens(creator["nationality"] if creator is not None else ""):
-        for cc, words in PLACE_WORDS.items():
+        for cc, words in COUNTRY_WORDS.items():
             if raw in words or any(w == raw or (w in raw if len(w) > 4 else has_word(raw, w)) for w in words):
                 hits.add(cc)
     if not hits:

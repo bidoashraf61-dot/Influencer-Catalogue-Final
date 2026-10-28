@@ -111,7 +111,7 @@ class Fit(unittest.TestCase):
             self.assertFalse(any(d.isdigit() for d in ch.replace("25–34", "")), ch)   # words, no shares
 
     def test_missing_data_is_neutral(self):
-        f = powerups.fit_for(row("HV-T-004"), {"gender": "Women", "aud_city": ["Riyadh"]})
+        f = powerups.fit_for(row("HV-T-004"), {"gender": "Women"})
         self.assertEqual(f["score"], powerups.NEUTRAL)
         self.assertEqual({i["level"] for i in f["items"]}, {"none"})
 
