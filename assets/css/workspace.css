@@ -124,5 +124,14 @@
   .ws-mod { min-height: 64px; }
   .ws-card { padding: 18px; }
   .ws-table th:nth-child(n+4), .ws-table td:nth-child(n+4) { white-space: nowrap; }
+  /* evidence: one card per creator, so the roster tag never scrolls off-screen */
+  .ws-table--cards thead { display: none; }
+  .ws-table--cards, .ws-table--cards tbody, .ws-table--cards tr, .ws-table--cards td { display: block; width: 100%; }
+  .ws-table--cards tr { padding: 14px 0; border-bottom: 1px solid rgba(18,18,18,.1); display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+  .ws-table--cards td { padding: 0; border: 0; white-space: normal !important; }
+  .ws-table--cards td.ws-who, .ws-table--cards td.ws-td-tag { grid-column: 1 / -1; }
+  .ws-table--cards td[data-label]::before { content: attr(data-label); display: block; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--gray); }
+  .ws-table--cards td.ws-td-tag::before { display: none; }
+  .ws-pack .ws-scroll { overflow: visible; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

@@ -355,7 +355,7 @@
       if (!r.b.ok) { box.appendChild(h("div", { class: "ws-empty" }, h("b", null, "Not available"), r.b.message || "")); return; }
       if (!r.b.packs.length) { box.appendChild(h("div", { class: "ws-empty" }, h("b", null, "No evidence yet"), "Name a competitor in Work and collect; what they posted with creators lands here.")); return; }
       r.b.packs.forEach(function (pk) {
-        var tb = h("table", { class: "ws-table" }, h("thead", null, h("tr", null, h("th", null, "Creator"), h("th", null, "Worked with"),
+        var tb = h("table", { class: "ws-table ws-table--cards" }, h("thead", null, h("tr", null, h("th", null, "Creator"), h("th", null, "Worked with"),
           h("th", null, "Posts"), h("th", null, "Best views"), h("th", null, "Followers"), h("th", null, "HelloVoice roster"))));
         var body = h("tbody");
         pk.creators.forEach(function (c) {
@@ -371,8 +371,9 @@
             }
           }
           body.appendChild(h("tr", null, h("td", { class: "ws-who" }, h("b", null, c.name), h("span", null, c.platform + (c.handle ? " · @" + c.handle.replace(/^@/, "") : ""))),
-            h("td", null, c.competitors.join(", ")), h("td", null, String(c.posts)), h("td", null, fmt(c.best_views)),
-            h("td", null, fmt(c.followers)), h("td", null, tag || "–")));
+            h("td", { "data-label": "Worked with" }, c.competitors.join(", ")), h("td", { "data-label": "Posts" }, String(c.posts)),
+            h("td", { "data-label": "Best views" }, fmt(c.best_views)), h("td", { "data-label": "Followers" }, fmt(c.followers)),
+            h("td", { "data-label": "Roster", class: "ws-td-tag" }, tag || "–")));
         });
         tb.appendChild(body);
         box.appendChild(h("article", { class: "ws-card ws-pack" }, h("div", { class: "ws-headrow" }, h("h2", null, pk.title),
