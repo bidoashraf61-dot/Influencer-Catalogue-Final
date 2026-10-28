@@ -449,7 +449,11 @@ def apply_edit(k, field, value, by, ip=None):
         if value == before:
             return True, "", value, False
         for cid in c["ids"]:
+            had = modules.level(cid, field[4:]) != "off"
             modules.set_level(cid, field[4:], value, by)
+            # Off after having it is a pause (the locked page says "your data is safe"); off for a
+            # company that never had it, or on again, clears the mark.
+            modules.set_paused(cid, field[4:], value == "off" and had, by)
     elif field.startswith("set:"):
         key = field[4:]
         if key not in modules.FIELDS:
@@ -479,7 +483,7 @@ def apply_edit(k, field, value, by, ip=None):
             return False, "Not a valid role.", None, False
         if value == before:
             return True, "", value, False
-        if modules.set_role(uid, person["code_id"], mod, value) is None:
+        if modules.set_role(uid, person["code_id"], mod, value, by) is None:
             return False, "Roles are not switched on yet.", None, False
     else:
         return False, "Unknown field.", None, False

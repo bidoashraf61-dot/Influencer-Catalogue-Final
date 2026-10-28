@@ -294,14 +294,14 @@ def user_roles(user_ids):
         return {}
 
 
-def set_role(user_id, code_id, module, role):
+def set_role(user_id, code_id, module, role, by=""):
     if module not in BY_KEY or role not in ROLES:
         return None
     try:
         with _roles_conn() as conn:
             conn.execute("DELETE FROM user_modules WHERE user_id = ? AND module = ?", (int(user_id), module))
-            conn.execute("INSERT INTO user_modules (user_id, code_id, module, role) VALUES (?,?,?,?)",
-                         (int(user_id), int(code_id), module, role))
+            conn.execute("INSERT INTO user_modules (user_id, code_id, module, role, changed_at, changed_by) VALUES (?,?,?,?,?,?)",
+                         (int(user_id), int(code_id), module, role, db.now(), by or ""))
     except Exception:
         return None
     return role
