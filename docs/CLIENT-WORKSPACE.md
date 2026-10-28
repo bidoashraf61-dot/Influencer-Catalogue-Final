@@ -49,8 +49,8 @@ admin. At `view` the Work tab says HelloVoice runs it for them and offers **Ask 
   company's people.
 - Requests go to `module_requests` (kinds role, module, limit). Role requests are answered in the Team tab;
   the others reach HelloVoice in the Tenants inbox.
-- **Inviting is closed** except for the companies in the setting `workspace_invites` (default: the QA company 55)
-  until colleagues are named correctly in emails and History. Set it to `"all"` to open it.
+- Inviting is open to every company (`workspace_invites = "all"`, set 28 October 2026 after the attribution
+  audit, f0813eb). A list of company code ids in that setting closes it to all others again.
 
 ## Endpoints
 
