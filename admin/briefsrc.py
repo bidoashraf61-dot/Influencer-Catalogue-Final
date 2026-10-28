@@ -574,7 +574,7 @@ REGULATED = {
     "food_health": "a food with health claims",
 }
 _REG_WORDS = [
-    ("medicine", r"\b(prescription|rx only|tablets?|capsules?|\d+\s?mg\b|dosage|dose|side effects|contraindicat|"
+    ("medicine", r"\b(prescription|rx only|tablets?|capsules?(?! (?:collection|wardrobe|line|range))|\d+\s?mg\b|dosage|dose|side effects|contraindicat|"
                  r"pharmaceutical|sfda[- ]registered|active ingredient)\b|دواء|أقراص|جرعة|وصفة طبية"),
     ("supplement", r"\b(supplement|vitamin|multivitamin|probiotic|collagen|omega[- ]?3|biotin)\b|مكمل|فيتامين"),
     ("medical_device", r"\b(medical device|glucometer|thermometer|inhaler|blood pressure monitor)\b|جهاز طبي"),
@@ -585,8 +585,15 @@ _CLAIM_WORDS = r"(cure|cures|treat|treats|heal|prevent|clinically|proven|guarant
                r"eliminates?|boosts? immunity|يعالج|علاج|يشفي|مثبت|مضمون)"
 
 
+# Spaces where a medicine, supplement, cosmetic or device can be the product (item 278: a fashion "capsule
+# collection" was flagged as a medicine).
+REGULATED_SPACES = {"health care", "skincare", "beauty", "hair care", "mother & baby", "fitness", "food"}
+
+
 def regulated_kind(text, categories):
     t = (text or "").lower()
+    if categories and not (set(categories) & REGULATED_SPACES):
+        return "none"
     for kind, rx in _REG_WORDS:
         if re.search(rx, t, re.I):
             return kind
