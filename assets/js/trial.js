@@ -26,7 +26,7 @@
     ".hvt-panel{width:min(440px,100%);height:100%;overflow:auto;background:#fff;color:#121212;padding:28px 26px 32px;",
     "font:400 15px/1.6 \"DM Sans\",Arial,sans-serif;transform:translateX(24px);transition:transform .35s cubic-bezier(.16,1,.3,1);",
     "box-shadow:-18px 0 40px -24px rgba(0,0,0,.45)}.hvt-sheet.is-on .hvt-panel{transform:none}",
-    ".hvt-panel h2{font:400 40px/.95 Bebasneue,\"Bebas Neue\",Arial,sans-serif;letter-spacing:.02em;margin:0 0 10px}",
+    ".hvt-panel h2{font:400 40px/.95 Bebasneue,\"Bebas Neue\",Arial,sans-serif;letter-spacing:.02em;margin:0 0 10px;padding-right:52px}",
     ".hvt-panel p{margin:0 0 20px;color:#383838}.hvt-panel label{display:block;font-weight:600;font-size:13px;margin:0 0 14px}",
     ".hvt-panel input,.hvt-panel textarea{display:block;width:100%;box-sizing:border-box;margin-top:6px;font:inherit;font-size:16px;",
     "padding:11px 12px;border:1px solid rgba(18,18,18,.28);border-radius:12px;background:#fff;color:#121212}",
