@@ -115,9 +115,13 @@ def companies():
             if u is not None:
                 people.append(u)
         ids = sorted(codes)
-        lv = {m["key"]: _agree((stored.get(i) or {}).get(m["key"], modules.DEFAULT) for i in ids)
+        # A colleague's own sign-in code carries no settings of its own (the gate reads the company's code),
+        # so the company's levels and limits are read from the account codes only.
+        guests = {u["code_id"] for u in people if "company_code_id" in u.keys() and u["company_code_id"]}
+        base = [i for i in ids if i not in guests] or ids
+        lv = {m["key"]: _agree((stored.get(i) or {}).get(m["key"], modules.DEFAULT) for i in base)
               for m in modules.MODULES}
-        lim = {f["key"]: _agree((setn.get(i) or {}).get(f["key"], "") for i in ids)
+        lim = {f["key"]: _agree((setn.get(i) or {}).get(f["key"], "") for i in base)
                for f in modules.LIMITS + modules.BRAND + modules.NOTES}
         if not lim["credits_month"] and people:
             lim["credits_month"] = _agree(u["monthly_credits"] if u["monthly_credits"] is not None else ""
