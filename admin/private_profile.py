@@ -12,8 +12,10 @@ reader yet, so those creators keep their name and handle only.
 """
 import json
 import urllib.request
+from pathlib import Path
 
 PRESETS = {"Instagram": "ig_profiles", "TikTok": "tt_profiles"}
+TRIED = "profile read tried"
 _FOLLOWER_KEYS = ("followersCount", "followers", "followerCount", "follower_count", "subscriberCount", "subscribersCount")
 
 
@@ -49,12 +51,13 @@ def enabled():
 
 
 def unread_codes(company, platform):
-    """Private creators of this company, on this platform, whose follower count has not been read."""
+    """Private creators of this company, on this platform, whose follower count has not been read and whose profile
+    has not been tried: a handle that never opens is tried once, not billed on every later run."""
     import db
     with db.connect() as conn:
         return [r["code"] for r in conn.execute(
-            "SELECT code FROM creators WHERE owner_code_id = ? AND platform = ? AND followers IS NULL ORDER BY code",
-            (int(company), platform))]
+            "SELECT code FROM creators WHERE owner_code_id = ? AND platform = ? AND followers IS NULL "
+            "AND IFNULL(note, '') NOT LIKE '%' || ? || '%' ORDER BY code", (int(company), platform, TRIED))]
 
 
 def ensure_job(company, platform):
@@ -139,7 +142,10 @@ def _photo(code, url):
         ok, _why = uploads.photo_bytes(data)
         if not ok:
             return
-        name = uploads.write_photo(data, code, links.PHOTO_DIR)
+        # links.PHOTO_DIR is set when the web server starts; a run collected by any other process (a script, a
+        # scheduler pass) has none, so the folder is worked out the same way server.py does.
+        folder = links.PHOTO_DIR or (Path(__file__).resolve().parent.parent / "site" / "assets" / "catalogue")
+        name = uploads.write_photo(data, code, folder)
         with db.connect() as conn:
             conn.execute("UPDATE creators SET photo = ? WHERE code = ?", (name, code))
     except Exception as exc:
@@ -155,4 +161,16 @@ def apply_run(run, job):
     company = int(src[8:])
     items = apify.call("GET", "/datasets/%s/items" % run["dataset"], params={"format": "json", "clean": "1", "limit": "10"}, timeout=60)
     items = items if isinstance(items, list) else []
-    return sum(1 for it in items if apply_item(company, it))
+    n = sum(1 for it in items if apply_item(company, it))
+    # every private creator this run tried that still has no followers is marked tried, so it is not read again
+    try:
+        import db
+        hm = json.loads(run["handle_map"] or "{}")
+        codes = [c for c in hm.values() if isinstance(c, str) and c.startswith("PV-")]
+        if codes:
+            with db.connect() as conn:
+                conn.execute("UPDATE creators SET note = TRIM(IFNULL(note, '') || ' · ' || ?) WHERE owner_code_id = ? AND followers IS NULL "
+                             "AND code IN (%s)" % ",".join("?" * len(codes)), [TRIED, company] + codes)
+    except Exception as exc:
+        print("private profile tried-mark failed:", repr(exc)[:160], flush=True)
+    return n
