@@ -106,13 +106,16 @@ class PortalMixin(connect_api.ConnectMixin):
         return self.headers.get("User-Agent")
 
     def _identity(self):
-        """(code_id, user_row or None, kind) for the current viewer."""
+        """(code_id, user_row or None, kind) for the current viewer. code_id is whose data they work on (a colleague
+        invited into a company: the company's); user_row is who they are, always the person and never the company's
+        account holder, so profile edits, 2FA, deleting an account and the like act on the right row."""
         cid = self.viewer_code_id()
         if cid is None:
             return None, None, None
         if cid == db.admin_code_id():
             return cid, None, "admin"
-        user = portal.user_for_code(cid)
+        me = self.person_code_id()
+        user = portal.user_for_code(me if me is not None else cid)
         return cid, user, ("user" if user else "guest")
 
     def _me_payload(self, cid, user, kind):
@@ -124,9 +127,9 @@ class PortalMixin(connect_api.ConnectMixin):
                "preview": bool(self.preview_mode()),
                # A person with admin access: their own account, plus a switch that reveals locked data.
                # Only a real admin (owner or admin) is "staff" in the page: a key account manager is not (owner, 2026-10-18).
-               "staff": bool(self.staff_viewer(cid)) and self.kam_clients() is None,
+               "staff": bool(self.staff_viewer(self.person_code_id() or cid)) and self.kam_clients() is None,
                # View as client is on: the page is the client's; the menu still offers the way back.
-               "as_client": bool(self.as_client() and self.staff_account(cid)),
+               "as_client": bool(self.as_client() and self.staff_account(self.person_code_id() or cid)),
                "unlock": bool(self.staff_unlocked() or (self.kam_clients() is not None and self.cookies().get(self.UNLOCK_COOKIE, "") == "1")),
                # A key account manager: the menu offers "My clients" (account/#clients).
                "kam": bool(kind == "user" and self.kam_clients() is not None),
