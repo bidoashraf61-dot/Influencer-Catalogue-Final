@@ -27,6 +27,12 @@ def company_code(own_code_id, company_code_id):
     return company_code_id if company_code_id else own_code_id
 
 
+def is_acting_person(looked_up_code, my_code, my_company):
+    """True when a lookup of `looked_up_code` means "me, the colleague": it is the company code my own pass works under.
+    False for my own code (already me), for any other company, and when I am nobody's colleague."""
+    return my_code is not None and looked_up_code is not None and my_code != looked_up_code and my_company == looked_up_code
+
+
 def default_role(is_colleague):
     """A person with no role row. The holder of an account is admin of their own company, as they have always
     been; a colleague invited into a company has no access until somebody gives them a role."""

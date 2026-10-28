@@ -95,6 +95,7 @@ import apify
 import profile_thumbs
 import apis_view
 import evidence
+import access_rules
 import modules
 import reference_view
 import views  # noqa: E402
@@ -476,6 +477,17 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def person_code_id(self):
         """The code on this browser's own pass: who is signed in, as against viewer_code_id() = whose data they see."""
         return self.viewer_cookie_id()
+
+    def person_user(self, code_id):
+        """portal.user_for_code(code_id), except that the company code a colleague works under means the colleague:
+        an email, a History entry or a role decision about "the viewer" names the person who acted, not the company's
+        account holder. Looking up an object's owner (selection or campaign code) still uses portal.user_for_code."""
+        me = self.person_code_id()
+        if me is not None and access_rules.is_acting_person(code_id, me, modules.data_code_id(me)):
+            u = portal.user_for_code(me)
+            if u is not None:
+                return u
+        return portal.user_for_code(code_id)
 
     def staff_viewer(self, cid=None):
         """True when this browser is signed in to the portal as someone who ALSO has admin access
@@ -4226,7 +4238,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         account that their account manager is told about and approves. {name, note}"""
         b = self.json_body()
         cid = self.signed_in_client()
-        user = portal.user_for_code(cid) if cid is not None else None
+        user = self.person_user(cid) if cid is not None else None
         if user is None or self.admin_like():
             return self.send_json(401, {"ok": False, "reason": "signin", "message": "Sign in with your work email first."}, self.cors())
         if self._throttled("campstart:%d" % cid, 10, 3600):
@@ -4303,11 +4315,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             d["logos"] = [self.logo_url(x, r["token"]) for x in db.campaign_logos(r)][:3]
             d["draft"] = r["status"] == "draft"
             d["has_selection"] = bool(r["selection_id"])
-            d["can_build"] = (not r["selection_id"]) and r["code_id"] in mine_team and portal.user_for_code(code_id) is not None
+            d["can_build"] = (not r["selection_id"]) and r["code_id"] in mine_team and self.person_user(code_id) is not None
             d.pop("selection_id", None); d.pop("code_id", None)
             out.append(d)
         out = self._pin_campaigns(out, code_id)
-        return self.send_json(200, {"ok": True, "can_start": portal.user_for_code(code_id) is not None, "campaigns": out},
+        return self.send_json(200, {"ok": True, "can_start": self.person_user(code_id) is not None, "campaigns": out},
                               self.cors() + [("Cache-Control", "no-store")])
 
     def _pin_campaigns(self, out, code_id):
@@ -4317,7 +4329,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             pins = [int(x) for x in (db.setting("pinned_campaigns") or [])]
         except (TypeError, ValueError):
             pins = []
-        u = portal.user_for_code(code_id) if code_id is not None else None
+        u = self.person_user(code_id) if code_id is not None else None
         if not pins or not (self.admin_like() or (u is not None and (u["domain"] or "").lower() in portal.SAMPLE_DOMAINS)):
             for d in out:
                 d.pop("id", None)
@@ -4388,7 +4400,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                k["selection_id"], k["id"]):
             return "admin"
         acct = self.signed_in_client()
-        u = portal.user_for_code(acct) if acct is not None else None
+        u = self.person_user(acct) if acct is not None else None
         return db.cinvite_role(k["id"], u["email"]) if u is not None else None
 
     def api_campaign(self, token):
@@ -4421,7 +4433,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             rep["campaign"]["selections"] = []
         if role in ("view", "edit"):
             acct = self.signed_in_client()
-            u = portal.user_for_code(acct) if acct is not None else None
+            u = self.person_user(acct) if acct is not None else None
             if u is not None:
                 db.cinvite_seen(k["id"], u["email"])
         if role in ("admin", "edit"):
@@ -4566,7 +4578,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if k is None:
             return self.send_json(status, {"ok": False, "signin": status == 401}, self.cors())
         cid = self.viewer_code_id()
-        user = portal.user_for_code(cid) if cid is not None else None
+        user = self.person_user(cid) if cid is not None else None
         if self._throttled("updreq:%d:%d" % (k["id"], cid or 0), 3, 86400):
             return
         note = " ".join(str(b.get("note") or "").split())[:400]
@@ -4594,7 +4606,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         action = str(b.get("action") or "on")
         who = self.admin()
         acct = self.signed_in_client()
-        u = portal.user_for_code(acct) if acct is not None else None
+        u = self.person_user(acct) if acct is not None else None
         by = who["email"] if who is not None else (u["email"] if u is not None else "")
         by_name = (u["name"] if u is not None and u["name"] else "") or "HelloVoice"
         msg = ""
@@ -5291,7 +5303,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if sel is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         cid = self.signed_in_client()
-        user = portal.user_for_code(cid) if cid is not None else None
+        user = self.person_user(cid) if cid is not None else None
         if user is None:
             return self.send_json(401, {"ok": False, "reason": "signin", "message": "Sign in with your work email first."}, self.cors())
         if portal.opens(cid, sel):
@@ -5323,7 +5335,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         elif do == "add":
             if cid is not None and self._throttled("invite:%d" % cid, 20, 3600):
                 return
-            me = portal.user_for_code(cid) if cid is not None else None
+            me = self.person_user(cid) if cid is not None else None
             state, err = access.invite(sel, email, (me["email"] if me is not None else "HelloVoice"),
                                        (me["name"] if me is not None else "") or "")
             if err:
@@ -5859,7 +5871,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(403 if why == "outside" else 400, {"ok": False, "reason": why, "message": msg}, self.cors())
         db.log("shortlist", code_id, self.client_ip(), self.headers.get("User-Agent"), "analysis request:%s:%s" % (code, plat))
         if why != "already":
-            u = portal.user_for_code(code_id)
+            u = self.person_user(code_id)
             sels = gating.selections_with(code_id, code)
             import notify
             # Item 195 (owner, 2026-10-20): the request waits in the Analyses inbox on /account/ for an
@@ -5994,7 +6006,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         db.log("shortlist", cid, self.client_ip(), self.headers.get("User-Agent"), "creator request:%s:%s" % (kind, handle))
         if not staff:
-            u = portal.user_for_code(int(cid)) if cid is not None else None
+            u = self.person_user(int(cid)) if cid is not None else None
             who = ((u["name"] or u["email"]) + ", " + (u["company"] or "")) if u else "An access-code client"
             what = ("is marked Unavailable on the selection; they ask you to check again" if kind == "unavailable"
                     else "is not on the roster yet; they ask you to sign them")
@@ -6691,13 +6703,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         db.log("request", code_id, self.client_ip(), self.headers.get("User-Agent"), str(rid))
         if tok and sel is not None:
             import lifecycle
-            _u = portal.user_for_code(code_id)
+            _u = self.person_user(code_id)
             lifecycle.mark_requested(sel, rid, (_u["name"] if _u is not None and _u["name"] else b.get("name")),
                                      _u["id"] if _u is not None else None)
         # The browser still mails the quote through the form service; this is the server's own copy to
         # the client's KAM and the team, which does not depend on that service accepting it.
         import notify
-        u = portal.user_for_code(code_id)
+        u = self.person_user(code_id)
         notify.send("quote", ["%s requested a quote for “%s” (%d creators)." % (
             (u["company"] or u["email"]) if u else (b.get("company") or "A client"), b.get("selection_name") or "a selection", len(selection)),
             "Name: %s" % (b.get("name") or ""), "Email: %s" % (b.get("email") or ""), "Phone: %s" % (b.get("phone") or "")],
@@ -6770,13 +6782,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def _status_who(self, role, reader):
         if role == "admin":
             a = self.admin()
-            u = portal.user_for_code(reader) if a is None else None
+            u = self.person_user(reader) if a is None else None
             if u is not None and u["name"]:
                 return "hv", u["name"], None   # staff signed in to the portal: their own name
             name = (a["name"] if a is not None and "name" in a.keys() and a["name"] else None) or \
                    ((a["email"].split("@")[0].replace(".", " ").title()) if a is not None else "HelloVoice")
             return "hv", name, None
-        u = portal.user_for_code(reader)
+        u = self.person_user(reader)
         return "client", (u["name"] if u is not None and u["name"] else "Client"), u
 
     def api_selection_status(self):
@@ -6822,7 +6834,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if row is None or row["s"] != "rejected":
             return self.send_json(400, {"ok": False, "reason": "not_rejected"}, self.cors())
         if role == "owner":
-            selstatus.tell_kam(sel, code, "rejected", portal.user_for_code(reader), row["reason"], row["note"])
+            selstatus.tell_kam(sel, code, "rejected", self.person_user(reader), row["reason"], row["note"])
         return self.send_json(200, {"ok": True, "status": row}, self.cors())
 
     def api_selection_replace(self):
@@ -6925,7 +6937,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             a = self.admin()
             who = (a["email"] if a is not None and "email" in a.keys() else None) or "HelloVoice"
         else:
-            u = portal.user_for_code(int(viewer))
+            u = self.person_user(int(viewer))
             who = "client: " + ((u["email"] if u is not None else None) or "code %s" % viewer)
         row, err = selrename.apply(sel, b.get("name"), who)
         if err:
@@ -6976,7 +6988,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if loaded is not None and name == (str(loaded).strip()[:120] or "Selection"):
             name = sel["name"]
         elif name != sel["name"]:
-            u_ = portal.user_for_code(int(viewer)) if int(viewer) != db.admin_code_id() else None
+            u_ = self.person_user(int(viewer)) if int(viewer) != db.admin_code_id() else None
             row, err = selrename.apply(sel, name, ("client: " + u_["email"]) if u_ is not None else None)
             name = sel["name"] if err else row["name"]
             sel = row if row is not None else sel
@@ -6996,7 +7008,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if not same and int(viewer) != db.admin_code_id():
             # A quote may already exist: the change is recorded, the account manager told, the page warns.
             import lifecycle
-            if lifecycle.on_client_edit(sel, stored, codes, portal.user_for_code(viewer),
+            if lifecycle.on_client_edit(sel, stored, codes, self.person_user(viewer),
                                         link=self.site_origin() + BASE + "/selections/edit?id=%d" % sel["id"]):
                 out["lifecycle"] = lifecycle.client_payload(db.selection(sel["id"]), "owner")
         return self.send_json(200, out, self.cors())

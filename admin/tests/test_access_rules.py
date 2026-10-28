@@ -7,7 +7,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from access_rules import refusal, default_role, company_code  # noqa: E402
+from access_rules import refusal, default_role, company_code, is_acting_person  # noqa: E402
 
 
 class Gate(unittest.TestCase):
@@ -44,6 +44,15 @@ class Gate(unittest.TestCase):
         self.assertEqual(company_code(26, 55), 55)        # invited into company 55
         self.assertEqual(company_code(32, None), 32)      # an account holder
         self.assertEqual(company_code(32, 0), 32)
+
+    def test_a_lookup_of_the_company_code_means_the_colleague_who_acts(self):
+        self.assertTrue(is_acting_person(55, 57, 55))      # colleague 57 working under company 55
+        self.assertFalse(is_acting_person(57, 57, 55))     # their own code: already them
+        self.assertFalse(is_acting_person(55, 55, 55))     # the account holder
+        self.assertFalse(is_acting_person(61, 57, 55))     # another company's owner is still that owner
+        self.assertFalse(is_acting_person(55, 32, 32))     # a plain account holder looking at someone else's code
+        self.assertFalse(is_acting_person(None, 57, 55))
+        self.assertFalse(is_acting_person(55, None, None))
 
 
 if __name__ == "__main__":
