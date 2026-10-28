@@ -11,7 +11,9 @@ import calendar
 import json
 import re
 import secrets
+import os
 import sqlite3
+import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -19,7 +21,40 @@ from pathlib import Path
 import overlap
 import pieces
 
-DB_PATH = Path(__file__).resolve().parent / "catalogue.db"
+DB_PATH = Path(os.environ.get("HV_DB_PATH") or Path(__file__).resolve().parent / "catalogue.db")
+
+# The trial process (trial.py) serves each share link from its own copy of a demo-only database: a
+# request names its copy and every connect() on that thread opens it. A thread started inside that
+# request inherits it, so work handed to a background thread never reaches another database.
+_local = threading.local()
+
+
+def use_path(path):
+    """Point this thread's connect() at ``path`` (None = DB_PATH again)."""
+    _local.path = path
+
+
+def current_path():
+    return getattr(_local, "path", None) or DB_PATH
+
+
+_thread_start = threading.Thread.start
+
+
+def _start_inheriting(self):
+    inherited = getattr(_local, "path", None)
+    if inherited is not None and not getattr(self, "_hv_wrapped", False):
+        run = self.run
+
+        def run_on_parent_db():
+            _local.path = inherited
+            run()
+        self.run = run_on_parent_db
+        self._hv_wrapped = True
+    return _thread_start(self)
+
+
+threading.Thread.start = _start_inheriting
 
 SCHEMA = """
 PRAGMA journal_mode = WAL;
@@ -360,7 +395,7 @@ def connect():
 
     Pass the yielded connection down to do several writes in ONE transaction.
     """
-    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn = sqlite3.connect(current_path(), timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     try:
@@ -3121,14 +3156,15 @@ PORTAL_COUNTRIES = ["Saudi Arabia", "UAE", "Egypt", "Kuwait", "Qatar", "Bahrain"
 
 def setting(key, default=None):
     import time as _t
-    hit = _setting_cache.get(key)
+    ck = (str(current_path()), key)          # one entry per database: trial copies never share a value
+    hit = _setting_cache.get(ck)
     if hit is not None and _t.time() - hit[0] < _SETTING_TTL:
         raw = hit[1]
     else:
         with connect() as conn:
             row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
         raw = None if row is None else row["value"]
-        _setting_cache[key] = (_t.time(), raw)
+        _setting_cache[ck] = (_t.time(), raw)
     if raw is None:
         return default
     try:
@@ -3142,7 +3178,7 @@ def clear_setting_cache():
 
 
 def set_setting(key, value):
-    _setting_cache.pop(key, None)
+    _setting_cache.pop((str(current_path()), key), None)
     with connect() as conn:
         conn.execute("INSERT INTO settings (key, value) VALUES (?, ?) "
                      "ON CONFLICT(key) DO UPDATE SET value = excluded.value",

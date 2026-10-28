@@ -98,6 +98,7 @@ import evidence
 import access_rules
 import modules
 import reference_view
+import trial
 import views  # noqa: E402
 import ui  # noqa: E402
 
@@ -333,8 +334,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         return p.startswith("/api/") and p not in ("/api/me/as-client",)
 
     def admin(self):
-        if self.as_client():
-            return None                                # seen as the client: no admin session
+        if trial.ACTIVE or self.as_client():
+            return None                                # a trial visitor, or seen as the client: no admin session
         token = auth.unsign(self.cookies().get(ADMIN_COOKIE, ""), SECRET)
         if not token:
             return None
@@ -687,6 +688,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         return (False, None)
 
     def viewer_cookie_id(self):
+        if trial.ACTIVE:
+            return trial.DEMO_CODE                     # every trial visitor is the demo company's owner (trial.py)
         raw = auth.unsign(self.cookies().get(VIEWER_COOKIE, ""), SECRET)
         if not raw or ":" not in raw:
             return None
@@ -741,6 +744,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             portal.unlock_begin(self.kam_unlocked(), scope=sc)
 
     def do_GET(self):
+        if self.trial_route():
+            return
         portal.memo_begin()
         self._unlock_begin()
         try:
@@ -749,6 +754,93 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             portal.unlock_begin(False)
             kam_scope.end()
             portal.memo_end()
+            trial.end()
+
+    # ------------------------------------------------------- trial links (item 271) --
+
+    def trial_route(self):
+        """True when the request was answered here: a trial link opened, or a trial visitor's request
+        handed to the trial process (trial.py). In the trial process itself: point the request at its
+        link's copy and refuse what a trial may not do."""
+        path = self.route(urllib.parse.urlparse(self.path).path)
+        if trial.ACTIVE:
+            if not trial.begin(self):
+                self.send_json(410, {"ok": False, "reason": "trial_ended"}, self.cors())
+                return True
+            if not trial.page_allowed(path):
+                self.send(302, b"", "text/plain", [("Location", "/workspace/"), ("Cache-Control", "no-store")])
+                trial.end()
+                return True
+            if path == "/api/trial/state":
+                st = {"trial": True, "client": trial.client_name(self)}
+                self.send_json(200, st, self.cors() + [("Cache-Control", "no-store")])
+                trial.end()
+                return True
+            if self.command == "POST" and not trial.post_allowed(path):
+                self.send_json(403, trial.REFUSED, self.cors())
+                trial.end()
+                return True
+            return False
+        if path == "/try" or path.startswith("/try/"):
+            self.trial_open(path[len("/try/"):] if path.startswith("/try/") else "")
+            return True
+        raw = self.cookies().get(trial.COOKIE, "")
+        if not raw:
+            return False
+        r, _ = trial.from_cookie(SECRET, raw)
+        gone = [("Set-Cookie", "%s=; Path=/; Max-Age=0" % trial.COOKIE),
+                ("Set-Cookie", "hv_trial_on=; Path=/; Max-Age=0")]
+        if self.admin():
+            return False                               # HelloVoice staff are never a trial visitor
+        if not trial.is_open(r):
+            if path.startswith("/api/"):
+                self.send_json(410, {"ok": False, "reason": "trial_ended",
+                                     "error": "This trial has ended. Ask HelloVoice for a new link."},
+                               self.cors() + gone)
+            else:
+                self.send(410, trial.page(r, "ended"), headers=gone)
+            return True
+        if path == "/api/trial/state":
+            return self.send_json(200, trial.state(r), self.cors() + [("Cache-Control", "no-store")]) or True
+        if path == "/api/trial/contact" and self.command == "POST":
+            if not guard.origin_ok(self.headers, ALLOWED_ORIGINS):
+                return self.send_json(403, {"ok": False}, self.cors()) or True
+            if not guard.limiter.allow("trialc:%s" % self.client_ip(), 6, 3600):
+                return self.too_many(guard.limiter.retry_after("trialc:%s" % self.client_ip(), 6, 3600)) or True
+            guard.limiter.hit("trialc:%s" % self.client_ip())
+            ok, said = trial.contact(r, self.json_body(), self.client_ip())
+            return self.send_json(200 if ok else 400, {"ok": ok, "message": said, "error": None if ok else said},
+                                  self.cors()) or True
+        trial.forward(self, r)
+        return True
+
+    def trial_open(self, token):
+        """/try/<token>[?to=/page]: the share link. Sets the trial cookie and lands on the demo."""
+        token = token.strip("/")
+        r = trial.link(token=token) if re.fullmatch(r"[A-Za-z0-9_-]{8,40}", token or "") else None
+        if r is None:
+            return self.send(404, trial.page(None, "missing"), headers=[("Cache-Control", "no-store")])
+        if not trial.is_open(r):
+            return self.send(410, trial.page(r, "ended"), headers=[("Cache-Control", "no-store")])
+        if self.admin():
+            return self.send(200, trial.page(r, "staff"), headers=[("Cache-Control", "no-store")])
+        try:
+            trial.ensure_copy(r)
+        except Exception as e:
+            print("trial copy:", repr(e)[:200], flush=True)
+            return self.send(503, trial.page(r, "preparing"), headers=[("Cache-Control", "no-store")])
+        to = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(self.path).query)).get("to") or "/workspace/"
+        if not to.startswith("/") or to.startswith("//") or "\\" in to:
+            to = "/workspace/"
+        age = max(60, r["expires_at"] - db.now())
+        sec = self.secure_flag()
+        return self.send(302, b"", "text/plain", [
+            ("Location", to), ("Cache-Control", "no-store"), ("Referrer-Policy", "no-referrer"),
+            ("Set-Cookie", "%s=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=%d%s"
+             % (trial.COOKIE, trial.cookie_value(SECRET, r), age, sec)),
+            ("Set-Cookie", "hv_trial_on=1; Path=/; SameSite=Lax; Max-Age=%d%s" % (age, sec)),
+            # A trial browser is no one's portal account: drop any client pass it carried.
+            ("Set-Cookie", VIEWER_COOKIE + "=; Path=/; Max-Age=0")])
 
     def _do_get(self):
         path = self.route(urllib.parse.urlparse(self.path).path)
@@ -1087,6 +1179,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 return self.send(200, tenants.company_html((query.get("k") or "").strip(), query, owner=role_ == "owner"))
             if path == "/tenants/requests":
                 return self.send(200, tenants.requests_html(query))
+            if path == "/tenants/trials":
+                return self.send(200, trial.admin_html(query, next(iter(sorted(ALLOWED_ORIGINS)), "")))
             if path == "/tenants/hist":
                 return self.send_json(200, tenants.history_rows((query.get("k") or "").strip(), query.get("f") or ""),
                                       [("Cache-Control", "no-store")])
@@ -1317,6 +1411,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         """Link-preview fetchers often ask with HEAD. Only tracking links
         answer it — logged as a preview, never counted as a click."""
         path = self.route(urllib.parse.urlparse(self.path).path)
+        if trial.ACTIVE or path.startswith("/try"):
+            return self.send(405, b"", "text/plain")
         if path.startswith("/go/"):
             return self.go(path[len("/go/"):])
         return self.send(405, b"", "text/plain")
@@ -1359,6 +1455,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                          "text/plain; charset=utf-8", h)
 
     def do_POST(self):
+        if self.trial_route():
+            return
         if self.route(urllib.parse.urlparse(self.path).path) in self.MEMO_POSTS:
             portal.memo_begin()
         self._unlock_begin()
@@ -1368,6 +1466,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             portal.unlock_begin(False)
             kam_scope.end()
             portal.memo_end()
+            trial.end()
 
     def _do_post(self):
         path = self.route(urllib.parse.urlparse(self.path).path)
@@ -1555,6 +1654,25 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                                            b.get("value"), by, self.client_ip())
                 return self.send_json(200 if ok else 400, {"ok": ok, "error": msg, "value": val, "changed": changed},
                                       [("Cache-Control", "no-store")])
+            if path == "/tenants/trials/new":
+                f = self.form_body()
+                try:
+                    r = trial.create(f.get("client"), int(f.get("days") or trial.DAYS), f.get("note") or "", by)
+                except ValueError as ex:
+                    return self.redirect("/tenants/trials?e=" + urllib.parse.quote(str(ex)))
+                return self.redirect("/tenants/trials?new=%d&ok=%s" % (r["id"], urllib.parse.quote(
+                    "Link for %s made. Copy it from the list." % r["client"])))
+            if path == "/tenants/trials/act":
+                f = self.form_body()
+                rid = int(f.get("id") or 0) if str(f.get("id") or "").isdigit() else 0
+                do = f.get("do") or ""
+                r = trial.link(rid)
+                if r is None or do not in ("extend", "reset", "revoke"):
+                    return self.redirect("/tenants/trials?e=" + urllib.parse.quote("That link no longer exists."))
+                {"extend": trial.extend, "reset": trial.reset, "revoke": trial.revoke}[do](rid)
+                said = {"extend": "%s: 14 more days.", "reset": "%s: back to the demo data.",
+                        "revoke": "%s: ended."}[do] % r["client"]
+                return self.redirect("/tenants/trials?ok=" + urllib.parse.quote(said))
             if path == "/tenants/requests/decide":
                 f = self.form_body()
                 try:
@@ -7143,7 +7261,11 @@ def main():
                          "Omit when the catalogue is served from this same origin.")
     ap.add_argument("--base-path", default="",
                     help="serve the dashboard under a path, e.g. /admin")
+    ap.add_argument("--trial", action="store_true",
+                    help="the trial process (trial.py): demo databases only, no schedulers, no network")
     args = ap.parse_args()
+    if args.trial:
+        return trial_main(args)
 
     db.init()
     history.init()
@@ -7196,6 +7318,8 @@ def main():
     # HELVY Connect app (item 168): phone pushes from the bell, team alerts, milestones and manual sends.
     push.start()
     db.purge_expired_sessions()
+    trial.init()
+    _start_trial_process(args)
     ALLOWED_ORIGINS.update(args.origin)
     global BASE
     BASE = "/" + args.base_path.strip("/") if args.base_path.strip("/") else ""
@@ -7232,6 +7356,64 @@ def main():
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
+
+
+def _start_trial_process(args):
+    """Keep the trial process (trial.py) running beside this one, restarting it if it stops."""
+    import subprocess as _sp
+
+    def run():
+        while True:
+            env = dict(_os.environ, HV_TRIAL="1", HV_DB_PATH=str(trial.TEMPLATE), HV_TRIAL_PORT=str(trial.PORT))
+            cmd = [sys.executable, "-u", str(HERE / "server.py"), "--trial", "--host", "127.0.0.1",
+                   "--port", str(trial.PORT), "--base-path", args.base_path]
+            for o in args.origin:
+                cmd += ["--origin", o]
+            try:
+                p = _sp.Popen(cmd, env=env)
+                print("trial process started, pid", p.pid, flush=True)
+                p.wait()
+                print("trial process stopped:", p.returncode, flush=True)
+            except Exception as e:
+                print("trial process:", repr(e)[:160], flush=True)
+            try:
+                trial.sweep()
+            except Exception:
+                pass
+            time.sleep(5)
+    __import__("threading").Thread(target=run, daemon=True, name="trial-process").start()
+
+
+def trial_main(args):
+    """The trial process: same handlers, demo databases only (trial.py)."""
+    if not trial.ACTIVE:
+        sys.exit("--trial needs HV_TRIAL=1 (it is started by the main service)")
+    trial.activate()
+    import licence
+    import workspace
+    import creators_private
+
+    def schema():
+        db.init()
+        history.init()
+        portal.init()
+        licence.init()
+        account.init()
+        workspace.init()
+        creators_private.ensure()
+        team.init()
+        evidence.init()
+        trial.init()
+    schema()
+    trial.ON_FIRST_USE = schema
+    ALLOWED_ORIGINS.update(args.origin)
+    global BASE
+    BASE = "/" + args.base_path.strip("/") if args.base_path.strip("/") else ""
+    actions.configure(port=args.port, base=BASE)
+    views.set_base(BASE)
+    srv = ThreadingHTTPServer((args.host, args.port), Handler)
+    print(f"trial  http://{args.host}:{args.port}{BASE or ''}  template {trial.TEMPLATE}", flush=True)
+    srv.serve_forever()
 
 
 if __name__ == "__main__":

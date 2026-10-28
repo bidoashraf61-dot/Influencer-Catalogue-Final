@@ -10,6 +10,13 @@
    guarded: private mode or blocked storage must never break the page. */
 (function () {
   "use strict";
+  // Trial share links (item 271): the trial strip, only in a browser opened from /admin/try/<token>.
+  if (/(?:^|;\s*)hv_trial_on=1/.test(document.cookie)) {
+    var tj = document.createElement("script");
+    tj.src = "/assets/js/trial.js";
+    tj.defer = true;
+    document.head.appendChild(tj);
+  }
   var API = ((window.CATALOGUE_CONFIG && window.CATALOGUE_CONFIG.api) || "/admin") + "/api/push/";
   var ICON = "/assets/app/icon-192.png";
   var LOGO = "/assets/brand/helvy-connect/helvy-connect-light-320.webp";
