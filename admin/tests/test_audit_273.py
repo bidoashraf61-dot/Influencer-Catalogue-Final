@@ -74,5 +74,26 @@ class FakeCap(unittest.TestCase):
         self.assertEqual(out["tag"], "Not recommended")
 
 
+class Mix(unittest.TestCase):
+    """Item 275: the mix names the sizes that come first; others only fill."""
+    ITEMS = [{"code": c, "band": b, "audience_level": 1} for c, b in
+             [("A", "micro"), ("B", "nano"), ("C", "mid"), ("D", "mega"), ("E", "micro"), ("F", "macro"), ("G", "mid")]]
+
+    def bands(self, mix):
+        return [i["band"] for i in matcher._mix([dict(i) for i in self.ITEMS], mix)]
+
+    def test_big_names_first(self):
+        self.assertEqual(self.bands("big"), ["mega", "macro", "mid", "mid", "micro", "nano", "micro"])
+
+    def test_many_micro_first(self):
+        self.assertEqual(self.bands("micro"), ["micro", "nano", "micro", "mid", "mid", "mega", "macro"])
+
+    def test_hero_then_crowd(self):
+        self.assertEqual(self.bands("hero"), ["mega", "micro", "nano", "mid", "micro", "mid", "macro"])
+
+    def test_auto_keeps_order(self):
+        self.assertEqual(self.bands("auto"), [i["band"] for i in self.ITEMS])
+
+
 if __name__ == "__main__":
     unittest.main()

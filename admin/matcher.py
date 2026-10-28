@@ -122,8 +122,8 @@ def answer_label(qid, v):
 HINTS = {
     ("goal", "awareness"): "Reach and views",
     ("mix", "hero"): "1 big name to launch, mid and micro creators to spread it",
-    ("mix", "micro"): "Lots of smaller, trusted voices close to their followers",
-    ("mix", "big"): "A few large creators for maximum reach",
+    ("mix", "micro"): "Nano and micro creators first: smaller, trusted voices",
+    ("mix", "big"): "Macro and mega creators first, for maximum reach",
     ("mix", "auto"): "Helvi picks the mix that fits your goal",
     ("goal", "engagement"): "Likes, comments and saves",
     ("goal", "traffic"): "Clicks and sales",
@@ -783,25 +783,30 @@ def score_all(brief, exclude=(), only=None, strict=False):
     return items
 
 
-MIX_LIFT = 1.15
 BIG, SMALL = ("macro", "mega"), ("nano", "micro")
+# The creator mix (item 172, made strong by Bido 2026-10-29, item 275): the sizes the mix names come first,
+# each tier in score order, and the next-closest sizes only fill the places left. Never a filter: a niche
+# brief with two mega creators still gets its full count.
+MIX_TIERS = {
+    "big": [BIG, ("mid",), SMALL],                      # Big names: macro + mega, then mid, then the rest
+    "micro": [SMALL, ("mid",), BIG],                    # Many micro: nano + micro, then mid, then the rest
+    "hero": [SMALL + ("mid",), BIG],                    # Hero + crowd: one big name first (below), then the crowd
+}
 
 
 def _mix(items, mix):
-    """The creator mix (item 172): a soft lift, never a filter. "micro" lifts nano and micro
-    accounts, "big" lifts macro and mega; "hero" puts the best macro or mega creator first and
-    lifts the small and mid accounts behind them."""
-    if mix not in ("hero", "micro", "big") or not items:
+    """``items`` (best first) reordered for the creator mix; "auto" or none leaves them as they are."""
+    if mix not in MIX_TIERS or not items:
         return items
-    lift = {"micro": SMALL, "big": BIG, "hero": SMALL + ("mid",)}[mix]
+    tiers = MIX_TIERS[mix]
 
-    def key(i):
-        rs = i["rank_score"] * (MIX_LIFT if i.get("band") in lift else 1.0)
-        return (-rs, i["code"])
-    out = sorted(items, key=key)
+    def tier(i):
+        return next((n for n, bands in enumerate(tiers) if i.get("band") in bands), len(tiers))
+    order = {i["code"]: n for n, i in enumerate(items)}
+    out = sorted(items, key=lambda i: (tier(i), order[i["code"]]))
     if mix == "hero":
-        hero = next((i for i in out if i.get("band") in BIG and i.get("audience_level", 1) < 2), None) \
-            or next((i for i in out if i.get("band") in BIG), None)
+        hero = next((i for i in items if i.get("band") in BIG and i.get("audience_level", 1) < 2), None) \
+            or next((i for i in items if i.get("band") in BIG), None)
         if hero is not None:
             out.remove(hero)
             out.insert(0, hero)
