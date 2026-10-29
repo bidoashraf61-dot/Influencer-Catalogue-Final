@@ -198,7 +198,8 @@
     check: "M5 12.5l4.5 4.5L19 7.5", cross: "M6.5 6.5l11 11M17.5 6.5l-11 11",
     back: "M15 5l-7 7 7 7",
     zin: "M12 6v12M6 12h12", zout: "M6 12h12", reset: "M5 12a7 7 0 1 0 2-5M5 4v4h4",
-    play: "M8 5.5v13l11-6.5z"
+    play: "M8 5.5v13l11-6.5z",
+    search: "M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5L20 20"
   };
   function icon(name, cls) {
     var s = document.createElementNS(SVGNS, "svg");
@@ -297,16 +298,19 @@
       strip.appendChild(b);
       return b;
     }
+    // The brands strip shows even for a single competitor (Bido, 29 Oct 2026): its logo, large, as the filter;
+    // with one brand it is picked from the start, so the posts below are plainly that brand's.
     if (names.length > 1) { chip(null); names.forEach(chip); }
+    else if (names.length === 1) { chip(names[0]); active = names[0]; strip.classList.add("is-lone"); }
     function paint() {
       strip.classList.toggle("is-picked", !!active);
       [].forEach.call(strip.children, function (c2, i) {
-        var nm = i === 0 ? null : names[i - 1];
+        var nm = strip.classList.contains("is-lone") ? names[i] : i === 0 ? null : names[i - 1];
         c2.setAttribute("aria-pressed", nm === active ? "true" : "false");
       });
     }
     paint();
-    if (names.length > 1) bd.appendChild(strip);
+    if (names.length) bd.appendChild(strip);
     var host = el("div", "ev-posts-host"), gridEl = el("div", "ev-dgrid"), moreBtn = el("button", "ev-act ev-more", ""); moreBtn.type = "button";
     host.appendChild(gridEl); bd.appendChild(host); bd.appendChild(moreBtn);
     moreBtn.addEventListener("click", function () { shown += 6; draw2(); });
@@ -424,7 +428,7 @@
 
   /* ---------------- Market Intelligence: map, ranking list, creator panel ---------------- */
 
-  var mi = null, miData = null, miFilter = { type: "all", platform: "all" }, miFocus = null, miView = { k: 1, x: 0, y: 0 }, miListN = 20, miIntro = true;
+  var mi = null, miData = null, miFilter = { type: "all", platform: "all", kind: "all", q: "" }, miFocus = null, miView = { k: 1, x: 0, y: 0 }, miListN = 20, miIntro = true;
   var XLINK = "http://www.w3.org/1999/xlink";
   var CALM = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -460,7 +464,31 @@
   function rankLabel() { return miData.rank_by === "interactions" ? "likes + comments" : "views"; }
   function typeOf(p) { return p.type === "hcp" ? "hcp" : "influencer"; }
   function kept(p) {
-    return (miFilter.type === "all" || typeOf(p) === miFilter.type) && (miFilter.platform === "all" || p.platforms.indexOf(miFilter.platform) >= 0);
+    return (miFilter.type === "all" || typeOf(p) === miFilter.type) && (miFilter.platform === "all" || p.platforms.indexOf(miFilter.platform) >= 0)
+      && (!miFilter.q || matches(p, miFilter.q));
+  }
+  // What a competitor post is, from what was fetched (Bido, 29 Oct 2026): a story (its link), a TikTok video,
+  // an Instagram reel (a reel link, or views on record: only videos have them) or an Instagram post.
+  var KINDS = [["all", "All content"], ["reel", "Reels"], ["post", "Posts"], ["video", "TikTok videos"], ["story", "Stories"]];
+  function kindOf(q) {
+    var u = q.url || "";
+    if (/\/stories\//.test(u)) return "story";
+    if (q.platform === "tiktok" || /tiktok\.com/.test(u)) return "video";
+    return /\/reel\//.test(u) || q.views ? "reel" : "post";
+  }
+  // A content filter keeps the creators with that kind of post and counts only those posts.
+  function byKind(p) {
+    if (miFilter.kind === "all") return p;
+    var ps = (p.posts || []).filter(function (q) { return kindOf(q) === miFilter.kind; });
+    if (!ps.length) return null;
+    var c = {}; for (var k in p) c[k] = p[k];
+    c.posts = ps;
+    return c;
+  }
+  // Find a creator by name or handle; Arabic names match as typed, Latin ones ignore case and the @.
+  function matches(p, q) {
+    q = q.toLowerCase().replace(/^@/, "").trim();
+    return !q || (p.name || "").toLowerCase().indexOf(q) >= 0 || (p.handle || "").toLowerCase().indexOf(q) >= 0;
   }
 
   // Market Intelligence has its own page: /market/#s=<selection token> (market/index.html).
@@ -565,12 +593,31 @@
       var n = d.on_map || 0, tot = d.selection_size || n;
       mi.scope.textContent = n + " of " + tot + " creators in this selection have posted with your competitors. Only they appear on the map; the rest of the selection has no competitor posts.";
     }
-    var people = d.creators.filter(kept);
+    var people = d.creators.filter(kept).map(byKind).filter(Boolean);
     var size = sizer(visible(people));
     var bar = el("div", "ev-mi__bar");
     var hasTT = d.creators.some(function (c) { return c.platforms.indexOf("tiktok") >= 0; });
     bar.appendChild(chips("Platform", [["all", "All platforms"], ["instagram", "Instagram"], ["tiktok", "TikTok", hasTT ? "" : "TikTok study not in yet"]], "platform"));
     bar.appendChild(chips("Creator type", [["all", "Everyone"], ["hcp", "Doctors / pharmacists"], ["influencer", "Influencers"]], "type"));
+    // Content kinds offered are the ones this study holds.
+    var have = {};
+    d.creators.forEach(function (p) { (p.posts || []).forEach(function (q) { have[kindOf(q)] = (have[kindOf(q)] || 0) + 1; }); });
+    var kinds = KINDS.filter(function (k) { return k[0] === "all" || have[k[0]]; });
+    if (kinds.length > 2) bar.appendChild(chips("Content", kinds.map(function (k) { return k[0] === "all" ? k : [k[0], k[1] + " " + num(have[k[0]])]; }), "kind"));
+    var find = el("label", "ev-find");
+    find.appendChild(icon("search"));
+    var fi = document.createElement("input"); fi.type = "search"; fi.id = "ev-find"; fi.placeholder = "Find a creator by name or @handle";
+    fi.setAttribute("aria-label", "Find a creator by name or handle"); fi.value = miFilter.q; fi.autocomplete = "off";
+    fi.addEventListener("input", function () {
+      clearTimeout(mi.findT);
+      mi.findT = setTimeout(function () { miFilter.q = fi.value; miListN = 20; mi.refocus = true; drawMI(); }, 220);
+    });
+    fi.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); var hit = d.creators.filter(kept)[0]; if (hit) openCreator(byKind(hit) || hit); }
+      if (e.key === "Escape" && fi.value) { fi.value = ""; miFilter.q = ""; mi.refocus = true; drawMI(); }
+    });
+    find.appendChild(fi);
+    bar.appendChild(find);
     // Projected range for the creators on show (owner, 2026-10-15): one post each, from their competitor
     // work: typical (median) in the middle, lowest to highest around it. Follows the filters and the objective.
     // One strip on its own row (Bido, 29 Oct 2026): the study's totals for the creators on show (posts with
@@ -642,6 +689,7 @@
     leg.appendChild(sizeLegend(size));
     bar.appendChild(leg);
     body.appendChild(bar);
+    if (mi.refocus) { mi.refocus = false; fi.focus(); fi.setSelectionRange(fi.value.length, fi.value.length); }
 
     var layout = el("div", "ev-mi__layout");
     var stage = el("div", "ev-mi__stage" + (miIntro && !CALM ? " is-intro" : ""));

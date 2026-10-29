@@ -270,6 +270,9 @@
   border-radius: 14px; transition: border-color .2s ease, box-shadow .2s ease, opacity .2s ease, transform .2s cubic-bezier(.16, 1, .3, 1); }
 .ev-pn__brands .ev-brand:hover { border-color: var(--ink); transform: translateY(-1px); }
 .ev-pn__brands .ev-logo--chip { height: 26px; max-width: 120px; }
+/* A lone competitor's logo, larger, as the panel's filter (Bido, 29 Oct 2026). */
+.ev-pn__brands.is-lone .ev-brand { min-height: 72px; padding: 10px 16px 10px 22px; }
+.ev-pn__brands.is-lone .ev-logo--chip { height: 44px; max-width: 170px; }
 .ev-brand--all { font: 700 14px "DM Sans", sans-serif; }
 .ev-brand__n { min-width: 26px; height: 26px; padding: 0 7px; border-radius: 999px; background: #efece6; display: inline-grid; place-items: center;
   font: 700 12.5px "DM Sans", sans-serif; font-variant-numeric: tabular-nums; color: var(--ink); }
@@ -461,3 +464,9 @@
 /* Twice the size on Bido's request (29 Oct 2026); smaller on phones so the headline still fits. */
 .ev-mi__logo { display: block; height: 96px; width: auto; margin: 0 0 10px; }
 @media (max-width: 640px) { .ev-mi__logo { height: 64px; } }
+
+/* Find a creator on the map (Bido, 29 Oct 2026). */
+.ev-find { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1.5px solid rgba(18, 18, 18, .14); border-radius: 999px; background: var(--white, #fff); flex: 1 1 260px; max-width: 360px; }
+.ev-find:focus-within { border-color: var(--ink, #121212); box-shadow: 0 0 0 3px var(--lime, #e8ff76); }
+.ev-find .ev-ic { width: 18px; height: 18px; flex: none; }
+.ev-find input { border: 0; outline: 0; background: transparent; font: 500 14px "DM Sans", sans-serif; width: 100%; min-width: 0; color: inherit; }
