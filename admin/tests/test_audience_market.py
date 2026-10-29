@@ -69,34 +69,20 @@ class Filter(unittest.TestCase):
         out = paging.page(idx, dict(f, sort="followers-desc"), audience=lambda: tops)
         return out, f
 
-    def test_clean_query(self):
-        f = paging.clean_query({"aud": ["GCC", "SA", "IN", "KW"]})
-        self.assertEqual(f["aud"], ["KW", "QA", "BH", "OM", "SA"])
-        self.assertTrue(paging.filtering(f))
-        self.assertFalse(paging.filtering(paging.clean_query({})))
+    # Item 280 (Bido, 2026-10-29): the roster takes no audience filter; old links that carry one are ignored.
+    def test_clean_query_drops_audience(self):
+        f = paging.clean_query({"aud": ["GCC", "SA"], "ac": ["KW"], "acp": ["40"], "ag": ["female"]})
+        self.assertEqual((f["aud"], f["ash"]), ([], {}))
+        self.assertFalse(paging.filtering(f))
 
-    def test_kuwait(self):
+    def test_audience_link_shows_everyone(self):
         out, _ = self.run_q(aud="KW")
-        self.assertEqual([c["code"] for c in out["items"]], ["KUWAIT_TT"])
-        self.assertEqual(out["items"][0]["ta"], ["KW"])
-        self.assertEqual(out["match"], 1)
-
-    def test_gcc(self):
-        out, _ = self.run_q(aud="GCC")
-        self.assertEqual([c["code"] for c in out["items"]], ["KUWAIT_TT", "QATAR", "TIE"])
-        self.assertEqual([c["ta"] for c in out["items"]], [["KW"], ["QA"], ["OM"]])
-
-    def test_no_filter_no_tag_no_count(self):
-        out, _ = self.run_q()
         self.assertEqual(len(out["items"]), 6)
-        self.assertFalse(any("ta" in c for c in out["items"]))
         self.assertNotIn("match", out)
-        self.assertNotIn("SA", str([c.get("ta") for c in out["items"]]))
 
-    def test_no_share_leaves(self):
-        out, _ = self.run_q(aud=["SA", "GCC"])
-        for c in out["items"]:
-            self.assertTrue(all(isinstance(x, str) and len(x) == 2 for x in c["ta"]))
+    def test_discover_audience_keys_dropped(self):
+        f = paging.clean_query({"disc": ['{"a_country": ["KW"], "er_min": 2}']})
+        self.assertEqual(f["disc"], {"er_min": 2})
 
 
 class Markets(unittest.TestCase):

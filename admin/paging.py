@@ -421,8 +421,10 @@ def clean_query(q):
         "industry": many("industry"), "sub": many("sub", 80),
         "fmin": num("fmin"), "fmax": num("fmax"),
         "lic": [v for v in many("lic") if v in ("SA", "AE", "EG")],
-        "aud": _aud(many("aud")),
-        "ash": _ash(one),
+        # Item 280 (Bido, 2026-10-29): the roster is filtered on the creators' own data only. Audience filters from
+        # old links or saved views are ignored here; they live on the selection page.
+        "aud": [],
+        "ash": {},
         "sort": sort if sort in SORTS else "daily",
         "group": one("group", 20) if one("group", 20) in GROUPS else "",
         "disc": None, "dplat": None,
@@ -433,6 +435,7 @@ def clean_query(q):
     if raw:
         try:
             d = json.loads(raw)
+            d = {k: v for k, v in d.items() if not str(k).startswith("a_")} if isinstance(d, dict) else None   # no audience (item 280)
             out["disc"] = d if isinstance(d, dict) and d else None
         except ValueError:
             out["disc"] = None

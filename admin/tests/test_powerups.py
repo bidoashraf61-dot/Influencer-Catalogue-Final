@@ -142,15 +142,15 @@ class Ranking(unittest.TestCase):
         self.assertEqual(val, powerups.blend(80, out["fit"]["score"]))
         self.assertLess(factor, 1.0)
 
-    def test_mix_is_soft(self):
-        items = [{"code": "A", "rank_score": 90, "band": "micro", "audience_level": 1},
-                 {"code": "B", "rank_score": 85, "band": "mega", "audience_level": 1},
-                 {"code": "C", "rank_score": 82, "band": "nano", "audience_level": 1}]
-        self.assertEqual([i["code"] for i in matcher._mix(list(items), "hero")], ["B", "A", "C"])
-        self.assertEqual([i["code"] for i in matcher._mix(list(items), "big")], ["B", "A", "C"])
-        self.assertEqual([i["code"] for i in matcher._mix(list(items), "micro")], ["A", "C", "B"])
-        self.assertEqual(len(matcher._mix(list(items), "micro")), 3)       # nobody removed
-        self.assertEqual([i["code"] for i in matcher._mix(list(items), None)], ["A", "B", "C"])
+    def test_mix_is_hard(self):            # item 280: a mix keeps only its sizes
+        items = [{"code": "A", "rank_score": 90, "band": "micro"}, {"code": "B", "rank_score": 85, "band": "mega"},
+                 {"code": "C", "rank_score": 82, "band": "nano"}, {"code": "D", "rank_score": 80, "band": "mid"},
+                 {"code": "E", "rank_score": 70, "band": "macro"}]
+        code = lambda m: [i["code"] for i in matcher._mix(list(items), m)]
+        self.assertEqual(code("big"), ["B", "E"])
+        self.assertEqual(code("micro"), ["A", "C"])
+        self.assertEqual(code("hero"), ["B", "A", "C", "D"])          # one big name, then nano/micro/mid only
+        self.assertEqual(code(None), ["A", "B", "C", "D", "E"])
 
     def test_read_claim_without_ai(self):
         got = powerups.read_claim("Lumi vitamin D3 drops", "Clinically proven to support strong bones", ["health care"])

@@ -535,6 +535,66 @@ def fit_for(c, p, platform=None):
     return {"score": score, "items": out_items, "chips": chips[:3]}
 
 
+# Item 280 (Bido, 2026-10-29): every power-up is a HARD rule on the creator's own data when a shortlist is built.
+# A creator with no data for an asked rule is left out (only creators proven to meet it are picked). Audience
+# answers (gender, age, audience city, audience country) are not rules here: they belong to the selection page.
+HARD_LABEL = {"type": "creator type", "lang": "content language", "licence": "Mawthooq licence", "fresh": "fresh or proven",
+              "tone": "tone", "claim": "product fit", "like": "creators like your picks"}
+
+
+def hard_fail(c, p, platform=None, markets=None):
+    """The first power-up rule creator ``c`` does not meet (a key of HARD_LABEL), or None when it meets them all."""
+    if not p:
+        return None
+    lst = None
+
+    def summaries():
+        nonlocal lst
+        if lst is None:
+            lst = _summaries(c["code"], platform)
+        return lst
+    if p.get("creator_type"):
+        m, _ = _type_match(c, p["creator_type"])
+        if m < 100:
+            return "type"
+    if p.get("content_lang"):
+        have = _langs(summaries())
+        ar, en = "arabic" in have, "english" in have
+        want = p["content_lang"]
+        if not (ar if want == "ar" else en if want == "en" else (ar and en)):
+            return "lang"
+    if p.get("licence"):
+        st = licences().get(c["code"]) or {}
+        want = [x for x in (markets or ["SA"]) if x in ("SA", "AE", "EG")] or ["SA"]
+        if not any(st.get(x) for x in want):
+            return "licence"
+    if p.get("collab"):
+        col = _collab(summaries())
+        if col is None:
+            return "fresh"
+        paid = col.get("paid") or 0
+        if (p["collab"] == "fresh" and paid > 0) or (p["collab"] == "proven" and paid < 1):
+            return "fresh"
+    if p.get("tone"):
+        if not (set(tones().get(c["code"]) or []) & set(p["tone"])):
+            return "tone"
+    if p.get("claim") and p.get("claim_tags"):
+        subs, inds, hcp = _creator_tags(c)
+        if not (subs & set(p["claim_tags"]) or _space_match(c, p.get("space") or []) == 100):
+            return "claim"
+    if p.get("claim") and p.get("regulated"):
+        subs, inds, hcp = _creator_tags(c)
+        medical = hcp or bool(subs & {"Pharmacy", "General medicine & health advice", "Dermatology & aesthetics", "Dentistry",
+                                      "Mother & child health"})
+        if not (medical or licences().get(c["code"])):
+            return "claim"
+    if p.get("lookalikes"):
+        picks = [x for x in p["lookalikes"] if x != c["code"]]
+        if picks and max(like_scores(x).get(c["code"], 0) for x in picks) < 50:
+            return "like"
+    return None
+
+
 def blend(perf, fit_score):
     return int(round(PERF_SHARE * perf + FIT_SHARE * fit_score))
 

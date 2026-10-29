@@ -793,6 +793,7 @@
     // A saved view or a link puts the audience back; anything malformed starts clean.
     function audSet(o) {
       audReset();
+      if (!audOf) return;                   // the roster takes no audience filter (item 280): old views restore none
       if (!o || typeof o !== "object") return;
       AUD_KEYS.forEach(function (k) {
         if (typeof o[k] === "string") state.aud[k] = o[k].slice(0, 8);
@@ -946,8 +947,8 @@
     // Audience: on the roster the GCC markets and Egypt; on a selection the countries its creators'
     // audiences actually reach, most common first. Shown only where there is audience data to read.
     var audCountries = null;
-    if (facets) audCountries = AUD_MARKETS;
-    else if (audOf) {
+    // Item 280 (Bido, 2026-10-29): audience is not a filter on the catalogue; it lives on the selection page.
+    if (audOf) {
       var cn = {};
       cards.forEach(function (card) {
         var au = audOf(card);

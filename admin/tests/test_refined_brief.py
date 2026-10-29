@@ -69,8 +69,7 @@ class Limits(unittest.TestCase):
                                                  "B": {"fake_followers_pct": 10, "er": 5},
                                                  "C": {"er": 5}})
             kept = matcher._client_limits({"max_fake": 30, "min_engagement": None}, self.items())
-            self.assertEqual([i["code"] for i in kept], ["B", "C"])
-            self.assertIn("fake share not known", [i for i in kept if i["code"] == "C"][0]["watchouts"])
+            self.assertEqual([i["code"] for i in kept], ["B"])            # item 280: no figure = not picked
         finally:
             matcher.db.analyses_for = orig
 

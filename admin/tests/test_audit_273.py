@@ -45,10 +45,11 @@ class Places(unittest.TestCase):
         self.assertEqual(fit._place_mark(row(city="UAE Not Specified yet"), "AE"), (1.0, {"AE"}))
         self.assertEqual(fit._place_mark(row(city="Iraq Not Specified yet"), "SA")[1], {"IQ"})
         self.assertEqual(fit._place_mark(row(city="woman from Egypt"), "EG")[1], {"EG"})   # "oman" inside "woman" is not Oman
-        # Countries only, never cities (item 274)
-        self.assertIsNone(fit._place_mark(row(city="Cairo"), "EG")[1])
-        self.assertFalse(matcher._based_in(row(city="Riyadh"), ["SA"]))
-        self.assertTrue(matcher._based_in(row(city="Riyadh", nationality="Saudi"), ["SA"]))
+        # Based in: the catalogue's own place rule, a known city counts for its country (item 280)
+        self.assertTrue(matcher._based_in(row(city="Riyadh"), ["SA"]))
+        self.assertTrue(matcher._based_in(row(city="UAE Not Specified yet"), ["AE"]))
+        self.assertFalse(matcher._based_in(row(city="Riyadh"), ["EG"]))
+        self.assertFalse(matcher._based_in(row(city="Amman"), ["SA"]))
 
 
 class FreeText(unittest.TestCase):
@@ -72,27 +73,6 @@ class FakeCap(unittest.TestCase):
             val, _, out = matcher.apply_rules(row("Beauty"), s, 39, "analysis", {"power": {"gender": "Women"}})
         self.assertLessEqual(val, fit.FAKE_CAP)
         self.assertEqual(out["tag"], "Not recommended")
-
-
-class Mix(unittest.TestCase):
-    """Item 275: the mix names the sizes that come first; others only fill."""
-    ITEMS = [{"code": c, "band": b, "audience_level": 1} for c, b in
-             [("A", "micro"), ("B", "nano"), ("C", "mid"), ("D", "mega"), ("E", "micro"), ("F", "macro"), ("G", "mid")]]
-
-    def bands(self, mix):
-        return [i["band"] for i in matcher._mix([dict(i) for i in self.ITEMS], mix)]
-
-    def test_big_names_first(self):
-        self.assertEqual(self.bands("big"), ["mega", "macro", "mid", "mid", "micro", "nano", "micro"])
-
-    def test_many_micro_first(self):
-        self.assertEqual(self.bands("micro"), ["micro", "nano", "micro", "mid", "mid", "mega", "macro"])
-
-    def test_hero_then_crowd(self):
-        self.assertEqual(self.bands("hero"), ["mega", "micro", "nano", "mid", "micro", "mid", "macro"])
-
-    def test_auto_keeps_order(self):
-        self.assertEqual(self.bands("auto"), [i["band"] for i in self.ITEMS])
 
 
 if __name__ == "__main__":
