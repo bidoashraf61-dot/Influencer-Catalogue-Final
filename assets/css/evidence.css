@@ -378,8 +378,13 @@
 .ev-tot__s b { font: 400 30px/1 Bebasneue, "Bebas Neue", sans-serif; }
 .ev-tot__s em { font: 700 12px "DM Sans", sans-serif; font-style: normal; }
 .ev-tot__s i { grid-column: 1 / -1; font: 500 11px "DM Sans", sans-serif; font-style: normal; opacity: .75; }
-.ev-tot + .ev-proj { margin-left: 12px; }
-@media (max-width: 720px) { .ev-tot + .ev-proj { margin-left: 0; } }
+.ev-strip { order: 5; flex: 1 0 100%; display: flex; gap: 16px; align-items: stretch; }
+.ev-strip .ev-proj { margin-left: 0; }
+.ev-strip .ev-tot { flex: 1 1 auto; }
+.ev-strip .ev-proj--strip { flex: 0 0 auto; align-content: center; }
+.ev-tot__s i span, .ev-proj--strip span span { font: inherit; }
+.ev-mi__bar > .ev-legend { order: 6; margin-left: auto; }
+@media (max-width: 900px) { .ev-strip { flex-wrap: wrap; } .ev-strip .ev-proj--strip { flex: 1 1 100%; } }
 /* Live embeds over the saved picture (evidence.js LIVEPOST), never taking the click. TikTok: 9:16 zoomed 1.4x and
    centred in the square, its like/comment rail outside it, our centred play button over TikTok's. Instagram: laid
    out 340 wide, scaled to the card and lifted past its header and the top of the 4:5 media, so the square shows

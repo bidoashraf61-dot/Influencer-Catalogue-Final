@@ -559,7 +559,6 @@
     // still on show glide from there, new ones pop in, and the projected figure counts to its new value.
     var prev = {};
     if (mi.svg && mi.svg.__dots) mi.svg.__dots.forEach(function (dd) { prev[dd.__h] = { x: dd.__x, y: dd.__y }; });
-    var prevProj = mi.projMid;
     body.textContent = "";
     // Which of the selection's creators are on the map, and why the others are not (owner, 2026-10-15).
     if (mi.scope) {
@@ -574,8 +573,9 @@
     bar.appendChild(chips("Creator type", [["all", "Everyone"], ["hcp", "Doctors / pharmacists"], ["influencer", "Influencers"]], "type"));
     // Projected range for the creators on show (owner, 2026-10-15): one post each, from their competitor
     // work: typical (median) in the middle, lowest to highest around it. Follows the filters and the objective.
-    // What the study holds for the creators on show (Bido, 29 Oct 2026): posts, creators by type, views and
-    // engagement, in the same banner look as the projection. Follows the filters.
+    // One strip on its own row (Bido, 29 Oct 2026): the study's totals for the creators on show (posts with
+    // stories, creators split into HCPs and influencers, views, engagements) beside the projection. Both
+    // always show, follow the filters, and every figure counts from its last value to its new one.
     var tot = { posts: 0, stories: 0, views: 0, eng: 0, hcp: 0 };
     people.forEach(function (p) {
       if (typeOf(p) === "hcp") tot.hcp++;
@@ -586,36 +586,48 @@
         tot.eng += (q.likes || 0) + (q.comments || 0) + (q.shares || 0);
       });
     });
-    if (people.length) {
-      var tb = el("div", "ev-proj ev-tot"); tb.setAttribute("role", "status");
-      tb.appendChild(el("small", "", "Competitor study"));
-      [[num(tot.posts), "posts", tot.stories ? num(tot.stories) + " stories" : ""],
-       [num(people.length), "creators", num(tot.hcp) + " HCPs · " + num(people.length - tot.hcp) + " influencers"],
-       [num(tot.views), "views", "posts and videos"],
-       [num(tot.eng), "engagements", "likes, comments, shares"]].forEach(function (s) {
-        var c = el("span", "ev-tot__s");
-        c.appendChild(el("b", "", s[0]));
-        c.appendChild(el("em", "", s[1]));
-        if (s[2]) c.appendChild(el("i", "", s[2]));
-        tb.appendChild(c);
-      });
-      tb.title = "Totals from the competitor posts of the creators on show. Story views and likes are private, so stories add to posts only.";
-      bar.appendChild(tb);
-    }
     var pj = { lo: 0, mid: 0, hi: 0, n: 0 };
     people.forEach(function (p) { var e = p.estimate; if (!e || p.locked) return; pj.lo += e.lo; pj.mid += e.mid; pj.hi += e.hi; pj.n++; });
-    if (pj.n) {
-      var pjb = el("div", "ev-proj"); pjb.setAttribute("role", "status");
-      pjb.appendChild(el("small", "", "Projected " + estUnit()));
-      var pjv = el("b", "", num(pj.mid));
-      pjb.appendChild(pjv);
-      countUp(pjv, prevProj, pj.mid);
-      mi.projMid = pj.mid;
-      var rejN = people.filter(function (p) { return p.estimate && !p.locked && p.status === "rejected"; }).length;
-      pjb.appendChild(el("span", "", num(pj.lo) + " \u2013 " + num(pj.hi) + " · " + pj.n + (pj.n === 1 ? " creator" : " creators") + " · one post each" + (rejN ? " · incl. " + rejN + " rejected" : "")));
-      pjb.title = "Typical " + estUnit() + " if each creator shown posts once, from their posts with your competitors; range = their lowest to highest.";
-      bar.appendChild(pjb);
+    var was = mi.nums || {}, now = {};
+    function fig(tag, key, value, cls) {
+      var n = el(tag, cls || "", num(was[key] == null ? 0 : was[key]));
+      countUp(n, was[key] == null ? 0 : was[key], value);
+      now[key] = value;
+      return n;
     }
+    var strip = el("div", "ev-strip");
+    var tb = el("div", "ev-proj ev-tot"); tb.setAttribute("role", "status");
+    tb.appendChild(el("small", "", "Competitor study"));
+    [["posts", tot.posts, "posts", function (c) { c.appendChild(fig("span", "stories", tot.stories)); c.appendChild(document.createTextNode(" stories")); }],
+     ["creators", people.length, "creators", function (c) {
+       c.appendChild(fig("span", "hcp", tot.hcp)); c.appendChild(document.createTextNode(" HCPs · "));
+       c.appendChild(fig("span", "inf", people.length - tot.hcp)); c.appendChild(document.createTextNode(" influencers")); }],
+     ["views", tot.views, "views", function (c) { c.appendChild(document.createTextNode("posts and videos")); }],
+     ["eng", tot.eng, "engagements", function (c) { c.appendChild(document.createTextNode("likes, comments, shares")); }]].forEach(function (s_) {
+      var c = el("span", "ev-tot__s");
+      c.appendChild(fig("b", s_[0], s_[1]));
+      c.appendChild(el("em", "", s_[2]));
+      var sub = el("i", ""); s_[3](sub); c.appendChild(sub);
+      tb.appendChild(c);
+    });
+    tb.title = "Totals from the competitor posts of the creators on show. Story views and likes are private, so stories add to posts only.";
+    strip.appendChild(tb);
+    var pjb = el("div", "ev-proj ev-proj--strip"); pjb.setAttribute("role", "status");
+    pjb.appendChild(el("small", "", "Projected " + estUnit()));
+    pjb.appendChild(fig("b", "proj", pj.mid));
+    mi.projMid = pj.mid;
+    var rejN = people.filter(function (p) { return p.estimate && !p.locked && p.status === "rejected"; }).length;
+    var pjs = el("span", "");
+    pjs.appendChild(fig("span", "plo", pj.lo)); pjs.appendChild(document.createTextNode(" \u2013 "));
+    pjs.appendChild(fig("span", "phi", pj.hi)); pjs.appendChild(document.createTextNode(" · "));
+    pjs.appendChild(fig("span", "pn", pj.n));
+    pjs.appendChild(document.createTextNode((pj.n === 1 ? " creator" : " creators") + " · one post each" + (rejN ? " · incl. " + rejN + " rejected" : "")));
+    pjb.appendChild(pjs);
+    pjb.title = pj.n ? "Typical " + estUnit() + " if each creator shown posts once, from their posts with your competitors; range = their lowest to highest."
+      : "None of the creators on show has " + estUnit() + " on record (stories only), so there is nothing to project.";
+    strip.appendChild(pjb);
+    mi.nums = now;
+    bar.appendChild(strip);
     var leg = el("div", "ev-legend");
     var hk = el("span", "ev-legend__item"); hk.appendChild(el("i", "ev-legend__hcp")); hk.appendChild(document.createTextNode("Doctor / pharmacist"));
     leg.appendChild(hk);
