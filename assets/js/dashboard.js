@@ -1564,6 +1564,35 @@
         + (o.at ? esc(day(o.at)) + (o.confirmed ? "" : " <small>planned</small>") : "Date to be confirmed") + "</em></div>";
     }).join("") + "</div>", g.owed.length + (g.owed.length === 1 ? " video" : " videos"));
   }
+  // With no publishing plan there are no gauges: the workspace's ranges for each creator size, beside what this
+  // campaign's creators got, with no grade (owner, 2026-10-29: a campaign that is not scored still shows its benchmarks).
+  var BAND_ORDER = ["nano", "micro", "mid", "macro", "mega"];
+  function plainBench() {
+    var bm = R.benchmarks; if (!bm || !bm.er) return "";
+    var by = {}, vr = [];
+    R.creators.forEach(function (c) {
+      if (!(c.delivered || c.posts) || !c.band || !bm.er[c.band]) return;
+      var x = by[c.band] = by[c.band] || { n: 0, s: 0, k: 0 }; x.n++;
+      if (c.er != null) { x.s += c.er; x.k++; }
+    });
+    R.posts.forEach(function (p) { if (p.section === "campaign" && p.view_rate != null) vr.push(p.view_rate); });
+    function rng(b) { return b[1] + "–" + b[0] + "%"; }
+    var rows = BAND_ORDER.filter(function (b) { return by[b]; }).map(function (b) {
+      var x = by[b];
+      return "<tr><td>" + esc((bm.bands || {})[b] || b) + "</td><td>" + x.n + "</td><td>" + rng(bm.er[b]) + "</td><td><b>" + (x.k ? pct(x.s / x.k) : "—") + "</b></td></tr>";
+    });
+    if (!rows.length) return "";
+    // The median video: one post that went far beyond its creator's following would pull an average past 100%.
+    vr.sort(function (a, b) { return a - b; });
+    var t = R.total || {}, vrNow = vr.length ? (vr.length % 2 ? vr[(vr.length - 1) / 2] : (vr[vr.length / 2 - 1] + vr[vr.length / 2]) / 2) : null;
+    var more = [];
+    if (bm.video_er) more.push("<tr><td>Engagement per view (videos)</td><td></td><td>" + rng(bm.video_er) + "</td><td><b>" + pct(t.video_er) + "</b></td></tr>");
+    if (bm.view_rate) more.push("<tr><td>Views per video, as % of followers (median)</td><td></td><td>" + rng(bm.view_rate) + "</td><td><b>" + pct(vrNow, 1) + "</b></td></tr>");
+    return sec("bench", "Benchmarks for these creators", "What creators of each size typically get, beside what this campaign's creators got. Shown for reference, not graded.",
+      '<table class="db-table"><thead><tr><th>Creator size</th><th>Creators</th><th>Typical range</th><th>This campaign</th></tr></thead><tbody>'
+      + '<tr><td colspan="4"><small>Engagement rate, % of followers</small></td></tr>' + rows.join("")
+      + (more.length ? '<tr><td colspan="4"><small>Videos</small></td></tr>' + more.join("") : "") + "</tbody></table>");
+  }
   function dataNotes() {
     var g = GL(), notes = R.data_notes || (g && g.notes) || []; if (!notes.length) return "";
     return sec("notes", "Data notes", "Only the things that change how to read the numbers above.", '<ul class="db-dn">' + notes.map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("") + "</ul>");
@@ -1621,6 +1650,7 @@
         + (links && pb.ctr && sc.mode !== "plat" ? gauge("Click-through", "% of views", pb.ctr, t.ctr, gr(t.ctr, pb.ctr)) : "")
         + '</div><div class="db-legend2"><span><i class="sw band"></i>Normal range for creators this size</span><span><i class="dot"></i>This campaign now</span></div>' : "";
       var cb = creatorBench();
+      if (!gauges && !cb) out += plainBench();
       if (gauges || cb) out += sec("bench", "Benchmarks for these creators", "What creators of these sizes typically get on these platforms. The shaded range is normal, the dot is where this campaign is now. The low end of a range is what we commit to, the high end is what we aim for.", gauges + cb);
       return out + platformSplit() + stillToCome() + dataNotes();
     },

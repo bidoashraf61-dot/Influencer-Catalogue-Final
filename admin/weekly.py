@@ -325,6 +325,9 @@ def panel(k):
     """What the campaign report shows: the stored panel (computed on demand once ended)."""
     if not ended(k):
         return None
+    import metrics
+    if not metrics.visibility(k).get("scored", True):
+        return None          # book again / replace is a grade: none for a campaign that is not scored (owner, 2026-10-29)
     with db.connect() as conn:
         row = conn.execute("SELECT data FROM campaign_next WHERE campaign_id = ?", (k["id"],)).fetchone()
     if row is not None:
