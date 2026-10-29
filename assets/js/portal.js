@@ -1251,10 +1251,10 @@
     opts = opts || {};
     var dark = !!opts.dark;
     var root = h("div", { class: "bs" + (dark ? " bs--dark" : "") + (opts.chat ? " bs--chat" : "") });
-    // Files: the HelloVoice brief template only (item 277). It is read exactly, free, and never kept.
-    var file = h("input", { type: "file", class: "bs__file", accept: ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document", tabindex: "-1", "aria-hidden": "true" });
+    // Any brief file (item 279): PDF, Word or text, read by Helvi; the HelloVoice template is read exactly and free.
+    var file = h("input", { type: "file", class: "bs__file", accept: ".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain", tabindex: "-1", "aria-hidden": "true" });
     var linkBtn = h("button", { class: "bs__opt", type: "button", "aria-expanded": "false", html: icon("link") + "<span>Paste a product link</span>" });
-    var fileBtn = h("button", { class: "bs__opt", type: "button", html: icon("upload") + "<span>Upload the filled template <small>HelloVoice brief, Word</small></span>" });
+    var fileBtn = h("button", { class: "bs__opt", type: "button", html: icon("upload") + "<span>Upload your brief <small>PDF, Word or text</small></span>" });
     var pick = h("div", { class: "bs__pick", role: "group", "aria-label": "Start from a link or a file" }, linkBtn, fileBtn, file);
     var urlIn = h("input", { class: "bs__url", type: "url", inputmode: "url", autocomplete: "off", spellcheck: "false", maxlength: "2000",
                              placeholder: "https://brand.com/product", "aria-label": "Product page link" });
@@ -1263,7 +1263,7 @@
     var fine = h("p", { class: "bs__fine" });
     var tag = srcCostTag("source");
     if (tag) fine.appendChild(tag);
-    fine.appendChild(h("span", null, "Helvi fills the brief for you to check. The template is read exactly, free, and never kept."));
+    fine.appendChild(h("span", null, "Helvi reads it and fills the brief for you to check. Files are never kept. Most exact, and free: our template."));
     fine.appendChild(tplLink());
     var err = h("p", { class: "bs__err", role: "alert", hidden: "" });
     var out = h("div", { class: "bs__out", "aria-live": "polite" });
@@ -1314,7 +1314,7 @@
     file.addEventListener("change", function () {
       var f = file.files && file.files[0];
       if (!f) return;
-      if (!/\.docx$/i.test(f.name)) { fail("Only the HelloVoice brief template can be uploaded. Download it, fill it in Word and upload it again.", true); return; }
+      if (/\.doc$/i.test(f.name)) { fail("Old Word files (.doc) can't be read. Save it as .docx or PDF and upload again."); return; }
       if (f.size > SRC_MAX) { fail("That file is too large. Briefs up to 4 MB can be read."); return; }
       var rd = new FileReader();
       rd.onload = function () { send({ file: { name: f.name, data: rd.result } }, "Reading " + f.name + "…"); };
@@ -1388,10 +1388,14 @@
       var byQ = {};
       (qs || []).forEach(function (q) { byQ[q.id] = q; });
       var has = function (k) { var v = answers[k]; return Array.isArray(v) ? v.length > 0 : !!v; };
-      var ask = REQ.filter(function (k) { return !has(k); }).concat(["count", "mix"]);
+      // Item 279: what Helvi was not sure of is asked too, with its pick already chosen (a template is always sure).
+      var conf = res.confidence || {};
+      var unsure = function (k) { return has(k) && conf[k] && conf[k] !== "high" && conf[k] !== "missing"; };
+      var ask = REQ.filter(function (k) { return !has(k) || unsure(k); }).concat(["count", "mix"]);
       var box = h("section", { class: "bs-need", "aria-label": "Finish the brief" });
-      box.appendChild(h("p", { class: "ai-sl__ask bs-need__h" }, ask.length > 2 ? "A few things your brief didn't say" : "Last check before Helvi builds"));
-      box.appendChild(h("p", { class: "ai-sl__hint" }, "Tap to answer. Everything else comes from your brief."));
+      var nMiss = REQ.filter(function (k) { return !has(k); }).length, nCheck = REQ.filter(unsure).length;
+      box.appendChild(h("p", { class: "ai-sl__ask bs-need__h" }, nMiss ? "A few things your brief didn't say" : nCheck ? "Check what Helvi read" : "Last check before Helvi builds"));
+      box.appendChild(h("p", { class: "ai-sl__hint" }, nCheck ? "Helvi's picks are chosen; tap to change anything marked Check." : "Tap to answer. Everything else comes from your brief."));
       var build = h("button", { class: "ai-sl__build bs-need__build", type: "button" }, "Build my shortlist");
       var why = h("p", { class: "bs-need__why", "aria-live": "polite" });
       function sync() {
@@ -1405,7 +1409,9 @@
         if (!q) return;
         var many = q.type === "many" || !!q.multi_ok;
         var grp = h("div", { class: "bs-need__q", role: "group", "aria-label": q.label });
-        grp.appendChild(h("p", { class: "bs-need__lbl" }, id === "goal" ? "Campaign goals" : q.label + (REQ.indexOf(id) > -1 ? "" : " (optional)")));
+        var lbl = h("p", { class: "bs-need__lbl" }, id === "goal" ? "Campaign goals" : q.label + (REQ.indexOf(id) > -1 ? "" : " (optional)"));
+        if (unsure(id)) lbl.appendChild(h("span", { class: "bs-conf bs-conf--md bs-need__chk", title: "Helvi read this from your brief but wasn't certain" }, "Check"));
+        grp.appendChild(lbl);
         var row = h("div", { class: "ai-sl__opts bs-need__opts" });
         // A value the brief typed that is not one of the options (10 creators) leads, already chosen.
         var opts_ = (q.options || []).slice();

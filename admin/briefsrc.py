@@ -521,9 +521,16 @@ def extract(data, name="", ctype=""):
         kind, title = "text", ""
     text = re.sub(r"[ \t ]+", " ", text or "")
     text = re.sub(r"\n\s*\n+", "\n", text).strip()
-    if len(re.sub(r"\W", "", text)) < 40:
+    if len(re.sub(r"\W", "", text)) < 40 and kind != "pdf":
         fail("empty")
-    return {"text": text[:MAX_TEXT], "kind": kind, "title": title, "chars": len(text)}
+    # Long briefs keep their beginning and their end (key details often sit in a final section, item 279).
+    keep = text if len(text) <= MAX_TEXT else text[:MAX_TEXT // 2] + "\n[...]\n" + text[-MAX_TEXT // 2:]
+    out = {"text": keep, "kind": kind, "title": title, "chars": len(text)}
+    if kind == "pdf":
+        # Item 279: the PDF itself goes to Gemini, which reads scans, Arabic and layouts our text extraction could
+        # not (PyMuPDF cannot load in the admin container; the stdlib reader gave nothing or garbage for real PDFs).
+        out["pdf"] = data
+    return out
 
 
 def from_url(url):
@@ -620,7 +627,7 @@ def keep_claims(claims, source):
     return out[:5]
 
 
-SCHEMA_FIELDS = ("product", "category", "audience", "market", "goal", "timing")
+SCHEMA_FIELDS = ("product", "category", "audience", "market", "goal", "timing", "platforms")
 
 
 def _schema():
@@ -632,7 +639,7 @@ def _schema():
     pq = {q["id"]: [v for v, _ in q.get("options", [])] for q in powerups.QUESTIONS}
     countries = [cc for cc, _ in fit.COUNTRIES]
     # Item 277: every field the brief form asks, every country the scorer knows, several goals and ages.
-    return {"type": "OBJECT", "properties": {
+    out = {"type": "OBJECT", "properties": {
         "product": {"type": "STRING"}, "brand": {"type": "STRING"},
         "category": {"type": "ARRAY", "items": {"type": "STRING", "enum": enum("category")}},
         "audience": {"type": "STRING"},
@@ -655,6 +662,17 @@ def _schema():
         "regulated": {"type": "STRING", "enum": ["none"] + list(REGULATED)},
         "confidence": {"type": "OBJECT", "properties": {f: conf for f in SCHEMA_FIELDS}},
     }}
+    # Item 279: every field must be answered, as null when the document does not say it. With optional fields
+    # the model sometimes stopped after three or four keys (a full brief came back almost empty, on every retry).
+    props = out["properties"]
+    for k, v in props.items():
+        if k != "confidence":
+            v["nullable"] = True
+    out["required"] = [k for k in props if k != "confidence"] + ["confidence"]
+    out["propertyOrdering"] = ["product", "brand", "goal", "platforms", "market", "markets", "category", "audience", "gender", "age",
+                               "count", "creator_size", "creator_type", "mix", "content_lang", "budget_sar", "max_fake_pct",
+                               "launch", "timing", "claims", "regulated", "confidence"]
+    return out
 
 
 SYSTEM = (
@@ -670,8 +688,13 @@ SYSTEM = (
     "followers, micro 20k-100k, mid 100k-500k, macro 500k-1M, mega 1M+. creator_type: doctor, pharmacist, derm, mom, mua, "
     "reviewer, fitness, foodie, fashion, comedy, lifestyle, only when the document asks for that kind of creator. content_lang: "
     "ar, en or both. mix: hero (one big name plus many smaller), micro (many small creators), big (big names). max_fake_pct: the "
-    "highest fake-follower share accepted. timing: only "
-    "if a start or launch date is given (asap within 2 weeks, month within 6 weeks, quarter next quarter, later otherwise); "
+    "highest fake-follower share accepted. Be strict: creator_size only when the document names sizes or follower ranges (\"big "
+    "names\" is mix big, not a size); creator_type only for the kinds of creator the document asks for, using derm for "
+    "dermatologists and aesthetic doctors, reviewer only for beauty reviewers; count is a number of creators, for a range give its "
+    "middle; Arabic numerals count (٥ is 5). timing: only "
+    "if a start or launch date or an explicit timeframe is given, counted from TODAY (asap within 2 weeks, month within 6 weeks, "
+    "quarter within about 4 months, later after that); never guess a timing. When the document changes an earlier instruction, "
+    "the later instruction wins. "
     "launch: that date as YYYY-MM or YYYY-MM-DD, else empty. claims: COPY, word for word, up to 5 health, efficacy or "
     "benefit claims that the document itself makes; never write, improve or invent a claim, and never add a medical claim. "
     "regulated: medicine, otc, cosmetic, supplement, medical_device or food_health when the product is one, else none. "
@@ -695,6 +718,12 @@ def _market_answer(markets):
     return vals[0] if len(vals) == 1 else vals
 
 
+TIMEFRAME = (r"\b(asap|as soon as|urgent|immediately|this (?:week|month)|next (?:week|month|quarter)|within \d+|in \d+ weeks?|"
+             r"q[1-4]|quarter|january|february|march|april|may|june|july|august|september|october|november|december|"
+             r"ramadan|eid|spring|summer|autumn|fall|winter|season|20\d\d)\b|الربيع|الصيف|الشتاء|الخريف|فورا|عاجل|الشهر|الربع|رمضان|العيد|يناير|فبراير|مارس|أبريل|مايو|يونيو|يوليو|أغسطس|"
+             r"سبتمبر|أكتوبر|نوفمبر|ديسمبر|٢٠٢")
+
+
 def raw_from(data):
     """A model's (or a template's) answers in the shape matcher.clean_answers reads."""
     import matcher
@@ -709,34 +738,42 @@ def raw_from(data):
         raw["count"] = str(n) if str(n) in matcher.COUNT_OF else "other:%d" % min(n, 50)
     b = data.get("budget_sar")
     if isinstance(b, (int, float)) and b > 0:
-        raw["budget"] = "50" if b < 50000 else "150" if b <= 150000 else "400" if b <= 400000 else "400+"
+        raw["budget"] = "50" if b < 50000 else "150" if b <= 150000 else "400" if b < 400000 else "400+"
     f = data.get("max_fake_pct")
     if isinstance(f, (int, float)) and f > 0:
         raw["max_fake"] = "15" if f <= 20 else "30" if f <= 35 else "50"
     return raw
 
 
-def read(text, origin, code_id=None, credits=0):
-    """Gemini fills the brief from ``text``. Returns the review payload (nothing is saved).
-    Raises ``gemini.AIError``."""
+def read(text, origin, code_id=None, credits=0, pdf=None):
+    """Gemini fills the brief from ``text`` (or from the PDF itself when ``pdf`` bytes are given). Returns the
+    review payload (nothing is saved). Raises ``gemini.AIError``."""
     import gemini
     import matcher
     import occasions
     from datetime import date
     import brief_template
     today = date.today().isoformat()
-    prompt = "TODAY: %s\nSOURCE (%s):\n%s" % (today, origin, text[:MAX_TEXT])
+    body = text if len(text) <= MAX_TEXT else text[:MAX_TEXT // 2] + "\n[...]\n" + text[-MAX_TEXT // 2:]
+    prompt = "TODAY: %s\nSOURCE (%s):\n%s" % (today, origin, body)
+    if pdf:
+        prompt = [{"role": "user", "parts": [
+            {"inline_data": {"mime_type": "application/pdf", "data": base64.b64encode(pdf).decode()}},
+            {"text": "TODAY: %s\nSOURCE (%s): the attached PDF." % (today, origin)}]}]
+        text = text or ""
     data = gemini.generate_json(prompt, _schema(), system=SYSTEM, temperature=0.1, max_tokens=4096, think=0,
                                 kind="brief_source", code_id=code_id, credits=credits)
     if not isinstance(data, dict):
         data = {}
     core = ("goal", "platforms", "market", "category")
-    if len(re.sub(r"\W", "", text)) > 150 and sum(1 for k in core if not data.get(k)) >= 2:
-        # Item 277: the same file once came back complete and once almost empty. One more careful read,
-        # not charged again; its answers fill only what the first one left out.
+    for attempt in (0, 1):
+        if not ((pdf or len(re.sub(r"\W", "", text)) > 60) and sum(1 for k in core if not data.get(k)) >= 2):
+            break
+        # Item 277/279: the same file once came back complete and once almost empty. Up to two more reads,
+        # not charged again; their answers fill only what the first one left out.
         try:
-            again = gemini.generate_json(prompt, _schema(), system=SYSTEM, temperature=0.0, max_tokens=4096, think=1024,
-                                         kind="brief_source", code_id=code_id, credits=0)
+            again = gemini.generate_json(prompt, _schema(), system=SYSTEM, temperature=0.0, max_tokens=4096,
+                                         think=0 if attempt == 0 else 1024, kind="brief_source", code_id=code_id, credits=0)
             if isinstance(again, dict):
                 for k, v in again.items():
                     if v not in (None, "", []) and data.get(k) in (None, "", []):
@@ -753,6 +790,11 @@ def read(text, origin, code_id=None, credits=0):
         launch = ""
     if launch and brief_template.timing_of(launch):
         answers["timing"] = brief_template.timing_of(launch)      # from the date, never the model's guess (item 277)
+    elif answers.get("timing") and not (re.search(TIMEFRAME, text, re.I) or
+                                        (pdf and (data.get("confidence") or {}).get("timing") == "high")):
+        answers.pop("timing")                                     # no date and no timeframe written: not a guess (item 279)
+    if answers.get("mix") == "hero":
+        answers.pop("creator_size", None)    # hero + crowd: the crowd's size must not filter out the hero (item 279)
     markets = _markets(data)
     if markets:
         answers["market"] = _market_answer(markets)
@@ -770,7 +812,8 @@ def finish(answers, product, brand, audience, markets, launch, claims, kind, ori
     import fit
     import occasions
     have = {"product": bool(product), "category": bool(answers.get("category")), "audience": bool(audience or answers.get("gender") or answers.get("age")),
-            "market": bool(answers.get("market")), "goal": bool(answers.get("goal")), "timing": bool(answers.get("timing") or launch)}
+            "market": bool(answers.get("market")), "goal": bool(answers.get("goal")), "timing": bool(answers.get("timing") or launch),
+            "platforms": bool(answers.get("platforms"))}
     confidence = {f: conf_of(f) if have[f] else "missing" for f in SCHEMA_FIELDS}
     # The notes carry what the options cannot hold, for the client to read and edit.
     bits = []

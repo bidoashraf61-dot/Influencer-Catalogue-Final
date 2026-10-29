@@ -163,15 +163,19 @@ class PhaseE(unittest.TestCase):
         s, b, _ = self.upload(c, fill(brief_template.build(), ticks=("category=skincare",)))
         self.assertEqual(sorted(b["missing"]), ["goal", "market", "platforms"])
 
-    def test_02_other_files_are_refused_and_cost_nothing(self):
+    def test_02_own_briefs_are_read_by_ai_and_bad_files_cost_nothing(self):
         c, _ = self.signup("bad@glow-b.com")
-        calls = len(CALLS)
         before = self.credits(c)
-        for data, name in ((BRIEF, "own brief.docx"), (b"%PDF-1.4 brief", "brief.pdf"),
-                           (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\0" * 64, "old.doc"), (b"hi", "a.txt")):
+        s, b, _ = self.upload(c, BRIEF, "own brief.docx")                          # item 279: any brief again
+        self.assertEqual(s, 200, b)
+        self.assertNotIn("template", b)
+        self.assertEqual(b["answers"]["category"], ["skincare"])
+        self.assertEqual((b["spent"], self.credits(c)), (5, before - 5))
+        before, calls = self.credits(c), len(CALLS)
+        for data, name, reason in ((b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\0" * 64, "old.doc", "doc"),
+                                   (bytes(range(256)) * 10, "x.bin", "type"), (b"hi", "a.txt", "empty")):
             s, b, _ = self.upload(c, data, name)
-            self.assertEqual((s, b["reason"]), (400, "not_template"), name)
-            self.assertEqual(b["template_url"], "api/brief/template")
+            self.assertEqual((s, b["reason"]), (400, reason), name)
         for url in ("http://127.0.0.1:%d/admin" % self.httpd.server_address[1], "http://169.254.169.254/latest/meta-data/",
                     "file:///etc/passwd", "https://influencer-catalogue.hellovoice.co.uk/admin/api/me", "http://10.0.0.1/",
                     "http://[::1]/", "http://2130706433/"):

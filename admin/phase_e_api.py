@@ -25,6 +25,10 @@ import portal
 MAX_UPLOAD_BODY = briefsrc.MAX_FILE * 4 // 3 + 64 * 1024        # base64 + the JSON around it
 
 
+class _ReadWithAI(Exception):
+    """An uploaded file that is not the template: read it with the AI like a link."""
+
+
 class PhaseEMixin:
 
     def phase_e_get(self, path, query):
@@ -104,9 +108,15 @@ class PhaseEMixin:
         # 1. Read the source: free, and nothing is charged when it cannot be read.
         try:
             if f:
-                # Files: the HelloVoice brief template only (Bido, 2026-10-29, item 277). It is read exactly
-                # from its tick boxes and drop-downs: no AI, nothing charged, the file is dropped.
+                # Item 279 (Bido, 2026-10-29): any brief file again. The HelloVoice template is still read exactly
+                # from its tick boxes and drop-downs (no AI, free); anything else goes to the AI reader below.
+                import brief_template
                 data = briefsrc.decode_upload(f.get("data"))
+                if not brief_template.is_template(data):
+                    got = briefsrc.from_file(f.get("name"), data)
+                    del data                                   # the upload is not kept anywhere
+                    origin = "uploaded brief “%s”" % got["label"]
+                    raise _ReadWithAI()
                 res = briefsrc.from_template(data, f.get("name"))
                 del data
                 db.log("brief_source", cid, self.client_ip(), self._ua(), "template " + str(f.get("name") or "")[:60])
@@ -118,6 +128,8 @@ class PhaseEMixin:
             else:
                 got = briefsrc.from_url(url)
                 origin = got["label"]
+        except _ReadWithAI:
+            pass
         except briefsrc.SourceError as exc:
             body = {"ok": False, "reason": exc.reason, "message": exc.message}
             if f:
@@ -143,7 +155,7 @@ class PhaseEMixin:
         if not ok:
             return self._no_credits(cid, "source")
         try:
-            res = briefsrc.read(got["text"], origin, code_id=cid, credits=cost)
+            res = briefsrc.read(got["text"], origin, code_id=cid, credits=cost, pdf=got.pop("pdf", None))
         except gemini.AIError as exc:
             portal.refund(cid, cost, "failed brief read")
             return self._ai_fail(exc)

@@ -1840,3 +1840,4 @@ body.sel-scores-off .cat-card .cat-score, body.sel-scores-off .cat-card .cat-pla
   .bs-need__build { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .bs-need { animation: none; } }
+.bs-need__chk { margin-left: 8px; vertical-align: 1px; letter-spacing: 0; text-transform: none; }
