@@ -1,5 +1,5 @@
 """The refined campaign brief (owner-approved 2026-10-13): the questions, what the brief keeps, and the
-client's hard limits on the shortlist (fake-follower share, minimum engagement, creator size).
+client's limits (since item 282 the fake-follower share ranks and minimum engagement is gone; creator size removes).
 
     python3 admin/tests/test_refined_brief.py
 """
@@ -12,24 +12,23 @@ import matcher  # noqa: E402
 
 FULL = {"goal": ["awareness", "traffic"], "platforms": ["Instagram"], "market": ["SA", "AE"],
         "category": ["skincare", "beauty"], "creator_size": ["micro", "mid"], "count": "8",
-        "max_fake": "30", "min_engagement": "above_benchmark", "timing": "month", "deliverable": ["reels"]}
+        "max_fake": "30", "timing": "month", "deliverable": ["reels"]}
 
 
 class Questions(unittest.TestCase):
     def test_approved_list(self):
         ids = [q["id"] for q in matcher.public_questions()]
-        self.assertEqual(ids, ["goal", "platforms", "market", "gender", "age", "category", "creator_size",
-                               "count", "deliverable", "max_fake", "min_engagement", "timing", "notes"])
-        self.assertNotIn("budget", ids)
+        self.assertEqual(ids, ["goal", "platforms", "market", "gender", "age", "category", "budget", "mix",
+                               "creator_size", "count", "deliverable", "max_fake", "timing", "notes"])
+        self.assertNotIn("min_engagement", ids)          # item 282
 
     def test_new_questions_are_offered_as_options(self):
         by = {q["id"]: q for q in matcher.public_questions()}
         self.assertEqual([o["value"] for o in by["creator_size"]["options"]], ["nano", "micro", "mid", "macro", "mega"])
         self.assertEqual([o["value"] for o in by["max_fake"]["options"]], ["15", "30", "50", "none"])
-        self.assertEqual([o["value"] for o in by["min_engagement"]["options"]], ["none", "above_benchmark", "top25"])
 
     def test_old_category_value_still_stored(self):
-        self.assertEqual(matcher.answer_label("category", "beauty"), "Makeup")
+        self.assertEqual(matcher.answer_label("category", "beauty"), "Beauty and makeup")
 
 
 class Brief(unittest.TestCase):
@@ -37,14 +36,14 @@ class Brief(unittest.TestCase):
         b = matcher.to_brief(FULL)
         self.assertEqual(b["size"], ["micro", "mid"])
         self.assertEqual(b["max_fake"], 30)
-        self.assertEqual(b["min_engagement"], "above_benchmark")
+        self.assertNotIn("min_engagement", b)
+        self.assertEqual(b["target"]["power"]["max_fake"], 30)      # item 282: the limit ranks, through the match
         self.assertIsNone(b["budget_max"])
 
     def test_no_limits_means_none(self):
         b = matcher.to_brief({"goal": "awareness", "platforms": ["Instagram"], "market": "SA", "category": ["fashion"],
-                              "max_fake": "none", "min_engagement": "none"})
+                              "max_fake": "none"})
         self.assertIsNone(b["max_fake"])
-        self.assertIsNone(b["min_engagement"])
         self.assertEqual(b["size"], [])
 
     def test_old_brief_with_budget_still_reads(self):
@@ -68,25 +67,15 @@ class Limits(unittest.TestCase):
             matcher.db.analyses_for = self.docs({"A": {"fake_followers_pct": 60, "er": 5},
                                                  "B": {"fake_followers_pct": 10, "er": 5},
                                                  "C": {"er": 5}})
-            kept = matcher._client_limits({"max_fake": 30, "min_engagement": None}, self.items())
-            self.assertEqual([i["code"] for i in kept], ["B"])            # item 280: no figure = not picked
-        finally:
-            matcher.db.analyses_for = orig
-
-    def test_top25_keeps_best_quarter(self):
-        orig = matcher.db.analyses_for
-        try:
-            rows = {c: {"er": e} for c, e in zip("ABCD", [1, 2, 3, 10])}
-            matcher.db.analyses_for = self.docs(rows)
-            items = [{"code": c, "platform": "Instagram", "followers": 50000} for c in "ABCD"]
-            kept = matcher._client_limits({"max_fake": None, "min_engagement": "top25"}, items)
-            self.assertEqual([i["code"] for i in kept], ["D"])
+            kept = matcher._client_limits({"max_fake": 30}, self.items())
+            self.assertEqual([i["code"] for i in kept], ["A", "B", "C"])       # item 282: nobody removed
+            self.assertEqual([i["fake_pct"] for i in kept], [60, 10, None])
         finally:
             matcher.db.analyses_for = orig
 
     def test_no_limits_changes_nothing(self):
         items = self.items()
-        self.assertIs(matcher._client_limits({"max_fake": None, "min_engagement": None}, items), items)
+        self.assertIs(matcher._client_limits({"max_fake": None}, items), items)
 
 
 if __name__ == "__main__":

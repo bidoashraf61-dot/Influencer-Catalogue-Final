@@ -1438,8 +1438,8 @@
       });
       // What else the brief set: shown, removable, never asked again.
       var EXTRA = [["gender", "Audience"], ["age", "Ages"], ["creator_size", "Sizes"], ["creator_type", "Creator type"],
-                   ["content_lang", "Language"], ["tone", "Tone"], ["max_fake", "Fake followers"], ["min_engagement", "Engagement"],
-                   ["licence", "Licence"], ["collab", "Fresh or proven"], ["budget", "Budget"], ["timing", "Starts"]];
+                   ["content_lang", "Language"], ["max_fake", "Fake followers"],
+                   ["licence", "Licence"], ["budget", "Budget"], ["timing", "Starts"]];
       var chips = h("ul", { class: "bs-need__also", "aria-label": "Also from your brief" });
       EXTRA.forEach(function (e) {
         var k = e[0];
@@ -3917,8 +3917,6 @@
       if (c.id === "licence") return chips(c, "licence", false, opts_("licence", { preferred: "Licensed creators rank higher" }));
       if (c.id === "city") return chips(c, "aud_city", true, opts_("aud_city"));
       if (c.id === "lang") return chips(c, "content_lang", false, opts_("content_lang"));
-      if (c.id === "fresh") return chips(c, "collab", false, opts_("collab", { fresh: "Few paid posts lately", proven: "Has run paid content" }));
-      if (c.id === "tone") return chips(c, "tone", true, opts_("tone"));
       if (c.id === "age") {
         var ages = (core.age ? core.age.options : []).filter(function (o) { return !isAny(o.value); });
         return chips(c, "age", true, ages);

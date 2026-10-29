@@ -71,9 +71,7 @@ QUESTIONS = [
                  ("stories", "Stories"), ("event", "Event or store attendance"), ("review", "Product reviews")]},
     {"id": "max_fake", "type": "one", "label": "Highest share of fake followers we accept", "required": False,
      "options": [("15", "15% or less"), ("30", "30% or less"), ("50", "50% or less"), ("none", "No limit")]},
-    {"id": "min_engagement", "type": "one", "label": "Minimum engagement", "required": False,
-     "options": [("none", "No minimum"), ("above_benchmark", "Above the benchmark for their size"),
-                 ("top25", "Top 25% of creators their size")]},
+    # Minimum engagement removed 2026-10-29 (item 282): the score already grades engagement against the creator's size.
     {"id": "timing", "type": "one", "label": "When does it start?", "required": False,
      "options": [("asap", "Within 2 weeks"), ("month", "Within 6 weeks"), ("quarter", "Next quarter"), ("later", "Just exploring")]},
     {"id": "notes", "type": "text", "label": "Anything else we should know?", "required": False, "max": 600},
@@ -137,8 +135,6 @@ HINTS = {
     ("max_fake", "30"): "Typical for public accounts",
     ("max_fake", "50"): "Allows heavily bought audiences",
     ("max_fake", "none"): "Do not filter on fake followers",
-    ("min_engagement", "above_benchmark"): "At or above the typical rate for their platform and size",
-    ("min_engagement", "top25"): "Best quarter of creators their size",
 }
 
 
@@ -295,11 +291,10 @@ def to_brief(answers):
         "budget_max": budget if isinstance(budget, (int, float)) else BUDGET_MAX.get(budget),
         "count": count,
         "notes": notes,
-        # Refined 2026-10-13: which sizes, the highest fake-follower share accepted (None = no limit),
-        # and the minimum engagement (None = none). Briefs saved before carry none of these.
+        # Refined 2026-10-13: which sizes and the highest fake-follower share accepted (None = no limit).
+        # Since item 282 the fake limit ranks (power "max_fake"), it no longer removes anyone.
         "size": _values(answers.get("creator_size"), ["nano", "micro", "mid", "macro", "mega"]),
         "max_fake": int(answers["max_fake"]) if answers.get("max_fake") in ("15", "30", "50") else None,
-        "min_engagement": answers.get("min_engagement") if answers.get("min_engagement") in ("above_benchmark", "top25") else None,
         "mix": answers.get("mix") if answers.get("mix") in ("hero", "micro", "big") else None,
     }
     if power:
@@ -579,56 +574,18 @@ def apply_rules(c, s, val, basis, target):
 
 
 def _client_limits(brief, items):
-    """The client's hard limits, applied to the scored creators (refined brief, 2026-10-13).
+    """The fake-follower share on each shortlisted creator, for the card (refined brief, 2026-10-13).
 
-    max_fake: a creator whose stored fake-follower share is above the limit is removed. A creator
-    with no figure stays in, and is marked "fake share not known" so the client can check it.
-    (Since item 280 a creator with no fake-follower figure is left out when a limit is set.)
-    min_engagement: "above_benchmark" keeps creators at or above the high end of the range the score grades
-    their engagement against (score_v5, by platform and size); "top25" keeps the best quarter by engagement
-    rate within each platform and size band. A creator
-    with no engagement rate cannot show it meets the minimum, so is removed."""
-    limit = brief.get("max_fake")
-    rule = brief.get("min_engagement")
-    if limit is None and rule is None or not items:
+    Since item 282 (Bido, 2026-10-29) nothing here removes a creator: the fake-follower limit ranks through the
+    nice-to-have match (powerups.fit_for), and the minimum-engagement question is gone."""
+    if brief.get("max_fake") is None or not items:
         return items
-    import score_v5
     every = db.analyses_for([i["code"] for i in items])
-
-    def doc_of(it):
-        return ((every.get(it["code"]) or {}).get(it["platform"]) or {}).get("data") or {}
-    # "Top 25% of creators their size": the cut is taken within each platform and size band, because an
-    # Instagram rate (per follower) and a TikTok rate (per view) are not on the same scale (audit 273).
-    groups = {}
-    for i in items:
-        er = doc_of(i).get("er")
-        if isinstance(er, (int, float)):
-            groups.setdefault((i["platform"], i.get("band")), []).append(er)
-    top_cut = {k: sorted(v)[int(len(v) * 0.75)] for k, v in groups.items()} if rule == "top25" else {}
-    kept = []
     for it in items:
-        d = doc_of(it)
+        d = ((every.get(it["code"]) or {}).get(it["platform"]) or {}).get("data") or {}
         fake = d.get("fake_followers_pct")
-        if limit is not None and (not isinstance(fake, (int, float)) or fake > limit):
-            continue                  # over the limit, or no figure to prove it is under (item 280: hard rules)
-        if isinstance(fake, (int, float)):
-            it["fake_pct"] = round(float(fake), 1)
-        else:
-            it["fake_pct"] = None
-            it.setdefault("watchouts", []).append("fake share not known")
-        if rule is not None:
-            er = d.get("er")
-            if not isinstance(er, (int, float)):
-                continue
-            if rule == "above_benchmark":
-                # the range the score itself grades engagement against (score_v5), at or above its high end
-                rng = score_v5._range("engagement", it["platform"], it["followers"]) if it["followers"] else None
-                if not rng or er < rng[1]:
-                    continue
-            elif rule == "top25" and er < top_cut.get((it["platform"], it.get("band")), float("inf")):
-                continue
-        kept.append(it)
-    return kept
+        it["fake_pct"] = round(float(fake), 1) if isinstance(fake, (int, float)) else None
+    return items
 
 
 AUD_COUNTRY_MIN = 50       # % of the measured audience in the brief's country (owner, 2026-10-14)
@@ -646,7 +603,7 @@ def size_of(followers):
 
 
 def _funnel(brief):
-    """How many creators are left after each hard rule, in order: [(what the rule leaves, count)]."""
+    """How many creators are left after each must-have (item 282: platform, country, space, size), in order."""
     wanted = [p for p in brief.get("platforms", []) if p in PLATFORMS]
     plats = " or ".join(wanted) or "any platform"
     cr = [c for c in db.list_creators(active_only=True) if not wanted or set(analysis.creator_platforms(c)) & set(wanted)]
@@ -662,16 +619,6 @@ def _funnel(brief):
     if brief.get("size"):
         cr = [c for c in cr if size_of(c["followers"]) in brief["size"]]
         steps.append(("of them in the creator sizes you asked for", len(cr)))
-    if brief.get("mix") in ("big", "micro"):
-        keep = BIG if brief["mix"] == "big" else SMALL
-        cr = [c for c in cr if size_of(c["followers"]) in keep]
-        steps.append(("of them big names (macro or mega)" if brief["mix"] == "big" else "of them nano or micro creators", len(cr)))
-    power = brief["target"].get("power") or {}
-    one = wanted[0] if len(wanted) == 1 else None
-    for key, label in powerups.HARD_LABEL.items():
-        if cr and any(powerups.hard_fail(c, power, one, want_cc) == key for c in cr):
-            cr = [c for c in cr if powerups.hard_fail(c, power, one, want_cc) != key]
-            steps.append(("of them matching the %s you asked for" % label, len(cr)))
     return steps
 
 
@@ -679,12 +626,9 @@ def why_empty(brief):
     """When a shortlist finds nobody: the hard rule that left no one, in words for the client (item 280)."""
     for words, n in _funnel(brief):
         if n == 0:
-            said = words.replace("of them matching", "of them match").replace("of them in the", "of them are in the") \
-                .replace("of them big names", "of them are big names").replace("of them nano", "of them are nano")
+            said = words.replace("of them in the", "of them are in the")
             return ("None %s." % said if words.startswith("of them") else "No %s yet." % words) + \
                 " Change that answer, or loosen it, and try again."
-    if brief.get("max_fake") is not None or brief.get("min_engagement"):
-        return "Nobody passed the fake-follower or engagement limits (creators with no figure are left out). Try a looser limit."
     return "None of the matching creators have enough public numbers to score yet. Try another platform."
 
 
@@ -697,7 +641,7 @@ def why_short(brief, n):
     drops = [(steps[i - 1][1] - steps[i][1], i) for i in range(1, len(steps))]
     words = steps[max(drops)[1]][0] if drops else ""
     hint = (" Fewest are left at: %s (%d)." % (words, steps[max(drops)[1]][1])) if words else ""
-    return "Only %d creator%s meet%s every rule of your brief (you asked for %d).%s" % (
+    return "Only %d creator%s meet%s the must-haves of your brief (you asked for %d).%s" % (
         n, "" if n == 1 else "s", "s" if n == 1 else "", want, hint)
 
 
@@ -746,10 +690,10 @@ def score_all(brief, exclude=(), only=None, strict=False):
         if cats:
             creators = [c for c in creators if _tagged(c, cats)]
         creators = [c for c in creators if _based_in(c, want_cc)]      # item 280: based there, nothing else
-        power = target.get("power") or {}
-        if power:
-            # Every power-up is a hard rule on the creator's own data; no data = not picked (item 280).
-            creators = [c for c in creators if powerups.hard_fail(c, power, wanted[0] if len(wanted) == 1 else None, want_cc) is None]
+    # Item 282 (Bido, 2026-10-29): only platform, based-in country, product space and size remove creators. Every other
+    # answer is a nice-to-have: it moves a creator up or down through the 60/40 blend and never removes anyone.
+    # Space and countries are already met, so they stay out of the match; the audience country is a small bonus below.
+    nice = {k: v for k, v in (target.get("power") or {}).items() if k not in ("space", "market")} if strict else None
     single = wanted[0] if len(wanted) == 1 else None
     scored = score_codes([c["code"] for c in creators], objective, target, single, among=wanted)
     bands = db.tier_prices()
@@ -771,9 +715,7 @@ def score_all(brief, exclude=(), only=None, strict=False):
         # The brief's two requirements (country for numbers that are only public, the product
         # space for everyone). The selection page applies the same rules, so a creator's number
         # is the same on the shortlist card and on the selection built from it.
-        # A shortlist scores on performance only: the power-ups are already hard rules above, and audience belongs
-        # to the selection page's scoring (item 280).
-        val, factor, s = apply_rules(c, s, val, basis, dict(target, power=None) if strict else target)
+        val, factor, s = apply_rules(c, s, val, basis, dict(target, power=nice) if strict else target)
         rank_score *= factor
         # Healthcare professionals first for a healthcare brief: that is what a pharma client is buying.
         if any(x in ("health care", "health") for x in cats) and str(c["tier"] or "").upper().startswith("HCP"):
@@ -783,6 +725,8 @@ def score_all(brief, exclude=(), only=None, strict=False):
         # country, or under 60% of the asked gender, ranks lower; one that meets the brief a little higher.
         # Not measured is left as it is.
         aud_lvl, aud_note = 1, None
+        if strict and home is not None and home >= AUD_COUNTRY_MIN:
+            rank_score *= AUD_MATCH_WEIGHT          # most of the measured audience is in the brief's country (item 282)
         if not strict and (home is not None or gshare is not None):
             miss = []
             if home is not None and home < AUD_COUNTRY_MIN:
@@ -830,18 +774,21 @@ MIX_TIERS = {
 
 
 def _mix(items, mix):
-    """The creator mix as a hard rule (Bido, 2026-10-29, item 280): Big names = macro and mega only; Many micro = nano
-    and micro only; Hero + crowd = the best macro or mega creator first, then nano, micro and mid creators only.
-    "Let Helvi decide" (or none) leaves the list as it is."""
+    """The creator mix orders the list, it never removes anyone (item 282; strong ordering from item 275): the sizes
+    the mix names come first, each in score order, then the next-closest sizes. Hero + crowd puts the best macro or
+    mega creator first, then the nano, micro and mid crowd, then the other big names. "Let Helvi decide" (or none)
+    leaves the list as it is."""
     if mix not in MIX_TIERS or not items:
         return items
-    if mix == "big":
-        return [i for i in items if i.get("band") in BIG]
-    if mix == "micro":
-        return [i for i in items if i.get("band") in SMALL]
-    hero = next((i for i in items if i.get("band") in BIG), None)
-    crowd = [i for i in items if i.get("band") in SMALL + ("mid",)]
-    return ([hero] if hero else []) + crowd
+    tiers = MIX_TIERS[mix]
+    if mix == "hero":
+        hero = next((i for i in items if i.get("band") in BIG), None)
+        rest = [i for i in items if i is not hero]
+        out = ([hero] if hero else []) + [i for t in tiers for i in rest if i.get("band") in t]
+    else:
+        out = [i for t in tiers for i in items if i.get("band") in t]
+    named = {id(i) for i in out}
+    return out + [i for i in items if id(i) not in named]       # no size on file: last, never dropped
 
 
 # Tags that name a word of a space but are not that space: "Health & Fitness" is not health care.

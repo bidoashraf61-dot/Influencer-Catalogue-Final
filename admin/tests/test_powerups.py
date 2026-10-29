@@ -119,7 +119,8 @@ class Fit(unittest.TestCase):
         f = powerups.fit_for(row("HV-T-001"), {"tone": ["educational"]})
         self.assertEqual(f["score"], 100)
         self.assertEqual(powerups.fit_for(row("HV-T-002"), {"tone": ["educational"]})["items"][0]["level"], "none")
-        self.assertEqual(powerups.fit_for(row("HV-T-002"), {"licence": "preferred"})["score"], 40)
+        # item 282: no licence on file counts as not known (neutral), not as a miss
+        self.assertEqual(powerups.fit_for(row("HV-T-002"), {"licence": "preferred"})["score"], 50)
 
     def test_lookalikes(self):
         f = powerups.fit_for(row("HV-T-003"), {"lookalikes": ["HV-T-001"]})
@@ -142,15 +143,29 @@ class Ranking(unittest.TestCase):
         self.assertEqual(val, powerups.blend(80, out["fit"]["score"]))
         self.assertLess(factor, 1.0)
 
-    def test_mix_is_hard(self):            # item 280: a mix keeps only its sizes
+    def test_mix_orders_never_removes(self):     # item 282: the mix shapes the order, everyone stays
         items = [{"code": "A", "rank_score": 90, "band": "micro"}, {"code": "B", "rank_score": 85, "band": "mega"},
                  {"code": "C", "rank_score": 82, "band": "nano"}, {"code": "D", "rank_score": 80, "band": "mid"},
                  {"code": "E", "rank_score": 70, "band": "macro"}]
         code = lambda m: [i["code"] for i in matcher._mix(list(items), m)]
-        self.assertEqual(code("big"), ["B", "E"])
-        self.assertEqual(code("micro"), ["A", "C"])
-        self.assertEqual(code("hero"), ["B", "A", "C", "D"])          # one big name, then nano/micro/mid only
+        self.assertEqual(code("big"), ["B", "E", "D", "A", "C"])
+        self.assertEqual(code("micro"), ["A", "C", "D", "B", "E"])
+        self.assertEqual(code("hero"), ["B", "A", "C", "D", "E"])     # one big name, the crowd, then other big names
         self.assertEqual(code(None), ["A", "B", "C", "D", "E"])
+        no_size = list(items) + [{"code": "F", "rank_score": 99, "band": None}]
+        self.assertEqual([i["code"] for i in matcher._mix(no_size, "big")][-1], "F")       # no size on file: last
+
+    def test_fake_limit_ranks(self):              # item 282: under the limit 100, unknown neutral, over it lower
+        orig = powerups._summaries
+        try:
+            for fake, want in ((10, 100), (None, 50), (40, 40)):
+                powerups._summaries = lambda code, pl, f=fake: [{"platform": "Instagram", "fake": f}]
+                self.assertEqual(powerups.fit_for(row("HV-T-001"), {"max_fake": 30})["score"], want)
+        finally:
+            powerups._summaries = orig
+
+    def test_no_hard_power_rules_left(self):      # item 282: only the four must-haves remove creators
+        self.assertFalse(hasattr(powerups, "hard_fail"))
 
     def test_read_claim_without_ai(self):
         got = powerups.read_claim("Lumi vitamin D3 drops", "Clinically proven to support strong bones", ["health care"])

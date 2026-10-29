@@ -59,10 +59,7 @@ def sections():
             {"id": "creator_size", "label": "Creator sizes (tick any)", "kind": "many", "options": q["creator_size"]["options"]},
             {"id": "creator_type", "label": "Creator type (tick any)", "kind": "many", "options": pq["creator_type"]["options"]},
             {"id": "max_fake", "label": "Highest share of fake followers you accept", "kind": "one", "options": q["max_fake"]["options"]},
-            {"id": "min_engagement", "label": "Minimum engagement", "kind": "one", "options": q["min_engagement"]["options"]},
             {"id": "licence", "label": "Mawthooq licence", "kind": "one", "options": pq["licence"]["options"]},
-            {"id": "collab", "label": "Fresh faces or proven with brands?", "kind": "one", "options": pq["collab"]["options"]},
-            {"id": "tone", "label": "Tone (tick any)", "kind": "many", "options": pq["tone"]["options"]},
             {"id": "deliverable", "label": "Content they should make (tick any)", "kind": "many", "options": q["deliverable"]["options"]},
             {"id": "budget", "label": "Budget for creators, SAR before VAT", "kind": "number", "hint": "A number, e.g. 120000"},
             {"id": "notes", "label": "Anything else we should know?", "kind": "text"},
@@ -291,10 +288,10 @@ def to_raw(got, today=None):
     """Template answers -> the answers dict matcher.clean_answers reads, plus the free-text fields."""
     import matcher
     raw = {}
-    for k in ("goal", "platforms", "market", "category", "age", "creator_size", "creator_type", "tone", "deliverable"):
+    for k in ("goal", "platforms", "market", "category", "age", "creator_size", "creator_type", "deliverable"):
         if got.get(k):
             raw[k] = got[k]
-    for k in ("gender", "content_lang", "mix", "max_fake", "min_engagement", "licence", "collab"):
+    for k in ("gender", "content_lang", "mix", "max_fake", "licence"):
         if got.get(k):
             raw[k] = got[k]
     n = _number(got.get("count"))

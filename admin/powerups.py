@@ -48,9 +48,8 @@ QUESTIONS = [
     {"id": "content_lang", "type": "one", "tier": "power", "label": "Content language",
      "options": [("ar", "Arabic"), ("en", "English"), ("both", "Both")]},
     {"id": "lookalikes", "type": "codes", "tier": "power", "label": "Creators like these", "max": 3},
-    {"id": "collab", "type": "one", "tier": "power", "label": "Fresh or proven",
-     "options": [("fresh", "Fresh faces"), ("proven", "Proven with brands"), ("either", "Either")]},
-    {"id": "tone", "type": "many", "tier": "power", "label": "Tone", "options": TONE_OPTIONS},
+    # Fresh or proven and Tone removed 2026-10-29 (item 282): too little data behind them. Old briefs that carry them
+    # are read without them.
 ]
 
 # The power-up cards, in the order "More power-ups" lists them, with the answer ids each fills.
@@ -63,8 +62,6 @@ CARDS = [
     {"id": "gender", "label": "Audience gender", "hint": "Mostly women, mostly men, or both.", "fields": ["gender"]},
     {"id": "lang", "label": "Content language", "hint": "The language they post in.", "fields": ["content_lang"]},
     {"id": "like", "label": "Creators like these", "hint": "Pick up to 3 you love. Helvi finds their twins.", "fields": ["lookalikes"]},
-    {"id": "fresh", "label": "Fresh or proven", "hint": "New to ads, or experienced with brands.", "fields": ["collab"]},
-    {"id": "tone", "label": "Tone", "hint": "How the content should feel.", "fields": ["tone"]},
 ]
 
 # Helvi's first three power-ups for the brief's space (brief §4). The first space that has a
@@ -76,15 +73,16 @@ TOP3 = {
     "fragrance": ["gender", "age", "like"], "fashion": ["gender", "age", "like"],
     # No Audience city card since 2026-10-29 (item 274): city data is too thin to rank on.
     "mother & baby": ["type", "age", "gender"],
-    "food": ["tone", "lang", "like"], "travel": ["tone", "lang", "like"], "lifestyle": ["tone", "lang", "like"],
+    "food": ["lang", "like", "age"], "travel": ["lang", "like", "age"], "lifestyle": ["lang", "like", "age"],
     "fitness": ["type", "age", "gender"],
-    "technology": ["gender", "lang", "tone"], "automotive": ["gender", "lang", "tone"],
-    "finance": ["gender", "lang", "tone"], "gaming": ["gender", "lang", "tone"],
+    "technology": ["gender", "lang", "age"], "automotive": ["gender", "lang", "age"],
+    "finance": ["gender", "lang", "age"], "gaming": ["gender", "lang", "age"],
     "other": ["age", "gender", "like"],
 }
 
 WEIGHTS = {"age": 1.0, "gender": 1.0, "city": 0.75, "lang": 1.0, "type": 1.5, "like": 1.5, "licence": 0.75,
-           "fresh": 0.5, "claim": 1.25, "tone": 0.75, "market": 1.0, "space": 1.0}
+           "fresh": 0.5, "claim": 1.25, "tone": 0.75, "market": 1.0, "space": 1.0,
+           "fake": 1.0}
 
 
 def public():
@@ -161,15 +159,15 @@ def from_answers(answers):
     a = [x for x in a if x in AGE_NAMES]
     if a:
         p["age"] = a
-    for k in ("creator_type", "tone", "lookalikes", "claim_tags"):     # aud_city retired (item 274)
+    for k in ("creator_type", "lookalikes", "claim_tags"):     # aud_city retired (item 274), tone (item 282)
         if answers.get(k):
             p[k] = list(answers[k])
     if answers.get("content_lang"):
         p["content_lang"] = answers["content_lang"]
     if answers.get("licence") == "preferred":
         p["licence"] = "preferred"
-    if answers.get("collab") in ("fresh", "proven"):
-        p["collab"] = answers["collab"]
+    if answers.get("max_fake") in ("15", "30", "50"):
+        p["max_fake"] = int(answers["max_fake"])        # a nice-to-have since item 282: ranks, never removes
     if answers.get("product") or answers.get("claim") or answers.get("claim_tags"):
         p["claim"] = True
         p["regulated"] = answers.get("regulated") == "yes"
@@ -476,7 +474,7 @@ def fit_for(c, p, platform=None):
         st = (licences().get(c["code"]) or {})
         want = [x for x in (p.get("market") or ["SA"]) if x in ("SA", "AE", "EG")] or ["SA"]
         got = [st.get(x) for x in want if st.get(x)]
-        m = 100 if "verified" in got else 80 if got else 40
+        m = 100 if "verified" in got else 80 if got else None      # no licence on file = not known (item 282)
         items.append(("licence", m, "Mawthooq licence", "Licensed"))
     if p.get("collab"):
         col = _collab(lst)
@@ -486,6 +484,14 @@ def fit_for(c, p, platform=None):
             paid = col.get("paid") or 0
             m = (100 if paid == 0 else 60 if paid <= 2 else 20) if p["collab"] == "fresh" else (100 if paid >= 3 else 70 if paid else 30)
         items.append(("fresh", m, "Fresh or proven", "Fresh face" if p["collab"] == "fresh" else "Brand-proven"))
+    if p.get("max_fake"):
+        fakes = [s["fake"] for s in lst if s.get("fake") is not None]
+        if fakes:
+            over = min(fakes) - p["max_fake"]
+            m = 100 if over <= 0 else max(0, int(round(100 - over * 6)))      # 10 points over the limit = 40
+        else:
+            m = None
+        items.append(("fake", m, "Fake followers", "Real audience"))
     if p.get("claim"):
         items.append(("claim", _claim_match(c, p), "Product + claim", "Health claim fit" if p.get("regulated") else "Fits the product"))
     if p.get("tone"):
@@ -533,66 +539,6 @@ def fit_for(c, p, platform=None):
         chips.remove(type_label)
         chips.insert(0, type_label)
     return {"score": score, "items": out_items, "chips": chips[:3]}
-
-
-# Item 280 (Bido, 2026-10-29): every power-up is a HARD rule on the creator's own data when a shortlist is built.
-# A creator with no data for an asked rule is left out (only creators proven to meet it are picked). Audience
-# answers (gender, age, audience city, audience country) are not rules here: they belong to the selection page.
-HARD_LABEL = {"type": "creator type", "lang": "content language", "licence": "Mawthooq licence", "fresh": "fresh or proven",
-              "tone": "tone", "claim": "product fit", "like": "creators like your picks"}
-
-
-def hard_fail(c, p, platform=None, markets=None):
-    """The first power-up rule creator ``c`` does not meet (a key of HARD_LABEL), or None when it meets them all."""
-    if not p:
-        return None
-    lst = None
-
-    def summaries():
-        nonlocal lst
-        if lst is None:
-            lst = _summaries(c["code"], platform)
-        return lst
-    if p.get("creator_type"):
-        m, _ = _type_match(c, p["creator_type"])
-        if m < 100:
-            return "type"
-    if p.get("content_lang"):
-        have = _langs(summaries())
-        ar, en = "arabic" in have, "english" in have
-        want = p["content_lang"]
-        if not (ar if want == "ar" else en if want == "en" else (ar and en)):
-            return "lang"
-    if p.get("licence"):
-        st = licences().get(c["code"]) or {}
-        want = [x for x in (markets or ["SA"]) if x in ("SA", "AE", "EG")] or ["SA"]
-        if not any(st.get(x) for x in want):
-            return "licence"
-    if p.get("collab"):
-        col = _collab(summaries())
-        if col is None:
-            return "fresh"
-        paid = col.get("paid") or 0
-        if (p["collab"] == "fresh" and paid > 0) or (p["collab"] == "proven" and paid < 1):
-            return "fresh"
-    if p.get("tone"):
-        if not (set(tones().get(c["code"]) or []) & set(p["tone"])):
-            return "tone"
-    if p.get("claim") and p.get("claim_tags"):
-        subs, inds, hcp = _creator_tags(c)
-        if not (subs & set(p["claim_tags"]) or _space_match(c, p.get("space") or []) == 100):
-            return "claim"
-    if p.get("claim") and p.get("regulated"):
-        subs, inds, hcp = _creator_tags(c)
-        medical = hcp or bool(subs & {"Pharmacy", "General medicine & health advice", "Dermatology & aesthetics", "Dentistry",
-                                      "Mother & child health"})
-        if not (medical or licences().get(c["code"])):
-            return "claim"
-    if p.get("lookalikes"):
-        picks = [x for x in p["lookalikes"] if x != c["code"]]
-        if picks and max(like_scores(x).get(c["code"], 0) for x in picks) < 50:
-            return "like"
-    return None
 
 
 def blend(perf, fit_score):

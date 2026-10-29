@@ -98,6 +98,7 @@ def summary(d, platform):
         "likes": _num(d.get("avg_likes")),
         "comments": _num(d.get("avg_comments")),
         "real": real,
+        "fake": _num(d.get("fake_followers_pct")),
         "growth": _growth(d),
         "ppw": _num(d.get("posts_per_week")),
         "idle": _days_since(d.get("last_post")),

@@ -29,9 +29,9 @@ import powerups
 # lookalike picks are not multiple-choice and stay with the shortlister.
 GROUPS = [
     ("campaign", "Campaign", ["goal", "platforms", "market", "category", "deliverable", "timing"]),
-    ("creators", "Creators", ["mix", "creator_size", "count", "creator_type", "collab", "licence", "max_fake", "min_engagement"]),
+    ("creators", "Creators", ["mix", "creator_size", "count", "creator_type", "licence", "max_fake"]),
     ("audience", "Audience", ["gender", "age", "content_lang"]),       # no Audience city since item 274
-    ("product", "Product", ["product", "claim", "regulated", "tone"]),
+    ("product", "Product", ["product", "claim", "regulated"]),
 ]
 REQUIRED = ("goal", "platforms", "market", "category")      # what a selection's own brief needs (matcher)
 # Short labels for the card's rows; the shortlister keeps its full questions.
