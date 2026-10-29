@@ -199,7 +199,17 @@
     back: "M15 5l-7 7 7 7",
     zin: "M12 6v12M6 12h12", zout: "M6 12h12", reset: "M5 12a7 7 0 1 0 2-5M5 4v4h4",
     play: "M8 5.5v13l11-6.5z",
-    search: "M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5L20 20"
+    search: "M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5L20 20",
+    // Filter and banner marks (Bido, 29 Oct 2026).
+    grid: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+    people: "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 6.5M18 14a6 6 0 0 1 3.5 6",
+    hcp: "M9.5 3.5h5v6h6v5h-6v6h-5v-6h-6v-5h6z",
+    star: "M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8 6.8 19.6l1-5.8-4.3-4.1 5.9-.8z",
+    reel: "M4 5h16v14H4zM4 9h16M8.5 5l2 4M13.5 5l2 4M10.5 12.3v4.4l3.8-2.2z",
+    video: "M4 5h16v14H4zM10 9v6l5-3z",
+    eye: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+    heart: "M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.3 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z",
+    trend: "M3 17l6-6 4 4 8-8M15 7h6v6"
   };
   function icon(name, cls) {
     var s = document.createElementNS(SVGNS, "svg");
@@ -469,7 +479,7 @@
   }
   // What a competitor post is, from what was fetched (Bido, 29 Oct 2026): a story (its link), a TikTok video,
   // an Instagram reel (a reel link, or views on record: only videos have them) or an Instagram post.
-  var KINDS = [["all", "All content"], ["reel", "Reels"], ["post", "Posts"], ["video", "TikTok videos"], ["story", "Stories"]];
+  var KINDS = [["all", "All", "grid", "All content"], ["reel", "Reels", "reel", "Instagram reels"], ["post", "Posts", "posts", "Instagram posts"], ["video", "TikTok", "video", "TikTok videos"], ["story", "Stories", "posts", "Stories"]];
   function kindOf(q) {
     var u = q.url || "";
     if (/\/stories\//.test(u)) return "story";
@@ -532,8 +542,13 @@
   function chips(label, opts, key) {
     var g = el("div", "ev-mi__chips"); g.setAttribute("role", "group"); g.setAttribute("aria-label", label);
     opts.forEach(function (o) {
-      var b = el("button", "ev-brand ev-brand--txt", PLAT_SVG[o[0]] ? "" : o[1]); b.type = "button";
+      var b = el("button", "ev-brand ev-brand--txt", PLAT_SVG[o[0]] || o[3] ? "" : o[1]); b.type = "button";
       if (PLAT_SVG[o[0]]) { b.innerHTML = PLAT_SVG[o[0]]; b.classList.add("ev-brand--ic", "ev-brand--" + o[0]); b.setAttribute("aria-label", o[1]); b.title = o[1]; }
+      else if (o[3]) {
+        // Icon and a short word; the full name is the tooltip and what a screen reader says (Bido, 29 Oct 2026).
+        b.classList.add("ev-brand--icx"); b.appendChild(icon(o[3])); b.appendChild(el("span", "", o[1]));
+        if (o[4]) { b.title = o[4]; b.setAttribute("aria-label", o[4]); }
+      }
       b.setAttribute("aria-pressed", miFilter[key] === o[0] ? "true" : "false");
       if (o[2]) { b.disabled = true; b.title = o[2]; }
       b.addEventListener("click", function () { miFilter[key] = o[0]; miListN = 20; drawMI(); });
@@ -597,13 +612,13 @@
     var size = sizer(visible(people));
     var bar = el("div", "ev-mi__bar");
     var hasTT = d.creators.some(function (c) { return c.platforms.indexOf("tiktok") >= 0; });
-    bar.appendChild(chips("Platform", [["all", "All platforms"], ["instagram", "Instagram"], ["tiktok", "TikTok", hasTT ? "" : "TikTok study not in yet"]], "platform"));
-    bar.appendChild(chips("Creator type", [["all", "Everyone"], ["hcp", "Doctors / pharmacists"], ["influencer", "Influencers"]], "type"));
+    bar.appendChild(chips("Platform", [["all", "All", "", "grid", "All platforms"], ["instagram", "Instagram"], ["tiktok", "TikTok", hasTT ? "" : "TikTok study not in yet"]], "platform"));
+    bar.appendChild(chips("Creator type", [["all", "All", "", "people", "Everyone"], ["hcp", "HCPs", "", "hcp", "Doctors / pharmacists"], ["influencer", "Influencers", "", "star", "Influencers"]], "type"));
     // Content kinds offered are the ones this study holds.
     var have = {};
     d.creators.forEach(function (p) { (p.posts || []).forEach(function (q) { have[kindOf(q)] = (have[kindOf(q)] || 0) + 1; }); });
     var kinds = KINDS.filter(function (k) { return k[0] === "all" || have[k[0]]; });
-    if (kinds.length > 2) bar.appendChild(chips("Content", kinds.map(function (k) { return k[0] === "all" ? k : [k[0], k[1] + " " + num(have[k[0]])]; }), "kind"));
+    if (kinds.length > 2) bar.appendChild(chips("Content", kinds.map(function (k) { return [k[0], k[0] === "all" ? k[1] : k[1] + " " + num(have[k[0]]), "", k[2], k[3]]; }), "kind"));
     var find = el("label", "ev-find");
     find.appendChild(icon("search"));
     var fi = document.createElement("input"); fi.type = "search"; fi.id = "ev-find"; fi.placeholder = "Find a creator by name or @handle";
@@ -645,23 +660,31 @@
     var strip = el("div", "ev-strip");
     var tb = el("div", "ev-proj ev-tot"); tb.setAttribute("role", "status");
     tb.appendChild(el("small", "", "Competitor study"));
-    [["posts", tot.posts, "posts", function (c) { c.appendChild(fig("span", "stories", tot.stories)); c.appendChild(document.createTextNode(" stories")); }],
+    var kc = { reel: 0, post: 0, video: 0, story: 0 };
+    people.forEach(function (p) { (p.posts || []).forEach(function (q) { kc[kindOf(q)]++; }); });
+    [["posts", tot.posts, "posts", function (c) {
+       [["reel", " reels"], ["post", " posts"], ["video", " TikToks"], ["story", " stories"]].filter(function (k) { return kc[k[0]]; }).forEach(function (k, i) {
+         if (i) c.appendChild(document.createTextNode(" · "));
+         c.appendChild(fig("span", "k" + k[0], kc[k[0]])); c.appendChild(document.createTextNode(k[1]));
+       }); }, "posts"],
      ["creators", people.length, "creators", function (c) {
        c.appendChild(fig("span", "hcp", tot.hcp)); c.appendChild(document.createTextNode(" HCPs · "));
        c.appendChild(fig("span", "inf", people.length - tot.hcp)); c.appendChild(document.createTextNode(" influencers")); }],
      ["views", tot.views, "views", function (c) { c.appendChild(document.createTextNode("posts and videos")); }],
      ["eng", tot.eng, "engagements", function (c) { c.appendChild(document.createTextNode("likes, comments, shares")); }]].forEach(function (s_) {
       var c = el("span", "ev-tot__s");
+      c.appendChild(icon({ posts: "posts", creators: "people", views: "eye", eng: "heart" }[s_[0]], "ev-tot__ic"));
       c.appendChild(fig("b", s_[0], s_[1]));
       c.appendChild(el("em", "", s_[2]));
       var sub = el("i", ""); s_[3](sub); c.appendChild(sub);
       tb.appendChild(c);
     });
-    tb.title = "Totals from the competitor posts of the creators on show. Story views and likes are private, so stories add to posts only.";
+    tb.title = "Totals from the competitor posts of the creators on show: reels, posts and TikTok videos.";
     strip.appendChild(tb);
     var pjb = el("div", "ev-proj ev-proj--strip"); pjb.setAttribute("role", "status");
     pjb.appendChild(el("small", "", "Projected " + estUnit()));
-    pjb.appendChild(fig("b", "proj", pj.mid));
+    var pjf = el("span", "ev-proj__fig"); pjf.appendChild(icon("trend", "ev-tot__ic")); pjf.appendChild(fig("b", "proj", pj.mid));
+    pjb.appendChild(pjf);
     mi.projMid = pj.mid;
     var rejN = people.filter(function (p) { return p.estimate && !p.locked && p.status === "rejected"; }).length;
     var pjs = el("span", "");

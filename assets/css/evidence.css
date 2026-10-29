@@ -470,3 +470,13 @@
 .ev-find:focus-within { border-color: var(--ink, #121212); box-shadow: 0 0 0 3px var(--lime, #e8ff76); }
 .ev-find .ev-ic { width: 18px; height: 18px; flex: none; }
 .ev-find input { border: 0; outline: 0; background: transparent; font: 500 14px "DM Sans", sans-serif; width: 100%; min-width: 0; color: inherit; }
+
+/* Icon chips (Bido, 29 Oct 2026): a mark and a short word; the full name is the tooltip. */
+.ev-brand--icx { display: inline-flex; align-items: center; gap: 7px; }
+.ev-brand--icx .ev-ic { width: 17px; height: 17px; flex: none; }
+/* Banner marks: one per figure, beside the number. */
+.ev-tot__s { grid-template-columns: auto auto auto; }
+.ev-tot__ic { width: 22px; height: 22px; align-self: center; grid-row: 1; }
+.ev-tot__s i { grid-column: 2 / -1; }
+.ev-proj__fig { display: inline-flex; align-items: center; gap: 8px; }
+.ev-proj__fig .ev-tot__ic { width: 24px; height: 24px; }
