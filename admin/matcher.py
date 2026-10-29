@@ -726,6 +726,16 @@ def score_all(brief, exclude=(), only=None, strict=False):
     want_cc = fit.target_list(target.get("country")) or [fit.DEFAULT_TARGET["country"]]
     based = {}
     if strict:
+        # Only creators the client's catalogue shows (portal_countries, the same rule as the roster page): a Jordan
+        # brief picked two Jordan-based creators the catalogue hides, so the shortlist showed 6 of its 8 (item 279).
+        land = db.setting("portal_countries", db.PORTAL_COUNTRIES)
+        if land:
+            import paging
+            def shown(c):
+                country = paging.place(c["city"])[0]
+                return country in land or (country == "Other" and str(c["city"] or "").strip().lower()
+                                           in ("", "unspecified", "other", "unknown"))
+            creators = [c for c in creators if shown(c)]
         if cats:
             creators = [c for c in creators if _tagged(c, cats)]
         measured = _measured_audience()
