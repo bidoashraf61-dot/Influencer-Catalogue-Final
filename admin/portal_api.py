@@ -1912,6 +1912,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "ok": True, "token": token, "name": name, "summary": summary, "narrated": narrated, "brief": text, "brief_id": brief_id,
             "reasons_pending": defer,
             "objective": brief["objective"], "totals": result["totals"], "pool": result["pool"],
+            "short": matcher.why_short(brief, len(result["picks"])),
             "picks": [dict(p, why=reasons.get(p["code"], ""), creator=shown.get(p["code"])) for p in result["picks"]],
             "alternates": [dict({k: a[k] for k in ("code", "score", "tag", "basis", "price")}, creator=shown.get(a["code"]))
                            for a in result["alternates"]],

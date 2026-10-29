@@ -675,6 +675,23 @@ def why_empty(brief):
         " or ".join(wanted) or "these platforms")
 
 
+def why_short(brief, n):
+    """When a shortlist holds fewer creators than the brief asked for: one plain sentence and what to loosen (item 279)."""
+    want = brief.get("count") or 8
+    if n >= want:
+        return None
+    loosen = []
+    if brief.get("size"):
+        loosen.append("allow more creator sizes")
+    if brief.get("max_fake") is not None:
+        loosen.append("accept a higher fake-follower share")
+    if brief.get("min_engagement"):
+        loosen.append("drop the minimum engagement")
+    loosen.append("add a platform or a country")
+    return "Only %d creator%s meet%s every part of your brief (you asked for %d). To see more, %s." % (
+        n, "" if n == 1 else "s", "s" if n == 1 else "", want, " or ".join(loosen[:2]))
+
+
 def _based_in(c, want):
     """True when the roster places the creator in one of the ``want`` countries."""
     _, hits = fit._place_mark(c, "|".join(want))

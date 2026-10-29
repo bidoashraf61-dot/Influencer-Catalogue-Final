@@ -4713,6 +4713,7 @@
       var txt = h("div", { class: "ai-result__txt" });
       txt.appendChild(h("p", { class: "ai-result__name" }, name));
       txt.appendChild(h("p", { class: "ai-result__sum" }, res.summary || (res.picks.length + " creators match your brief, best fit first.")));
+      if (res.short) txt.appendChild(h("p", { class: "ai-result__short" }, res.short));     // fewer than asked, and why (item 279)
       if (res.reasons_pending) txt.appendChild(h("p", { class: "ai-result__pending", role: "status" }, h("i", { "aria-hidden": "true" }), "Helvi is writing why each creator fits…"));
       var tlb = timingLine(res.timing, { short: true });
       if (tlb) txt.appendChild(tlb);

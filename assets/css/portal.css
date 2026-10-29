@@ -1841,3 +1841,4 @@ body.sel-scores-off .cat-card .cat-score, body.sel-scores-off .cat-card .cat-pla
 }
 @media (prefers-reduced-motion: reduce) { .bs-need { animation: none; } }
 .bs-need__chk { margin-left: 8px; vertical-align: 1px; letter-spacing: 0; text-transform: none; }
+.ai-result__short { margin: 8px 0 0; padding: 8px 12px; border-radius: 12px; background: #fff1e2; color: #a85507; font-size: 14px; font-weight: 600; line-height: 1.45; max-width: 70ch; }
