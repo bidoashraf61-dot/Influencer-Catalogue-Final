@@ -480,3 +480,16 @@
 .ev-tot__s i { grid-column: 2 / -1; }
 .ev-proj__fig { display: inline-flex; align-items: center; gap: 8px; }
 .ev-proj__fig .ev-tot__ic { width: 24px; height: 24px; }
+
+/* Easier to read on the strip (Bido, 29 Oct 2026): bigger figures, darker and larger words. */
+.ev-strip .ev-proj small { font-size: 12.5px; letter-spacing: .09em; }
+.ev-tot { column-gap: 30px; padding: 12px 22px; }
+.ev-tot__s b { font-size: 40px; }
+.ev-tot__s em { font-size: 15px; font-weight: 800; color: #121212; }
+.ev-tot__s i { font-size: 13px; font-weight: 600; opacity: 1; color: #2b2b2b; }
+.ev-tot__ic { width: 26px; height: 26px; stroke-width: 2; }
+.ev-strip .ev-proj--strip { padding: 12px 22px; }
+.ev-strip .ev-proj--strip b { font-size: 44px; }
+.ev-strip .ev-proj--strip > span { font-size: 14px; font-weight: 700; color: #121212; }
+.ev-proj__fig .ev-tot__ic { width: 28px; height: 28px; }
+@media (max-width: 720px) { .ev-tot__s b { font-size: 32px; } .ev-strip .ev-proj--strip b { font-size: 36px; } }
