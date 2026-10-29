@@ -91,6 +91,8 @@
     return String(n);
   }
   function dm(ts) { return ts ? new Date(ts * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""; }
+  // Campaign days are stored as UTC midnight (first day) and 23:59:59 UTC (last day), as the dashboard reads them.
+  function cdm(ts) { return ts ? new Date(ts * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }) : ""; }
   function ago(ts) {
     if (!ts) return "";
     var s = Date.now() / 1000 - ts;
@@ -104,11 +106,11 @@
   }
   // Where a campaign is in its run: "Starts 3 Nov", "Day 4 of 21", "3 Oct – 24 Oct".
   function when(a, b) {
-    if (!a || !b) return a ? "From " + dm(a) : "";
+    if (!a || !b) return a ? "From " + cdm(a) : "";
     var now = Date.now() / 1000, span = Math.max(1, Math.round((b - a) / 86400));
-    if (now < a) return "Starts " + dm(a);
+    if (now < a) return "Starts " + cdm(a);
     if (now <= b) return "Day " + Math.min(span, Math.max(1, Math.ceil((now - a) / 86400))) + " of " + span;
-    return dm(a) + " – " + dm(b);
+    return cdm(a) + " – " + cdm(b);
   }
   var SIG = { good: "Strong", moderate: "Fair", low: "Low" };
   var TRACK = { good: "On track", moderate: "Slightly behind", low: "Behind target" };
@@ -1078,7 +1080,7 @@
             return h("span", { class: "hvb-t__stagecell" }, wrap, moveMenu(it, opts.stages, function (to) { B.move(it, to); })); } },
         { k: "kam", t: "KAM", v: function (it) { return (it.kam || "").toLowerCase(); }, cell: function (it) { return it.kam || "HelloVoice team"; } },
         { k: "when", t: camp ? "Dates" : "Updated", v: function (it) { return camp ? (it.raw.starts_at || 0) : (it.updated || 0); }, cell: function (it) {
-            var range = it.raw.starts_at ? dm(it.raw.starts_at) + " – " + dm(it.raw.ends_at) : "–";
+            var range = it.raw.starts_at ? cdm(it.raw.starts_at) + " – " + cdm(it.raw.ends_at) : "–";
             return camp ? h("span", null, range, it.when && it.when !== range ? h("small", null, it.when) : null) : ago(it.updated); } },
         { k: "creators", t: "Creators", n: 1, v: function (it) { return num(it, "creators"); }, cell: function (it) { return String(num(it, "creators")); } },
         { k: "approved", t: "Approved", n: 1, v: function (it) { return num(it, "approved"); }, cell: function (it) { return String(num(it, "approved")); } },

@@ -71,6 +71,8 @@
     if (!ts) return "";
     return new Date(ts * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   }
+  // Campaign first and last days, stored in UTC like the dashboard reads them.
+  function cday(ts) { return ts ? new Date(ts * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : ""; }
   function shortDay(ts) { return ts ? new Date(ts * 1000).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) : ""; }
   function dm(ts) { return ts ? new Date(ts * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""; }
   function ago(ts) {
@@ -945,7 +947,7 @@
     }
     return h("section", { class: "ac-bug", "aria-label": c.name },
       h("div", { class: "ac-bug__top" }, brands, h("span", { class: "ac-live" }, "Live"),
-        h("span", { class: "ac-muted" }, [day(c.starts_at), day(c.ends_at)].filter(Boolean).join(" – "))),
+        h("span", { class: "ac-muted" }, [cday(c.starts_at), cday(c.ends_at)].filter(Boolean).join(" – "))),
       h("div", { class: "ac-bug__row" }, h("h2", { class: "ac-bug__title" }, c.name), stamp(c.verdict)),
       scorelineDl([
         ["Views", big(c.views), null, null],
@@ -963,7 +965,7 @@
         qchip(c.quote),
         h("span", { class: "ac-item__verdict ac-item__verdict--" + (c.verdict.grade || "none") }, c.verdict.label || "Getting started")),
       h("b", { class: "ac-item__name" }, c.name),
-      h("span", { class: "ac-muted" }, [day(c.starts_at), day(c.ends_at)].filter(Boolean).join(" – ")),
+      h("span", { class: "ac-muted" }, [cday(c.starts_at), cday(c.ends_at)].filter(Boolean).join(" – ")),
       h("div", { class: "ac-item__nums" },
         h("span", null, h("b", null, big(c.views)), " views"),
         h("span", null, h("b", null, c.delivered + (c.planned ? "/" + c.planned : "")), " posts"),
