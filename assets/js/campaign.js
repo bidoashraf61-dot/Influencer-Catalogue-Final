@@ -18,7 +18,7 @@
   var ICON_LINK = (window.HV_ICONS || {}).link || "";
   var R = null;
   var FILTER = { platform: "", kind: "", section: "campaign" };
-  var KIND = { post: "Post", reel: "Reel", story: "Story", video: "Video", short: "Short" };
+  var KIND = { post: "Post", carousel: "Carousel", reel: "Reel", story: "Story", video: "Video", short: "Short" };
   var PLURAL = { post: "Posts", reel: "Reels", story: "Stories", video: "Videos", short: "Shorts" };
   var SIG = { good: "Strong", moderate: "Fair", low: "Low" };
   var countryName = (function () {
@@ -58,6 +58,12 @@
   function icon(p) { return ICONS[p] || ICON_LINK; }
   // No brief, strategy or targets: nothing is graded, every pill reads "Not scored" (owner, 2026-10-29).
   function unscored() { return !!(R && R.visibility && R.visibility.scored === false); }
+  // A creator with no video at all: Instagram shows no views on photo posts and carousels (owner, 2026-10-29).
+  function noViews(code) {
+    var mine = (R.posts || []).filter(function (p) { return p.code === code && p.section === "campaign"; });
+    return mine.length && !mine.some(function (p) { return p.video; })
+      ? '<span class="mx-na" title="Instagram does not show view counts on photo posts and carousels.">Not public</span>' : "—";
+  }
   function sig(grade, title) {
     if (unscored()) return '<span class="mx-sig mx-sig--none" title="No brief or targets were set for this campaign, so it is not scored.">Not scored</span>';
     var g = SIG[grade] ? grade : "none";
@@ -940,7 +946,7 @@
       var rate = c.video_er != null ? c.video_er : c.er;      // reactions per view, the rate the campaign goal measures
       var tds = ['<td class="mx-rank">' + (c.badge ? medal(c.badge, c.rank) : (c.rank || "—")) + "</td>",
         '<td><div class="mx-tc">' + ava(c.photo) + "<div>" + creatorLink(c, "mx-tc__name") + '<div class="mx-tc__links">' + profileLinks(c) + "</div></div></div></td>",
-        "<td>" + c.delivered + (c.planned ? " / " + c.planned : "") + "</td>", "<td>" + (c.views ? full(c.views) : "—") + "</td>"];
+        "<td>" + c.delivered + (c.planned ? " / " + c.planned : "") + "</td>", "<td>" + (c.views ? full(c.views) : noViews(c.code)) + "</td>"];
       if (vis.reach) tds.push("<td>" + full(c.reach) + "</td>");
       tds.push("<td>" + full(c.engagement) + "</td>",
         "<td>" + pct(rate) + "</td>");

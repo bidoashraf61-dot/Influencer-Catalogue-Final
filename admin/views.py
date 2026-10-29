@@ -3822,7 +3822,7 @@ def client_report_card(k):
           "<a href='" + u("/settings") + "'>Settings</a>.</div></details></div>")
 
 
-KIND_LABEL = {"post": "Post", "reel": "Reel", "story": "Story", "video": "Video", "short": "Short"}
+KIND_LABEL = {"post": "Post", "carousel": "Carousel", "reel": "Reel", "story": "Story", "video": "Video", "short": "Short"}
 
 
 def campaign_content_page(k, members, posts, error=None, message=None):

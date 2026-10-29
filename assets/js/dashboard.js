@@ -14,8 +14,8 @@
   var LINK = (window.HV_ICONS || {}).link || "";
   var R = null, TOKEN = "", PRINT_W = 0;
   var F = { platform: "", range: "all", from: "", to: "", creators: [] };
-  var ONE = { post: "Photo", reel: "Reel", story: "Story", video: "Video", short: "Short" };
-  var KIND = { post: "Photo posts", reel: "Reels", story: "Stories", video: "Videos", short: "Shorts" };
+  var ONE = { post: "Photo", carousel: "Carousel", reel: "Reel", story: "Story", video: "Video", short: "Short" };
+  var KIND = { post: "Photo posts", carousel: "Carousels", reel: "Reels", story: "Stories", video: "Videos", short: "Shorts" };
   var COL = ["#14884a", "#ff691e", "#b9d400", "#8a7a68", "#121212"];
   var SIG = { good: "Strong", moderate: "Fair", low: "Low" };
   var countryName = (function () {
@@ -1274,6 +1274,12 @@
   }
 
   // Each creator's videos, one row per video, a chip for every platform it went out on.
+  // A creator with no video at all: Instagram shows no views on photo posts and carousels (owner, 2026-10-29).
+  var NO_VIEWS_TIP = "Instagram does not show view counts on photo posts and carousels.";
+  function noViews(code) {
+    var mine = R.posts.filter(function (p) { return p.code === code && p.section === "campaign"; });
+    return mine.length && !mine.some(function (p) { return p.video; }) ? '<span class="db-na" title="' + NO_VIEWS_TIP + '">Not public</span>' : "—";
+  }
   function videosByCreator(list, rows) {
     var pieces = mergePieces(list), by = {};
     // Only for campaigns with planned videos or one video on several platforms; otherwise it repeats the table (owner, 2026-10-29).
@@ -1670,7 +1676,7 @@
       return (ns ? '<h3 style="margin-top:0">Creators ranked by video views</h3>' : '<h3 style="margin-top:0">How creators are scored · out of 100</h3>' + scoreBar()) + '<table class="db-table"><thead><tr><th>#</th><th>Creator</th><th>Posts</th><th>Views</th>' + (R.visibility.reach === false ? "" : "<th>Reach</th>") + '<th>Eng.</th><th>% of views</th><th>% of eng.</th><th>ER</th>' + (R.visibility.clicks && R.objective.links ? "<th>Clicks</th>" : "") + (ns ? "" : "<th>Score</th>") + "</tr></thead><tbody>"
         + rows.map(function (c, i) { var x = filtered() ? (by[c.code] || {}) : { posts: c.delivered, views: c.views, reach: c.reach, eng: c.engagement };
           var n = filtered() ? i + 1 : c.rank;
-          return '<tr' + (n && n <= 3 ? ' class="is-top"' : "") + "><td>" + (n && n <= 3 ? '<span class="db-medal">' + medal(n) + "</span>" : (n || "—")) + '</td><td><span class="db-who">' + ava(c.photo) + "<b>" + who(c) + "</b></span></td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + (x.views ? num(x.views) : "—") + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng)
+          return '<tr' + (n && n <= 3 ? ' class="is-top"' : "") + "><td>" + (n && n <= 3 ? '<span class="db-medal">' + medal(n) + "</span>" : (n || "—")) + '</td><td><span class="db-who">' + ava(c.photo) + "<b>" + who(c) + "</b></span></td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + (x.views ? num(x.views) : noViews(c.code)) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng)
             + "</td><td>" + share(x.views, tot.v) + "</td><td>" + share(x.eng, tot.e) + "</td><td>" + pct(c.video_er != null ? c.video_er : c.er) + "</td>" + (R.visibility.clicks && R.objective.links ? "<td>" + full(c.clicks) + "</td>" : "") + (ns ? "" : "<td>" + (filtered() && viewScore[c.code] != null ? scoreTxt(viewScore[c.code]) : scoreTxt(c.score)) + "</td>") + "</tr>"; }).join("")
         + '</tbody></table><p class="db-note" style="margin-top:10px">' + esc(ns ? "Ranked by video views, then engagement. " + NS_TIP : scoreTip()) + "</p>" + videosByCreator(list, rows);
       // The score breakdown table is gone from the drawer (owner, 2026-10-29): the score is already in the table above.

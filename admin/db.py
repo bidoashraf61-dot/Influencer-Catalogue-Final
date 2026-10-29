@@ -3200,7 +3200,7 @@ def set_setting(key, value):
 
 # ---------------------------------------------------------------- content --
 
-KINDS = ["post", "reel", "story", "video", "short"]
+KINDS = ["post", "carousel", "reel", "story", "video", "short"]   # carousel: a swipe post, no public views
 VIDEO_KINDS = {"reel", "video", "short"}
 
 

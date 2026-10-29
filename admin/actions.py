@@ -46,7 +46,7 @@ def configure(port=None, base=None, host=None):
 # --------------------------------------------------------------- registry --
 
 PLATFORMS = "Instagram, TikTok, Snapchat, YouTube, X, Facebook or Threads"
-KINDS = "post, reel, story, video or short"
+KINDS = "post, carousel, reel, story, video or short"
 COUNTS = {"likes": "Likes.", "comments": "Comments.", "views": "Views.",
           "shares": "Shares.", "saves": "Saves."}
 
