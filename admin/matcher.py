@@ -803,26 +803,45 @@ def _mix(items, mix):
     return out + [i for i in items if id(i) not in named] + unscored     # no size on file, then no numbers: last
 
 
-# Tags that name a word of a space but are not that space: "Health & Fitness" is not health care.
-NOT_IN_SPACE = {"health care": ("fitness", "wellness", "sport")}
+# Item 285 (Bido, 2026-10-29): a product space is the catalogue's own Interest tag, matched exactly, so the AI
+# shortlist finds the same creators the catalogue's Interest filter shows. Only tags of the same name or meaning
+# count ("Food" and "Food & Restaurants"); related spaces do not (Skincare is not Beauty, Gaming is not Tech).
+SPACE_TAGS = {
+    "health care": ("health care", "health & medical", "health"),
+    "skincare": ("skincare",),
+    "beauty": ("beauty", "make-up", "beauty & personal care"),
+    "hair care": ("hair care",),
+    "fragrance": ("fragrance",),
+    "fashion": ("fashion",),
+    "luxury": ("luxury",),
+    "lifestyle": ("lifestyle",),
+    "mother & baby": ("motherhood",),
+    "food": ("food & restaurants", "food"),
+    "travel": ("travel & tourism", "travel"),
+    "fitness": ("health & fitness", "fitness"),
+    "entertainment": ("entertainment & comedy", "entertainment"),
+    "e-commerce": ("e-commerce & shopping", "shopping & deals"),
+    "sports": ("sports",),
+    "music & art": ("music & art",),
+    "education": ("education",),
+    "home & interior": ("home & interior",),
+    "technology": ("tech & gadgets",),
+    "automotive": ("automotive",),
+    "finance": ("finance & business", "finance"),
+    "gaming": ("gaming",),
+}
 
 
 def _tagged(c, cats):
-    """The creator's interest tags name one of ``cats`` (healthcare professionals always count for
-    health care). Read tag by tag, so one tag cannot count for a space it only shares a word with."""
-    interest = str(c["interest"] or "").lower()
-    tags = [t.strip() for t in re.split(r"[,|/;]", interest) if t.strip()]
+    """The creator carries the catalogue Interest tag of one of ``cats`` (SPACE_TAGS, exact). Healthcare
+    professionals always count for health care."""
+    tags = {t.strip().lower() for t in re.split(r"[,|/;]", str(c["interest"] or "")) if t.strip()}
     for cat in cats:
         cat = cat.lower()
         if cat in ("health care", "health") and str(c["tier"] or "").upper().startswith("HCP"):
             return True
-        words = fit.CATEGORY_WORDS.get(cat) or [cat]
-        skip = NOT_IN_SPACE.get(cat, ())
-        for t in tags:
-            if any(x in t for x in skip):
-                continue
-            if cat in t or any(fit.has_word(t, w) for w in words):
-                return True
+        if tags & set(SPACE_TAGS.get(cat, (cat,))):
+            return True
     return False
 
 

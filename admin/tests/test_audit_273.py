@@ -30,7 +30,13 @@ class Tags(unittest.TestCase):
             self.assertFalse(matcher._tagged(row("Beauty, Make-up, Lifestyle"), [cat]), cat)
         self.assertTrue(matcher._tagged(row("Beauty, Skincare"), ["skincare"]))
         self.assertTrue(matcher._tagged(row("Hair Care"), ["hair care"]))
-        self.assertTrue(matcher._tagged(row("Skincare"), ["beauty"]))
+        # item 285: exact catalogue tags, so Skincare is not Beauty, Gaming not Tech, Health & Fitness not Sports
+        self.assertFalse(matcher._tagged(row("Skincare"), ["beauty"]))
+        self.assertTrue(matcher._tagged(row("Make-up"), ["beauty"]))
+        self.assertFalse(matcher._tagged(row("Gaming"), ["technology"]))
+        self.assertFalse(matcher._tagged(row("Health & Fitness"), ["sports"]))
+        self.assertFalse(matcher._tagged(row("Sports"), ["fitness"]))
+        self.assertTrue(matcher._tagged(row("Shopping & Deals"), ["e-commerce"]))
 
     def test_fitness_and_literal_spaces(self):
         self.assertTrue(matcher._tagged(row("Health & Fitness"), ["fitness"]))
