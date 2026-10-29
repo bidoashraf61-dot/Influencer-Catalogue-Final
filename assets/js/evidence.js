@@ -474,7 +474,7 @@
     var t = el("div", "ev-mi__title");
     // The map is Helvi Intelligence; its mark says so before the headline does (Bido, 26 Oct 2026).
     var mark = document.createElement("img");
-    mark.className = "ev-mi__logo"; mark.alt = "Helvi Intelligence"; mark.height = 34;
+    mark.className = "ev-mi__logo"; mark.alt = "Helvi Intelligence"; mark.height = 96;
     mark.src = "../assets/brand/modules/helvi-intelligence-480.png?v=2";
     t.appendChild(mark);
     var h = el("h1", "ev-mi__t", "Who works with your competitors"); h.id = "ev-mi-t"; t.appendChild(h);
