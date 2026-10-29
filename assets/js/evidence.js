@@ -517,7 +517,8 @@
   // The creators the map shows: everyone in focus mode, else each competitor's best (by the objective's measure):
   // 5 each when there are several, more when a pack has one or two competitors so the overview is not near empty.
   function visible(people) {
-    if (miFocus) return people.filter(function (p) { return p.competitors[miFocus]; }).slice(0, 30);
+    // Focus shows every creator of that competitor (Bido, 29 Oct 2026); past 40 they go on dense rings.
+    if (miFocus) return people.filter(function (p) { return p.competitors[miFocus]; });
     var nc = miData.competitors.length, pick = {}, each = nc > 2 ? 5 : nc === 2 ? 14 : 40;
     miData.competitors.forEach(function (c) {
       people.filter(function (p) { return p.competitors[c.name]; }).slice(0, each).forEach(function (p) { pick[p.handle] = true; });
@@ -532,7 +533,8 @@
   function sizer(list) {
     var vs = list.map(function (p) { return p.rank_value || 0; }).filter(function (v) { return v > 0; });
     var lo = vs.length ? Math.min.apply(null, vs) : 1, hi = vs.length ? Math.max.apply(null, vs) : 1;
-    var a = miFocus ? 28 : 24, b = miFocus ? 44 : 38;
+    var dense = miFocus && list.length > 40;
+    var a = dense ? 10 : miFocus ? 28 : 24, b = dense ? 17 : miFocus ? 44 : 38;
     var L = function (v) { return Math.log10(Math.max(v, 1)); };
     var f = function (v) { return hi > lo ? (L(v) - L(lo)) / (L(hi) - L(lo)) : 0.5; };
     var r = function (p) { return a + (b - a) * Math.max(0, Math.min(1, f(p.rank_value || lo))); };
@@ -572,6 +574,34 @@
     bar.appendChild(chips("Creator type", [["all", "Everyone"], ["hcp", "Doctors / pharmacists"], ["influencer", "Influencers"]], "type"));
     // Projected range for the creators on show (owner, 2026-10-15): one post each, from their competitor
     // work: typical (median) in the middle, lowest to highest around it. Follows the filters and the objective.
+    // What the study holds for the creators on show (Bido, 29 Oct 2026): posts, creators by type, views and
+    // engagement, in the same banner look as the projection. Follows the filters.
+    var tot = { posts: 0, stories: 0, views: 0, eng: 0, hcp: 0 };
+    people.forEach(function (p) {
+      if (typeOf(p) === "hcp") tot.hcp++;
+      (p.posts || []).forEach(function (q) {
+        tot.posts++;
+        if (/\/stories\//.test(q.url || "")) tot.stories++;
+        tot.views += q.views || 0;
+        tot.eng += (q.likes || 0) + (q.comments || 0) + (q.shares || 0);
+      });
+    });
+    if (people.length) {
+      var tb = el("div", "ev-proj ev-tot"); tb.setAttribute("role", "status");
+      tb.appendChild(el("small", "", "Competitor study"));
+      [[num(tot.posts), "posts", tot.stories ? num(tot.stories) + " stories" : ""],
+       [num(people.length), "creators", num(tot.hcp) + " HCPs · " + num(people.length - tot.hcp) + " influencers"],
+       [num(tot.views), "views", "posts and videos"],
+       [num(tot.eng), "engagements", "likes, comments, shares"]].forEach(function (s) {
+        var c = el("span", "ev-tot__s");
+        c.appendChild(el("b", "", s[0]));
+        c.appendChild(el("em", "", s[1]));
+        if (s[2]) c.appendChild(el("i", "", s[2]));
+        tb.appendChild(c);
+      });
+      tb.title = "Totals from the competitor posts of the creators on show. Story views and likes are private, so stories add to posts only.";
+      bar.appendChild(tb);
+    }
     var pj = { lo: 0, mid: 0, hi: 0, n: 0 };
     people.forEach(function (p) { var e = p.estimate; if (!e || p.locked) return; pj.lo += e.lo; pj.mid += e.mid; pj.hi += e.hi; pj.n++; });
     if (pj.n) {
@@ -794,7 +824,22 @@
       // Focus: one competitor in the centre, its creators in rings, names under the photos.
       var fc = d.competitors.filter(function (c) { return c.name === miFocus; })[0] || { name: miFocus };
       placed.push({ x: cx, y: cy, r: 114 });
-      vis.forEach(function (p, i) {
+      if (vis.length > 40) {
+        // Every creator: oval rings out from the logo, each holding as many small photos as its length allows;
+        // names stay in the hover title and the list, so the map stays readable.
+        for (var vi = 0, rg = 0; vi < vis.length; rg++) {
+          var ry = 150 + rg * 30, rx = ry * 1.55, circ = 2 * Math.PI * Math.sqrt((rx * rx + ry * ry) / 2);
+          var cnt2 = Math.min(Math.max(8, Math.floor(circ / 32)), vis.length - vi);
+          for (var qi = 0; qi < cnt2; qi++, vi++) {
+            var p2 = vis[vi], r2 = dotR(p2), a2 = -Math.PI / 2 + qi * 2 * Math.PI / cnt2 + (rg % 2 ? Math.PI / cnt2 : 0);
+            var at2 = place(cx + rx * Math.cos(a2), cy + ry * Math.sin(a2), r2);
+            links2.appendChild(svg("line", { x1: at2.x, y1: at2.y, x2: cx, y2: cy, class: "ev-map__own" }));
+            var dd2 = dot(p2, at2, r2, defs, stage, Object.keys(p2.competitors).length > 1, []);
+            dd2.__comps = [miFocus]; dots.push(dd2);
+            nodes.appendChild(dd2);
+          }
+        }
+      } else vis.forEach(function (p, i) {
         var r = dotR(p), ring = i < 8 ? 0 : i < 20 ? 1 : 2, idx = ring === 0 ? i : ring === 1 ? i - 8 : i - 20, cnt = ring === 0 ? 8 : 12;
         var a = -Math.PI / 2 + idx * 2 * Math.PI / cnt + (ring === 1 ? 0.26 : 0), rad = 205 + ring * 125;
         var at = place(cx + rad * 1.55 * Math.cos(a), cy + rad * Math.sin(a), r);
