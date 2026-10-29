@@ -494,3 +494,5 @@
 .ev-proj__fig .ev-tot__ic { width: 28px; height: 28px; }
 @media (max-width: 720px) { .ev-tot__s b { font-size: 32px; } .ev-strip .ev-proj--strip b { font-size: 36px; } }
 .ev-tot__s { grid-template-columns: auto auto 1fr; }
+/* The shine stays, but softer, so it never washes out a figure as it passes. */
+.ev-strip .ev-proj::after { background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, .32) 50%, transparent 60%); }
