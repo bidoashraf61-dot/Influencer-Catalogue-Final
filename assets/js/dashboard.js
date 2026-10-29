@@ -1280,6 +1280,10 @@
     var mine = R.posts.filter(function (p) { return p.code === code && p.section === "campaign"; });
     return mine.length && !mine.some(function (p) { return p.video; }) ? '<span class="db-na" title="' + NO_VIEWS_TIP + '">Not public</span>' : "—";
   }
+  // With planned videos the panel is every creator's videos; without, only videos posted on more than one platform,
+  // and the title says so (owner, 2026-10-29: "why only these creators").
+  var VIDS_PLANNED = "Videos by creator", VIDS_CROSS = "Videos posted on more than one platform";
+  function vidsTitle(rows) { return rows.some(function (c) { return c.planned; }) ? VIDS_PLANNED : VIDS_CROSS; }
   function videosByCreator(list, rows) {
     var pieces = mergePieces(list), by = {};
     // Only for campaigns with planned videos or one video on several platforms; otherwise it repeats the table (owner, 2026-10-29).
@@ -1299,9 +1303,9 @@
           }).join("") + "</div></div>";
       }).join("");
       var owed = []; for (var i = mine.length; i < (c.planned || 0); i++) owed.push('<div class="db-vid is-owed"><div class="db-vid__t"><b>Video ' + (i + 1) + " of " + c.planned + "</b><small>Not published yet</small></div></div>");
-      return '<div class="db-vids"><h4>' + ava(c.photo) + "<span>" + who(c) + "</span><b>" + mine.length + (c.planned ? "/" + c.planned : "") + " videos · " + num(tot) + " views</b></h4>" + rowsHtml + owed.join("") + "</div>";
+      return '<div class="db-vids"><h4>' + ava(c.photo) + "<span>" + who(c) + "</span><b>" + mine.length + (c.planned ? "/" + c.planned : "") + (mine.length === 1 && !c.planned ? " video · " : " videos · ") + num(tot) + " views</b></h4>" + rowsHtml + owed.join("") + "</div>";
     }).join("");
-    return out ? "<h3>Videos by creator</h3>" + out : "";
+    return out ? "<h3>" + vidsTitle(rows) + "</h3>" + out : "";
   }
 
   /* ------------------------------------------- goals: targets, forecast, benchmarks */
@@ -2134,9 +2138,10 @@
     [].slice.call(wrap.querySelectorAll("h3")).forEach(function (h) {
       var t = h.textContent.trim();
       if (t === "Score breakdown") { var tb = h.nextElementSibling; if (tb && tb.tagName === "TABLE") drop(tb); drop(h); }
-      if (t === "Videos by creator") {
+      if (t === VIDS_PLANNED || t === VIDS_CROSS) {
         var sec = h.closest(".pp-sec"), box = document.createElement("div");
-        box.innerHTML = ppSec("00", "Videos by creator", "Every video each creator published, and its views on each platform.", "");
+        box.innerHTML = t === VIDS_PLANNED ? ppSec("00", t, "Every video each creator published, and its views on each platform.", "")
+          : ppSec("00", t, "The same video on several platforms, and its views on each one.", "");
         var ns = box.firstChild, body = ns.querySelector(".pp-b");
         while (h.nextSibling) body.appendChild(h.nextSibling);
         drop(h); sec.parentNode.insertBefore(ns, sec.nextSibling);
