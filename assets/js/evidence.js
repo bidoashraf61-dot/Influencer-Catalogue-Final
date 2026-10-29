@@ -514,12 +514,13 @@
     return g;
   }
 
-  // The creators the map shows: everyone in focus mode, else each competitor's best 5 (by the objective's measure).
+  // The creators the map shows: everyone in focus mode, else each competitor's best (by the objective's measure):
+  // 5 each when there are several, more when a pack has one or two competitors so the overview is not near empty.
   function visible(people) {
     if (miFocus) return people.filter(function (p) { return p.competitors[miFocus]; }).slice(0, 30);
-    var pick = {};
+    var pick = {}, each = miData.competitors.length > 2 ? 5 : 14;
     miData.competitors.forEach(function (c) {
-      people.filter(function (p) { return p.competitors[c.name]; }).slice(0, 5).forEach(function (p) { pick[p.handle] = true; });
+      people.filter(function (p) { return p.competitors[c.name]; }).slice(0, each).forEach(function (p) { pick[p.handle] = true; });
     });
     return people.filter(function (p) { return pick[p.handle]; });
   }
@@ -723,10 +724,12 @@
     if (!miFocus) {
       // Competitors on a wide oval so the whole screen is used; every creator gets ONE home (the competitor
       // they did most posts for) and fans out around it. Lines to their other competitors light up on hover.
-      var n = d.competitors.length, RX = n > 1 ? 470 : 0, RY = n > 1 ? 262 : 0;
+      // One competitor sits to the right of the brand, not on top of it (a zero-size oval put both hubs on the
+      // centre and turned every creator's angle into NaN, so none of them were drawn).
+      var n = d.competitors.length, RX = n > 1 ? 470 : 330, RY = n > 1 ? 262 : 0;
       var maxV = Math.max.apply(null, d.competitors.map(function (c) { return c.views; }).concat([1]));
       d.competitors.forEach(function (c, i) {
-        var a = -Math.PI / 2 + i * 2 * Math.PI / Math.max(n, 1);
+        var a = n > 1 ? -Math.PI / 2 + i * 2 * Math.PI / n : 0;
         pos[c.name] = { x: cx + RX * Math.cos(a), y: cy + RY * Math.sin(a), a: a, r: 56 + 20 * Math.sqrt(c.views / maxV) };
       });
       placed.push({ x: cx, y: cy, r: 106 });
@@ -739,7 +742,7 @@
       });
       Object.keys(homes).forEach(function (k) {
         var cp = pos[k], list = homes[k], m = list.length;
-        var out = Math.atan2((cp.y - cy) / RY, (cp.x - cx) / RX);
+        var out = RY ? Math.atan2((cp.y - cy) / RY, (cp.x - cx) / RX) : cp.a;
         list.forEach(function (p, i) {
           var r = dotR(p), ring = i < 7 ? 0 : 1, j = ring ? i - 7 : i, cnt = ring ? Math.max(m - 7, 1) : Math.min(m, 7);
           var spread = Math.min(2.6, 0.55 * cnt), a = out + (cnt > 1 ? (j / (cnt - 1) - 0.5) * spread : 0);
