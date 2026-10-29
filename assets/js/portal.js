@@ -4199,6 +4199,10 @@
     host.appendChild(card);
 
     var qs = null, byId = {}, answers = {}, step = 0, busy = false, last = null, srcRes = null;
+    // Answers the client confirmed in this card. Profile values (country, industry) only pre-select a step; they
+    // earn their points when the client confirms them, so the meter starts at 0 (Bido, 2026-10-29, item 281).
+    var confirmed = {};
+    function confirmAll() { confirmed = {}; Object.keys(answers).forEach(function (k) { confirmed[k] = true; }); }
     /* -- the game layer: coach animations and campaign power -- */
     // The coach: idle poses loop; reactions (thumbs, cheer, point) play once, in full, then hand
     // over to whatever is waiting, so a tap is always answered before the next pose.
@@ -4239,6 +4243,7 @@
     var POINTS = { goal: 100, platforms: 100, market: 100, category: 100, mix: 100, count: 100 };
     var LEVELS = [[0, "Draft"], [300, "Good"], [600, "Strong"], [1000, "Full power"]];
     function scoreOf(id) {
+      if (!confirmed[id]) return 0;
       var v = answers[id];
       if (v == null || (Array.isArray(v) && !v.length)) return 0;
       return POINTS[id] || 0;
@@ -4313,7 +4318,7 @@
     function close() {
       card.classList.remove("is-open"); run.hidden = true; intro.hidden = false;
     }
-    start.addEventListener("click", function () { answers = profileAnswers(); srcRes = null; open(); });
+    start.addEventListener("click", function () { answers = profileAnswers(); confirmed = {}; srcRes = null; open(); });
     // From a link or a file: Helvi fills the six answers, the client lands on the review to check them.
     function fromSource(which) {
       card.classList.add("is-open"); intro.hidden = true; run.hidden = false; run.classList.remove("is-staging");
@@ -4324,15 +4329,15 @@
         p.appendChild(h("p", { class: "ai-sl__ask" }, "Start from what you have"));
         p.appendChild(h("p", { class: "ai-sl__hint" }, "A product page or your brief. Helvi fills the brief, you check it."));
         var bs = HV.briefSource({ dark: true, complete: true, onUse: function (got, res) {
-          answers = Object.assign(profileAnswers(), got); srcRes = res;
+          answers = Object.assign(profileAnswers(), got); srcRes = res; confirmAll();     // the client checked the read brief
           review();
         }, onBuild: function (got, res) {
           // Straight to the shortlist (item 277): no ticket, no power-up stage; power-ups found in the brief apply.
-          answers = Object.assign(profileAnswers(), got); srcRes = res;
+          answers = Object.assign(profileAnswers(), got); srcRes = res; confirmAll();
           if (!busy) go(nameFor());
         } });
         p.appendChild(bs);
-        p.appendChild(h("div", { class: "ai-sl__nav" }, h("button", { class: "ai-sl__back", type: "button", onclick: function () { answers = profileAnswers(); srcRes = null; ask(0); } }, "Answer the questions instead")));
+        p.appendChild(h("div", { class: "ai-sl__nav" }, h("button", { class: "ai-sl__back", type: "button", onclick: function () { answers = profileAnswers(); confirmed = {}; srcRes = null; ask(0); } }, "Answer the questions instead")));
         swap(p);
         var b = bs.querySelectorAll(".bs__opt")[which === "file" ? 1 : 0];
         if (b) b.click();
@@ -4379,7 +4384,7 @@
           b.addEventListener("click", function () {
             answers[id] = o.value;
             Array.prototype.forEach.call(mix.children, function (x) { x.setAttribute("aria-pressed", String(x === b)); x.setAttribute("aria-checked", String(x === b)); });
-            pop(b, scoreOf(id)); reward(scoreOf(id)); setTimeout(next, reduce ? 0 : 750);
+            confirmed[id] = true; pop(b, scoreOf(id)); reward(scoreOf(id)); setTimeout(next, reduce ? 0 : 750);
           });
           mix.appendChild(b);
         });
@@ -4396,7 +4401,7 @@
         var on = many ? picked.indexOf(o.value) > -1 : answers[id] === o.value;
         var b = h("button", { class: "ai-sl__opt", type: "button", "aria-pressed": String(on) }, o.label);
         b.addEventListener("click", function () {
-          if (!many) { answers[id] = o.value; b.setAttribute("aria-pressed", "true"); pop(b, scoreOf(id)); reward(scoreOf(id)); setTimeout(function () { next(); }, reduce ? 0 : 750); return; }
+          if (!many) { answers[id] = o.value; b.setAttribute("aria-pressed", "true"); confirmed[id] = true; pop(b, scoreOf(id)); reward(scoreOf(id)); setTimeout(function () { next(); }, reduce ? 0 : 750); return; }
           picked = toggleMulti(q, picked, o.value);
           Array.prototype.forEach.call(opts.children, function (x, xi) { if (q.options[xi]) x.setAttribute("aria-pressed", String(picked.indexOf(q.options[xi].value) > -1)); });
           if (isAny(o.value) && oIn) { oIn.value = ""; oIn.hidden = true; oBtn.setAttribute("aria-pressed", "false"); }
@@ -4432,7 +4437,7 @@
           oNext = h("button", { class: "ai-sl__next", type: "button", onclick: function () {
             var nv = withOther(q, null, oIn.value);
             if (!nv) return;
-            answers[id] = nv; pop(oNext, scoreOf(id)); reward(scoreOf(id)); setTimeout(next, reduce ? 0 : 750);
+            answers[id] = nv; confirmed[id] = true; pop(oNext, scoreOf(id)); reward(scoreOf(id)); setTimeout(next, reduce ? 0 : 750);
           } }, "Next");
           oNext.hidden = !own; oNext.disabled = !own;
         }
@@ -4440,7 +4445,7 @@
       var nav = h("div", { class: "ai-sl__nav" });
       if (i > 0) nav.appendChild(h("button", { class: "ai-sl__back", type: "button", onclick: function () { ask(i - 1); } }, "Back"));
       if (!q.required && !many) nav.appendChild(h("button", { class: "ai-sl__skip", type: "button", onclick: function () { delete answers[id]; next(); } }, "Skip"));
-      var nextBtn = h("button", { class: "ai-sl__next", type: "button", onclick: function () { answers[id] = picked.slice(); pop(nextBtn, scoreOf(id)); reward(scoreOf(id)); setTimeout(next, reduce ? 0 : 750); } }, "Next");
+      var nextBtn = h("button", { class: "ai-sl__next", type: "button", onclick: function () { answers[id] = picked.slice(); confirmed[id] = true; pop(nextBtn, scoreOf(id)); reward(scoreOf(id)); setTimeout(next, reduce ? 0 : 750); } }, "Next");
       if (many) { nextBtn.disabled = !picked.length; nav.appendChild(nextBtn); }
       if (oNext) nav.appendChild(oNext);
       p.appendChild(nav);
