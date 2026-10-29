@@ -3931,6 +3931,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                          cost=money(f.get("total_cost")), notes=(f.get("notes") or "").strip() or None)
         vis = {key: f.get("vis_" + key) == "1" for key in ("reach", "clicks", "all_content", "audience")}
         vis["emv"] = False                   # EMV is internal only
+        vis["scored"] = f.get("vis_scored") == "1"
+        vis["notes"] = (f.get("vis_notes") or "").strip()[:2000]
         own_rates = self.rates_from(f)
         targets = {}
         for key in db.TARGET_KEYS:
@@ -6733,7 +6735,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def _roster_fingerprint(self):
         with db.connect() as conn:
             return tuple(conn.execute(
-                "SELECT (SELECT count(*) || ':' || coalesce(max(updated_at), 0) FROM creators),"
+                "SELECT (SELECT count(*) || ':' || coalesce(" + db.CREATOR_STAMP + ", 0) FROM creators),"
                 " (SELECT count(*) || ':' || coalesce(max(rowid), 0) FROM creator_analysis),"
                 " (SELECT group_concat(name || ':' || coalesce(price_from, '') || ':' || coalesce(price_to, '')) FROM tiers)").fetchone())
 

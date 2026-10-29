@@ -3580,6 +3580,9 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
                  "<div class='price-hint'>Pick a template, enter the client's budget — it works out the minimum the budget must buy, "
                  "what the booked creators can safely deliver, and the benchmark the client sees.</div></div>"
                  "<a class='btn small' href='" + u("/calculator") + "?id=" + str(k["id"]) + "'>Open the calculator</a></div>"
+               + "<label class='tick' style='margin-top:16px'><input type='checkbox' name='vis_scored' value='1'"
+               + (" checked" if vis.get("scored", True) else "") + "><span>Score this campaign (grades, objective bar, "
+               "targets reached). Untick when there is no brief or targets: every grade then reads “Not scored”.</span></label>"
                + "<label style='margin-top:16px'>Targets the client sees</label>"
                "<div class='row'>" + tgt("posts", "Posts", "e.g. 24") + tgt("views", "Views", "e.g. 500000")
                + tgt("reach", "Reach", "e.g. 300000") + tgt("engagement", "Engagement", "e.g. 20000")
@@ -3596,7 +3599,10 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
                          [("reach", "Reach &amp; impressions"), ("clicks", "Affiliate link clicks"),
                           ("audience", "What people said (comments)"),
                           ("all_content", "Posts outside the hashtags")])
-               + "</div><p class='price-hint'>These apply to the dashboard and the full report. Costs, CPM, EMV, notes and ratings are never shown to the client.</p>")
+               + "</div><p class='price-hint'>These apply to the dashboard and the full report. Costs, CPM, EMV, notes and ratings are never shown to the client.</p>"
+               "<label style='margin-top:14px'>Data notes the client sees (Goals &amp; benchmarks tab, one per line)</label>"
+               "<textarea name='vis_notes' rows='4' placeholder='e.g. Facebook group posts were not reachable (private groups).'>"
+               + e(vis.get("notes") or "") + "</textarea>")
         + "<h2>Internal</h2><div class='card'><div class='row'>"
         + "<div><label>Total cost to us (SAR)</label><input name='total_cost' value='"
         + (format(k["cost"], ",") if k["cost"] is not None else "") + "' inputmode='numeric'>"

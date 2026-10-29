@@ -17,7 +17,7 @@
 .db-head { display: flex; align-items: center; gap: 16px; padding: 12px 0 10px; }
 .db-head__logo img { width: 146px; height: auto; display: block; }
 .db-head__brands { display: flex; align-items: center; gap: 8px; }
-.db-head__brands img { height: 40px; width: auto; max-width: 130px; object-fit: contain; }
+.db-head__brands img { height: 64px; width: auto; max-width: 190px; object-fit: contain; }   /* client logo bigger (owner, 2026-10-29) */
 .db-head__brands span { color: var(--gray); font-family: var(--heading); font-size: 18px; }
 .db-head__title { flex: 1; }
 .db-head__title h1 { font-family: var(--heading); font-weight: 400; font-size: 34px; line-height: .95; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -1009,7 +1009,7 @@
   .db-head__logo, .db-head__brands { min-height: 64px; display: flex; align-items: center; }
   .db-head__logo img { width: 116px; }
   .db-head__brands { gap: 6px; }
-  .db-head__brands img { height: 30px; max-width: 96px; }
+  .db-head__brands img { height: 44px; max-width: 132px; }
   .db-head__title { flex: 1 1 100%; min-width: 0; }
   .db-head__title h1 { font-size: 34px; }
   .db-head__title p { overflow-wrap: anywhere; }

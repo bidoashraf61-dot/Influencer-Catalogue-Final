@@ -37,7 +37,11 @@
   function day(t, y) { if (!t) return ""; var d = typeof t === "number" ? new Date(t * 1000) : new Date(t + "T00:00:00Z");
     return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: y ? "numeric" : undefined, timeZone: "UTC" }); }
   function ago(t) { if (!t) return ""; var s = Date.now() / 1000 - t; return s < 3600 ? Math.max(1, Math.round(s / 60)) + " min ago" : s < 86400 ? Math.round(s / 3600) + " h ago" : Math.round(s / 86400) + " days ago"; }
-  function sig(g, tip) { return '<span class="db-sig db-sig--' + (SIG[g] ? g : "none") + '"' + (tip ? ' title="' + esc(tip) + '"' : "") + ">" + (SIG[g] || "—") + "</span>"; }
+  // No brief, strategy or targets: nothing is graded, every pill reads "Not scored" (owner, 2026-10-29).
+  function unscored() { return !!(R && R.visibility && R.visibility.scored === false); }
+  var NS_TIP = "No brief or targets were set for this campaign, so it is not scored.";
+  function sig(g, tip) { if (unscored()) return '<span class="db-sig db-sig--none" title="' + NS_TIP + '">Not scored</span>';
+    return '<span class="db-sig db-sig--' + (SIG[g] ? g : "none") + '"' + (tip ? ' title="' + esc(tip) + '"' : "") + ">" + (SIG[g] || "—") + "</span>"; }
   function flag(cc) { return '<span class="fi fi-' + esc(String(cc).toLowerCase()) + '" aria-hidden="true"></span>'; }
   function ava(p) { return p ? '<img src="' + esc(p) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span class="db-ava"></span>'; }
   function ico(d) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + "</svg>"; }
@@ -624,6 +628,7 @@
     var o = R.objective || { label: "Balanced", kpis: [] }, P = R.progress || {}, items = P.items || [];
     var box = $("w-objective");
     var goals = '<button type="button" class="db-goals" data-area="kpi">' + IC.goal + "<span>Goals &amp; benchmarks</span><b>›</b></button>";
+    if (unscored()) { box.innerHTML = '<span class="db-obj__label" title="' + NS_TIP + '">Campaign objective · <b>Not scored</b> — no brief or targets were set</span>' + goals; return; }
     if (!items.length) { box.innerHTML = '<span class="db-obj__label">Objective · <b>' + esc(o.label) + "</b> — no targets set yet</span>" + goals; return; }
     var done = P.overall != null ? P.overall : items.reduce(function (a, i) { return a + Math.min(100, i.pct); }, 0) / items.length;
     var marks = items.filter(function (i) { return i.expected != null && i.goal; });
@@ -709,9 +714,10 @@
   }
   function renderTop(list) {
     var rows = ranked(list).slice(0, 5);
-    $("w-top").innerHTML = head(IC.top, "Creators leaderboard", (filtered() ? "Score out of 100, worked out on the posts in this view. " : "") + scoreTip(), "creators")
-      + '<div class="db-card__body">' + (rows.length ? '<div class="db-top__how">' + scoreBar(true) + "</div>" : "") + (rows.map(function (r, i) {
-                return '<div class="db-rank' + (i === 0 ? " is-1" : "") + '"><span class="db-rank__n">' + (i < 3 ? medal(i + 1) : i + 1) + "</span>" + ava(r.c.photo) + "<span><b>" + who(r.c) + "</b><small>" + r.c.delivered + (r.c.planned ? "/" + r.c.planned : "") + (r.c.delivered === 1 && !r.c.planned ? " video · " : " videos · ") + num(r.c.seen != null ? r.c.seen : r.c.views) + " views" + '</small></span><span class="db-rank__score" title="' + "Score out of 100" + '">' + r.label + "</span></div>";
+    var ns = unscored();
+    $("w-top").innerHTML = head(IC.top, "Creators leaderboard", ns ? "Ranked by video views, then engagement. " + NS_TIP : (filtered() ? "Score out of 100, worked out on the posts in this view. " : "") + scoreTip(), "creators")
+      + '<div class="db-card__body">' + (rows.length && !ns ? '<div class="db-top__how">' + scoreBar(true) + "</div>" : "") + (rows.map(function (r, i) {
+                return '<div class="db-rank' + (i === 0 ? " is-1" : "") + '"><span class="db-rank__n">' + (i < 3 ? medal(i + 1) : i + 1) + "</span>" + ava(r.c.photo) + "<span><b>" + who(r.c) + "</b><small>" + r.c.delivered + (r.c.planned ? "/" + r.c.planned : "") + (r.c.delivered === 1 && !r.c.planned ? " video · " : " videos · ") + (ns ? num(r.c.engagement) + " engagements" : num(r.c.seen != null ? r.c.seen : r.c.views) + " views") + '</small></span><span class="db-rank__score" title="' + (ns ? "Video views" : "Score out of 100") + '">' + (ns ? num(r.c.views || 0) : r.label) + "</span></div>";
       }).join("") || '<p class="db-note">No creators in this view.</p>') + "</div>";
   }
 
@@ -841,6 +847,9 @@
   function cmDay(t) { return t ? day(t) : "—"; }
   function cmWait(C) {
     if (C.status === "none" || !C.first_post) return '<div class="cm-wait"><p>No videos are live yet. Once creators post, the comments under them are read here.</p></div>';
+    // An ended campaign has no weekly schedule left: say plainly that its comments were not read (2026-10-29).
+    if (R.campaign.status === "ended" || (R.campaign.ends_at && Date.now() / 1000 > R.campaign.ends_at + 30 * 86400))
+      return '<div class="cm-wait"><p><span class="db-na">Not read yet</span> The comments under this campaign\'s videos have not been read.</p></div>';
     // Read once a week (owner, 2026-10-23): every 7 days from the first video, all videos together.
     var now = Date.now() / 1000, fp = C.first_post, wk = 7 * 86400, r1 = fp + wk, nx = C.next_read || C.next_week || r1;
     return '<div class="cm-wait"><p>Comments are read once a week, every 7 days from the first video. The ' + (now >= r1 ? "next" : "first") + " reading lands on <b>" + cmDay(nx) + "</b>.</p>"
@@ -1267,10 +1276,13 @@
   // Each creator's videos, one row per video, a chip for every platform it went out on.
   function videosByCreator(list, rows) {
     var pieces = mergePieces(list), by = {};
+    // Only for campaigns with planned videos or one video on several platforms; otherwise it repeats the table (owner, 2026-10-29).
+    if (!rows.some(function (c) { return c.planned; }) && !pieces.some(function (p) { return p.parts && p.parts.length > 1; })) return "";
     pieces.forEach(function (p) { (by[p.code] = by[p.code] || []).push(p); });
     var out = rows.map(function (c) {
       var mine = (by[c.code] || []).slice().sort(function (a, b) { return (a.posted_at || 0) - (b.posted_at || 0); });
       if (!mine.length && !c.planned) return "";
+      if (!c.planned && !mine.some(function (p) { return p.parts && p.parts.length > 1; })) return "";   // one video, one platform: the table says it all
       var tot = mine.reduce(function (a, p) { return a + seen(p); }, 0);
       var rowsHtml = mine.map(function (p, i) {
         var parts = p.parts || [p];
@@ -1346,7 +1358,7 @@
       var inner = '<span class="db-tv__top"><b>' + KEYN[i.key] + "</b>" + (lead.indexOf(i.key) >= 0 ? ' <span class="db-lead">headline</span>' : "") + stPill(st[0], st[1])
         + '<span class="db-tv__nums"><strong>' + tvFmt(i.key, i.actual) + "</strong> of " + tvFmt(i.key, i.goal) + "</span></span>"
         + '<span class="db-tv__track" role="img" aria-label="' + esc(label) + '"><i style="--w:' + w.toFixed(1) + "%;background:" + col + '"></i>'
-        + (exp == null ? "" : '<em style="left:' + exp.toFixed(1) + '%"><u>posts so far</u></em>') + (over ? '<s style="color:' + col + '">+' + over + "%</s>" : "") + "</span>"
+        + (exp == null ? "" : '<em style="left:' + exp.toFixed(1) + '%"><u>expected by now</u></em>') + (over ? '<s style="color:' + col + '">+' + over + "%</s>" : "") + "</span>"
         + '<span class="db-tv__sub"><span class="db-tv__pct" style="color:' + col + '">' + Math.round(i.pct) + "% met</span>" + esc(togo + today)
         + (can ? '<svg class="db-tv__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' : "") + "</span>"
         + (rng ? '<span class="db-tv__rng">Benchmark range for these creators <b>' + esc(rng) + "</b></span>" : "");
@@ -1553,8 +1565,8 @@
     }).join("") + "</div>", g.owed.length + (g.owed.length === 1 ? " video" : " videos"));
   }
   function dataNotes() {
-    var g = GL(); if (!g || !g.notes.length) return "";
-    return sec("notes", "Data notes", "Only the things that change how to read the numbers above.", '<ul class="db-dn">' + g.notes.map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("") + "</ul>");
+    var g = GL(), notes = R.data_notes || (g && g.notes) || []; if (!notes.length) return "";
+    return sec("notes", "Data notes", "Only the things that change how to read the numbers above.", '<ul class="db-dn">' + notes.map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("") + "</ul>");
   }
 
   // What the tab is showing, in one line, when the page's platform filter changes it.
@@ -1579,12 +1591,14 @@
       var sc = scope(), P = SP() || {}, items = P.items || [], t = R.total, plan = R.plan || {}, pb = sc.mode === "plat" ? (sc.bp.bench || {}) : (plan.benchmark || {}), g = GL();
       var o = R.objective || {}, lead = o.kpis || [];
       var plats = sc.mode === "plat" ? [sc.pl] : planPlats();
-      var head = '<div class="db-goal-sum" role="group" aria-label="Summary"><div><span>' + (sc.mode === "plat" ? esc(sc.pl) + " targets" : "All targets") + '</span><b>' + (items.length ? Math.round(P.all_met ? 100 : Math.min(99, P.overall || 0)) + "%" : "—") + '</b><small>' + (!items.length ? "No targets set yet" : P.all_met ? "Every target met" : "100% only when every target is met") + "</small></div>"
-        + "<div><span>Objective</span><b>" + esc(o.label || "Balanced") + "</b><small>" + esc(lead.map(function (k) { return KEYN[k]; }).join(" & ")) + " lead</small></div>"
+      var ns = unscored();
+      var head = '<div class="db-goal-sum" role="group" aria-label="Summary"><div><span>' + (sc.mode === "plat" ? esc(sc.pl) + " targets" : "All targets") + '</span><b>' + (ns ? "Not scored" : items.length ? Math.round(P.all_met ? 100 : Math.min(99, P.overall || 0)) + "%" : "—") + '</b><small>' + (ns ? "No brief or targets were set" : !items.length ? "No targets set yet" : P.all_met ? "Every target met" : "100% only when every target is met") + "</small></div>"
+        + (ns ? "" : "<div><span>Objective</span><b>" + esc(o.label || "Balanced") + "</b><small>" + esc(lead.map(function (k) { return KEYN[k]; }).join(" & ")) + " lead</small></div>")
         + (plats.length ? "<div><span>Benchmarked for</span><b class=\"db-goal-plat\">" + plats.map(function (p) { return '<span class="db-goal-plat__p"><span class="db-goal-plat__ic" style="color:' + (PCOL[p] || "#121212") + '">' + (ICONS[p] || "") + "</span><i>" + esc(p) + "</i></span>"; }).join("") + "</b><small>" + esc(plan.category || plan.template || "") + "</small></div>" : "") + "</div>";
       var out = head + scopeNote(sc);
       if (sc.mode === "bonus") return out + bonusCard(sc.pl) + platformSplit() + dataNotes();
-      out += objectiveBox() + tvInfographic(items, lead) + forecastBox();
+      out += ns ? sec("targets", "Targets", NS_TIP, '<p class="db-empty">Not scored: no brief, strategy or targets were set for this campaign, so the numbers on this dashboard are the results as delivered.</p>')
+        : objectiveBox() + tvInfographic(items, lead) + forecastBox();
       // Benchmarks as gauges: the shaded band is the normal range for these
       // creators, the dot is where the campaign is now.
       function gauge(label, unit, band, now, grade) {
@@ -1622,15 +1636,14 @@
       var rows = filtered() ? ranked(list).map(function (r) { return r.c; }) : R.creators;
       var tot = rows.reduce(function (a, c) { var x = filtered() ? (by[c.code] || {}) : { views: c.views, eng: c.engagement }; a.v += x.views || 0; a.e += x.eng || 0; return a; }, { v: 0, e: 0 });
       function share(v, t) { return t ? Math.round((v || 0) / t * 100) + "%" : "—"; }
-      return '<h3 style="margin-top:0">How creators are scored · out of 100</h3>' + scoreBar() + '<table class="db-table"><thead><tr><th>#</th><th>Creator</th><th>Posts</th><th>Views</th>' + (R.visibility.reach === false ? "" : "<th>Reach</th>") + '<th>Eng.</th><th>% of views</th><th>% of eng.</th><th>ER</th>' + (R.visibility.clicks && R.objective.links ? "<th>Clicks</th>" : "") + "<th>Score</th></tr></thead><tbody>"
+      var ns = unscored();
+      return (ns ? '<h3 style="margin-top:0">Creators ranked by video views</h3>' : '<h3 style="margin-top:0">How creators are scored · out of 100</h3>' + scoreBar()) + '<table class="db-table"><thead><tr><th>#</th><th>Creator</th><th>Posts</th><th>Views</th>' + (R.visibility.reach === false ? "" : "<th>Reach</th>") + '<th>Eng.</th><th>% of views</th><th>% of eng.</th><th>ER</th>' + (R.visibility.clicks && R.objective.links ? "<th>Clicks</th>" : "") + (ns ? "" : "<th>Score</th>") + "</tr></thead><tbody>"
         + rows.map(function (c, i) { var x = filtered() ? (by[c.code] || {}) : { posts: c.delivered, views: c.views, reach: c.reach, eng: c.engagement };
           var n = filtered() ? i + 1 : c.rank;
-          return '<tr' + (n && n <= 3 ? ' class="is-top"' : "") + "><td>" + (n && n <= 3 ? '<span class="db-medal">' + medal(n) + "</span>" : (n || "—")) + '</td><td><span class="db-who">' + ava(c.photo) + "<b>" + who(c) + "</b></span></td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + num(x.views) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng)
-            + "</td><td>" + share(x.views, tot.v) + "</td><td>" + share(x.eng, tot.e) + "</td><td>" + pct(c.video_er != null ? c.video_er : c.er) + "</td>" + (R.visibility.clicks && R.objective.links ? "<td>" + full(c.clicks) + "</td>" : "") + "<td>" + (filtered() && viewScore[c.code] != null ? scoreTxt(viewScore[c.code]) : scoreTxt(c.score)) + "</td></tr>"; }).join("")
-        + '</tbody></table><p class="db-note" style="margin-top:10px">' + esc(scoreTip()) + "</p>" + videosByCreator(list, rows)
-        + (filtered() ? "" : '<h3>Score breakdown</h3><table class="db-table"><thead><tr><th>Creator</th><th>Views</th><th>Engagement</th>' + (weights().er > 0 ? "<th>Eng. rate</th>" : "") + '' + (weights().clicks > 0 ? "<th>Clicks</th>" : "") + '<th>Score</th></tr></thead><tbody>'
-          + R.creators.filter(function (c) { return c.parts; }).map(function (c) { var q = c.parts; return "<tr><td>" + esc(c.name) + "</td><td>" + q.exposure.toFixed(0) + "</td><td>" + q.engagement.toFixed(0) + "</td>" + (weights().er > 0 ? "<td>" + q.er.toFixed(0) + "</td>" : "") + (weights().clicks > 0 ? "<td>" + q.clicks.toFixed(0) + "</td>" : "") + "<td><b>" + scoreTxt(c.score) + "</b></td></tr>"; }).join("")
-          + "</tbody></table>");
+          return '<tr' + (n && n <= 3 ? ' class="is-top"' : "") + "><td>" + (n && n <= 3 ? '<span class="db-medal">' + medal(n) + "</span>" : (n || "—")) + '</td><td><span class="db-who">' + ava(c.photo) + "<b>" + who(c) + "</b></span></td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + (x.views ? num(x.views) : "—") + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng)
+            + "</td><td>" + share(x.views, tot.v) + "</td><td>" + share(x.eng, tot.e) + "</td><td>" + pct(c.video_er != null ? c.video_er : c.er) + "</td>" + (R.visibility.clicks && R.objective.links ? "<td>" + full(c.clicks) + "</td>" : "") + (ns ? "" : "<td>" + (filtered() && viewScore[c.code] != null ? scoreTxt(viewScore[c.code]) : scoreTxt(c.score)) + "</td>") + "</tr>"; }).join("")
+        + '</tbody></table><p class="db-note" style="margin-top:10px">' + esc(ns ? "Ranked by video views, then engagement. " + NS_TIP : scoreTip()) + "</p>" + videosByCreator(list, rows);
+      // The score breakdown table is gone from the drawer (owner, 2026-10-29): the score is already in the table above.
     },
     stage: function () {
       var c = R.campaign, ST = { done: "Done", active: "In progress", pending: "Not started" };
@@ -2015,7 +2028,7 @@
       var nm = ppName(c.name), pic = c.photo_large || c.photo;
       return '<div class="pp-pod__c pp-pod__c--' + c.rank + '"><span class="pp-pod__pic">' + (pic ? '<img src="' + esc(pic) + '" alt="">' : "") + '<i>' + medal(c.rank) + "</i></span>"
         + "<b>" + esc(nm.en) + "</b>" + (nm.ar ? '<span class="pp-ar" dir="rtl" lang="ar">' + esc(nm.ar) + "</span>" : "")
-        + '<strong>' + scoreTxt(c.score) + "</strong><small>" + num(c.seen != null ? c.seen : c.views) + " views · " + num(c.engagement) + " engagements</small></div>";
+        + '<strong>' + (unscored() ? num(c.views || 0) : scoreTxt(c.score)) + "</strong><small>" + (unscored() ? "video views · " : num(c.seen != null ? c.seen : c.views) + " views · ") + num(c.engagement) + " engagements</small></div>";
     }).join("") + "</div>";
   }
   // Comment highlights: the most-liked comments, with the buying questions among them, each with its English line.
@@ -2053,7 +2066,7 @@
     var step = (c.steps || []).filter(function (s) { return s.on !== false && s.state === "active"; }).map(function (s) { return s.label; }).join(" · ");
     var t = R.comments ? cmPick() : null, nm = top ? ppName(top.name) : null;
     var facts = [];
-    if (top) facts.push('<div class="pp-sum__f"><span>Top creator</span><b>' + esc(nm.en) + "</b><small>" + scoreTxt(top.score) + " score · " + num(top.seen != null ? top.seen : top.views) + " views</small></div>");
+    if (top) facts.push('<div class="pp-sum__f"><span>Top creator</span><b>' + esc(nm.en) + "</b><small>" + (unscored() ? num(top.views || 0) + " video views" : scoreTxt(top.score) + " score · " + num(top.seen != null ? top.seen : top.views) + " views") + "</small></div>");
     if (t && t.n) facts.push('<div class="pp-sum__f"><span>Comments read</span><b>' + full(t.n) + "</b><small>" + cmPct(t.intent, t.n) + "% ask how to buy · " + cmPct(t.pos, t.n) + "% positive</small></div>");
     return '<section class="pp-sum"><div class="pp-sum__brand"><img src="' + PP_LOGO + '" alt="Helvi Track">'
       + (c.logos || []).slice(0, 3).map(function (u) { return '<span>×</span><img src="' + esc(u) + '" alt="">'; }).join("") + "</div>"
@@ -2070,7 +2083,8 @@
   function ppTidy(wrap) {
     function drop(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
     [].slice.call(wrap.querySelectorAll(".db-tv__pace, .db-tv__chev, .db-ps--add")).forEach(drop);
-    var notes = wrap.querySelector("#sec-notes"); if (notes) drop(notes.closest(".db-sec"));
+    // Data notes stay when they explain a gap: a campaign that is not scored or has its own notes (owner, 2026-10-29).
+    var notes = wrap.querySelector("#sec-notes"); if (notes && !unscored() && !(R.visibility && R.visibility.notes)) drop(notes.closest(".db-sec"));
     // comments: the numbers, the insight and the topics, not the comments themselves; each topic a closed, compact box
     [].slice.call(wrap.querySelectorAll(".cmp-tl__body, .cmb__load, .cmp-secbar")).forEach(drop);
     [].forEach.call(wrap.querySelectorAll(".cmp-tl__r"), function (d) { d.open = false; });
@@ -2248,11 +2262,11 @@
       var geo = R.comments && cmPick().n ? PANEL.geo() : "";
       // A summary page first (design audit, 2026-10-23), then every section on a new page.
       var body = ppSummary() + ppSec(num2(), "Goals & benchmarks", "Every target, where it should be for the posts published, the forecast and the benchmarks for creators of this size.", PANEL.kpi())
-        + ppSec(num2(), "Creators leaderboard", "Score out of 100 for the campaign's objective, what each creator delivered and every video.", ppPodium() + PANEL.creators())
+        + ppSec(num2(), "Creators leaderboard", unscored() ? "Creators ranked by video views, and what each delivered. Not scored: no brief or targets were set." : "Score out of 100 for the campaign's objective, what each creator delivered and every video.", ppPodium() + PANEL.creators())
         + ppSec(num2(), "Views & engagement", "How the campaign grew, day by day.", PANEL.trend())
         + (PANEL.did ? ppSec(num2(), "What people did", "Likes, comments, saves and shares, by platform and by creator.", PANEL.did()) : "")
         + ppSec(num2(), "Platforms & content", "Views, reach and engagement rate on each platform, and the formats published.", PANEL.plat() + (mixT ? "<h3>Content mix</h3>" + mixT : ""))
-        + (geo ? ppSec(num2(), "What people say", "Viewers' comments under the campaign videos, read by AI. Commenters' names are never stored.", geo, "pp-sec--geo") : "")
+        + ppSec(num2(), "What people say", "Viewers' comments under the campaign videos, read by AI. Commenters' names are never stored.", geo || '<p class="db-empty">The comments of this campaign have not been read yet.</p>', geo ? "pp-sec--geo" : "")
         + ppSec(num2(), "Every post", "Each creator's posts with their numbers. Every card opens the post.", PANEL.posts())
         + (R.visibility.clicks === false || (!clicksFor() && !(R.sales && R.sales.totals)) ? "" : ppSec(num2(), R.sales && R.sales.totals ? "Clicks to sales" : "Affiliate clicks", "", PANEL.clicks()))
         + ppSec(num2(), "Campaign stage", "The scope of work, step by step.", ppStage())

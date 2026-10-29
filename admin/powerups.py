@@ -227,7 +227,7 @@ def _sig_read():
     with db.connect() as conn:
         return tuple(conn.execute(
             "SELECT (SELECT COUNT(*) || ':' || COALESCE(MAX(updated_at), 0) FROM creator_analysis),"
-            " (SELECT COUNT(*) || ':' || COALESCE(MAX(updated_at), 0) FROM creators)").fetchone())
+            " (SELECT COUNT(*) || ':' || COALESCE(" + db.CREATOR_STAMP + ", 0) FROM creators)").fetchone())
 
 
 def licences():

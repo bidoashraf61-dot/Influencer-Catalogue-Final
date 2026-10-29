@@ -56,7 +56,10 @@
     return Math.round(s / 86400) + " days ago";
   }
   function icon(p) { return ICONS[p] || ICON_LINK; }
+  // No brief, strategy or targets: nothing is graded, every pill reads "Not scored" (owner, 2026-10-29).
+  function unscored() { return !!(R && R.visibility && R.visibility.scored === false); }
   function sig(grade, title) {
+    if (unscored()) return '<span class="mx-sig mx-sig--none" title="No brief or targets were set for this campaign, so it is not scored.">Not scored</span>';
     var g = SIG[grade] ? grade : "none";
     return '<span class="mx-sig mx-sig--' + g + '"' + (title ? ' title="' + esc(title) + '"' : "") + ">"
       + (SIG[grade] || "No data") + "</span>";
@@ -397,6 +400,7 @@
       R = b.report; R._t = t;
       // No tracking links = no clicks anywhere on the report: no tab, no
       // column, no share of the score (the server already scored without it).
+      R._noLinks = !!(R.objective && R.objective.links === false && R.visibility.clicks);
       if (R.objective && R.objective.links === false) R.visibility.clicks = false;
       if (!same || !FILTER) FILTER = { platform: "", kind: "", section: "campaign" };      // a refresh keeps the reader's filters
       render(t);
@@ -593,7 +597,7 @@
     renderClicks();
     renderCarousel();
     renderSay();
-    $("tab-clicks").hidden = !R.visibility.clicks;
+    $("tab-clicks").hidden = !R.visibility.clicks && !R._noLinks;
     markTab("overview");
     $("mx-csv").href = API + "/api/campaign.csv?t=" + encodeURIComponent(t);
     $("mx-dash").href = $("mx-dash-end").href = "dashboard/#t=" + encodeURIComponent(t); $("mx-dash").hidden = false;
@@ -639,9 +643,11 @@
       else if (now <= end) bits.push("Day " + dn + " <span>of " + total + "</span>");
       else bits.push("<span>Ran " + total + " days</span>");
     }
-    bits.push("<span>Updated every 24 hours" + (R.updated_at ? " · last " + ago(R.updated_at) : "") + "</span>");
+    if (c.status === "live") bits.push("<span>Updated every 24 hours" + (R.updated_at ? " · last " + ago(R.updated_at) : "") + "</span>");
+    else if (R.updated_at) bits.push("<span>Numbers read " + ago(R.updated_at) + "</span>");
     $("mx-ticker").innerHTML = bits.join(" · ");
-    var v = R.verdict || {};
+    var v = unscored() ? {} : (R.verdict || {});
+    $("mx-verdict").hidden = unscored();
     $("mx-verdict").className = "mx-verdict" + (v.grade ? " mx-verdict--" + v.grade : "");
     $("mx-verdict").innerHTML = esc(v.label || "") + "<small>overall, against target</small>";
   }
@@ -695,6 +701,11 @@
     // Every target counts: 100% only when all of them are met.
     var mine = items, P = R.progress || {};
     var box = $("mx-delivery");
+    if (unscored()) {
+      box.innerHTML = '<div class="mx-obj"><div class="mx-obj__label"><span>Campaign objective · <b>Not scored</b></span>'
+        + '<span class="mx-obj__pct">No brief or targets were set for this campaign</span></div></div>';
+      return;
+    }
     if (!mine.length) {
       box.innerHTML = '<div class="mx-obj"><div class="mx-obj__label"><span>Campaign objective · <b>' + esc(o.label)
         + '</b></span><span class="mx-obj__pct">No targets set yet</span></div></div>';
@@ -911,28 +922,30 @@
       + (w.er > 0 ? Math.round(w.er * 100) + "% engagement rate, " : "")
       + (w.clicks > 0 ? "and " + Math.round(w.clicks * 100) + "% affiliate clicks (compared with the best)" : "and no clicks — this campaign has no tracking links") + ". It rewards the results each creator delivered for the campaign, not their follower count. The top three get gold, silver and bronze; creators who have not posted yet are listed last.");
     var tag = $("mx-objective");
-    if (tag) tag.textContent = "Scored for " + o.label;
+    var ns = unscored();
+    if (ns && info) info.setAttribute("data-info", "Not scored: no brief or targets were set for this campaign. Creators are ranked by video views, then engagement. The top three get gold, silver and bronze.");
+    if (tag) tag.textContent = ns ? "Ranked by video views · not scored" : "Scored for " + o.label;
     var ranked = cs.filter(function (c) { return c.rank; });
     $("mx-podium").innerHTML = ranked.slice(0, 3).map(function (c) {
       return '<div class="mx-pod mx-pod--' + c.rank + '" style="--medal:' + MEDAL[c.badge] + '"><svg class="mx-medal" viewBox="0 0 40 50" aria-hidden="true">'
         + medalBody(c.badge, c.rank) + "</svg>"
         + (c.photo ? '<img class="mx-pod__photo" src="' + esc(c.photo) + '" alt="">' : '<span class="mx-pod__photo"></span>')
-        + '<div class="mx-pod__name">' + creatorLink(c, "") + '</div><div class="mx-pod__score">' + c.score.toFixed(0)
-        + "<small>score out of 100</small></div><div class=\"mx-pod__line\">" + num(c.seen != null ? c.seen : (c.views || 0)) + " views · "
+        + '<div class="mx-pod__name">' + creatorLink(c, "") + '</div><div class="mx-pod__score">' + (ns ? num(c.views || 0) + "<small>video views</small>" : c.score.toFixed(0)
+        + "<small>score out of 100</small>") + "</div><div class=\"mx-pod__line\">" + (ns ? "" : num(c.seen != null ? c.seen : (c.views || 0)) + " views · ")
         + num(c.engagement) + " engagements" + (vis.clicks && c.clicks ? " · " + num(c.clicks) + " clicks" : "") + "</div></div>";
     }).join("");
     var head = ["#", "Creator", "Posts", "Views"].concat(vis.reach ? ["Reach"] : []).concat(["Engagement", "Eng. rate"])
-      .concat(vis.clicks ? ["Clicks"] : []).concat(["Score"]);
+      .concat(vis.clicks ? ["Clicks"] : []).concat(ns ? [] : ["Score"]);
     var rows = cs.map(function (c) {
       var rate = c.video_er != null ? c.video_er : c.er;      // reactions per view, the rate the campaign goal measures
       var tds = ['<td class="mx-rank">' + (c.badge ? medal(c.badge, c.rank) : (c.rank || "—")) + "</td>",
         '<td><div class="mx-tc">' + ava(c.photo) + "<div>" + creatorLink(c, "mx-tc__name") + '<div class="mx-tc__links">' + profileLinks(c) + "</div></div></div></td>",
-        "<td>" + c.delivered + (c.planned ? " / " + c.planned : "") + "</td>", "<td>" + full(c.views) + "</td>"];
+        "<td>" + c.delivered + (c.planned ? " / " + c.planned : "") + "</td>", "<td>" + (c.views ? full(c.views) : "—") + "</td>"];
       if (vis.reach) tds.push("<td>" + full(c.reach) + "</td>");
       tds.push("<td>" + full(c.engagement) + "</td>",
         "<td>" + pct(rate) + "</td>");
       if (vis.clicks) tds.push("<td>" + full(c.clicks) + "</td>");
-      tds.push('<td><span class="mx-score"><i style="--w:' + c.score + '%"></i>' + c.score.toFixed(0) + "</span></td>");
+      if (!ns) tds.push('<td><span class="mx-score"><i style="--w:' + c.score + '%"></i>' + c.score.toFixed(0) + "</span></td>");
       return "<tr>" + tds.join("") + "</tr>";
     }).join("");
     $("mx-table").innerHTML = "<thead><tr>" + head.map(function (h) { return "<th>" + h + "</th>"; }).join("") + "</tr></thead><tbody>" + rows + "</tbody>";
@@ -953,7 +966,7 @@
       return '<div class="mx-bullet"><div class="mx-bullet__name">' + (IC[i.key] || "") + TLABEL[i.key] + " " + sig(i.grade) + "</div>"
         + '<div class="mx-bullet__track" role="img" aria-label="' + TLABEL[i.key] + " " + Math.round(i.pct) + '% of goal">'
         + '<div class="mx-bullet__fill ' + i.grade + '" style="width:' + fill + '%"></div>'
-        + (mark == null ? "" : '<div class="mx-bullet__mark" style="left:' + mark + '%"><span>posts so far</span></div>') + "</div>"
+        + (mark == null ? "" : '<div class="mx-bullet__mark" style="left:' + mark + '%"><span>expected by now</span></div>') + "</div>"
         + '<div class="mx-bullet__num"><b>' + (isRate ? pct(i.actual) : num(i.actual)) + "</b>of " + (isRate ? pct(i.goal, 1) : num(i.goal)) + " goal</div></div>";
     }).join("") : "";
     var ex = [];
@@ -964,9 +977,18 @@
     else ex.push(["Engagement rate", t.er, t.er_grade, "Strong from " + bmf(bm.er.micro[0]) + "% (micro creators)"]);
     if (t.video_er != null && !erT) ex.push(["Video engagement", t.video_er, t.video_er_grade, "Strong from " + bmf(bm.video_er[0]) + "%"]);
     if (R.visibility.clicks && t.ctr != null && R.clicks && R.clicks.links) ex.push(["Click-through", t.ctr, t.ctr_grade, "Strong from " + bmf(bm.ctr[0]) + "%"]);
+    if (unscored()) {
+      $("mx-targets-lede").textContent = "Not scored: no brief, strategy or targets were set for this campaign, so these are the results as delivered.";
+      ex.forEach(function (x) { x[3] = x[3].replace(/^Strong from /, "Industry guide: "); });
+    }
     $("mx-bench").innerHTML = ex.map(function (x) {
       return '<div class="mx-bench__item"><h3>' + h3ic(x[0]) + x[0] + '</h3><div class="mx-bench__val">' + pct(x[1]) + " " + sig(x[2]) + "</div><p>" + x[3] + "</p></div>";
-    }).join("");
+    }).join("") + dataNotes();
+  }
+  // What the numbers leave out, under the goals (owner, 2026-10-29): the campaign's own notes, then what the data shows.
+  function dataNotes() {
+    var out = (R.data_notes || (R.goals && R.goals.notes) || String((R.visibility && R.visibility.notes) || "").split(/\n+/).filter(function (l) { return l.trim(); })).map(esc);
+    return out.length ? '<div class="mx-notes"><h3>' + h3ic("Data notes") + 'Data notes</h3><ul>' + out.map(function (l) { return "<li>" + l + "</li>"; }).join("") + "</ul></div>" : "";
   }
 
   /* ----------------------------------------------------------- charts */
@@ -1011,7 +1033,9 @@
 
   function renderCharts() {
     var h = (R.history || []).map(function (d) { return { d: d.d, views: d.views, eng: d.engagement != null ? d.engagement : d.likes + d.comments }; });
-    $("mx-charts").innerHTML = h.length
+    $("mx-charts").innerHTML = h.length === 1
+      ? '<p class="mx-empty-note">The numbers were read once (' + esc(day(h[0].d, false)) + '), so there is no growth line to draw.</p>'
+      : h.length
       ? '<div class="mx-chart"><h3>' + IC.views + 'Views so far</h3>' + area(h, "views", "#14884a", "Views so far") + "</div>"
         + '<div class="mx-chart"><h3>' + IC.engagement + 'Engagement so far</h3>' + area(h, "eng", "#ff691e", "Engagement so far") + "</div>"
       : '<p class="mx-empty-note">The charts fill in as posts are captured, once every 24 hours.</p>';
@@ -1068,8 +1092,8 @@
   var SAY_ITEMS = null;
   function renderSay() {
     var t = sayTotals(), C = R.comments || {};
-    $("sec-say").hidden = $("tab-say").hidden = !(t && t.n);
-    if (!t || !t.n) return;
+    $("sec-say").hidden = $("tab-say").hidden = false;
+    if (!t || !t.n) { $("mx-say").innerHTML = '<p class="mx-empty-note"><span class="mx-na">Not read yet</span> The comments of this campaign have not been read.</p>'; return; }
     var share = t.intent / t.n, p = t.pos / t.n, z = t.neg / t.n, th = Object.keys(t.themes).sort(function (a, b) { return t.themes[b] - t.themes[a]; });
     var head = t.n < (C.min_sample || 30) ? "Only " + t.n + " comments so far" : share >= 0.15 ? "1 in " + Math.max(2, Math.round(1 / share)) + " want to buy"
       : z >= 0.3 ? "Viewers are divided" : p >= 0.6 ? "Viewers love it" : "Mostly neutral";
@@ -1112,9 +1136,10 @@
 
   function renderClicks() {
     var vis = R.visibility, cl = R.clicks;
-    $("sec-clicks").hidden = !vis.clicks;
-    if (!vis.clicks) return;
-    if (!cl || !cl.links || !cl.has_destination) {
+    // One structure for every campaign (owner, 2026-10-29): with no tracking links the section stays, with one line.
+    $("sec-clicks").hidden = !vis.clicks && !R._noLinks;
+    if (!vis.clicks && !R._noLinks) return;
+    if (R._noLinks || !cl || !cl.links || !cl.has_destination) {
       $("mx-clicks").innerHTML = '<p class="mx-empty-note"><span class="mx-na">Not part of this campaign</span> No tracking links were set up, so there are no clicks to count.</p>';
       return;
     }

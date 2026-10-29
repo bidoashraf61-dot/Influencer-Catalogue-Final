@@ -439,7 +439,7 @@
 .mx-arrow:hover { background: var(--lime); border-color: var(--lime); }
 .mx-arrow:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
 .mx-carousel__track { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 230px); gap: 16px; overflow-x: auto;
-  scroll-snap-type: x mandatory; padding: 4px 2px 14px; scrollbar-width: thin; }
+  scroll-snap-type: x mandatory; padding: 4px 2px 14px; scrollbar-width: thin; align-items: start; }   /* no empty card bottoms (2026-10-29) */
 .mx-cc { scroll-snap-align: start; border-radius: var(--r-md); background: var(--linen); overflow: hidden; display: flex; flex-direction: column; }
 .mx-cc__photo { display: block; aspect-ratio: 1 / 1; background: #ddd5cb; }
 .mx-cc__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -1027,3 +1027,8 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
   .mx-q, .mx-say__top, .mx-say__grid > div { break-inside: avoid; }
 }
 /* end report redesign */
+
+/* Data notes under the goals (2026-10-29) */
+.mx-notes { grid-column: 1 / -1; padding: 20px 22px; border-radius: var(--r-md); background: #f4f2ee; }
+.mx-notes h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--gray); font-weight: 500; }
+.mx-notes ul { margin: 0; padding-left: 18px; font-size: 14px; color: var(--ink); line-height: 1.6; }

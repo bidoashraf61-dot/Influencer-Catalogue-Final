@@ -461,6 +461,9 @@ def migrate(conn):
     if "updated_at" not in cols:
         conn.execute("ALTER TABLE creators ADD COLUMN updated_at INTEGER")
         conn.execute("UPDATE creators SET updated_at = ?", (now(),))
+    # Stamps written as text go back to numbers, the form the app writes (see CREATOR_STAMP).
+    conn.execute("UPDATE creators SET updated_at = CAST(strftime('%s', updated_at) AS INTEGER) "
+                 "WHERE typeof(updated_at) = 'text' AND strftime('%s', updated_at) IS NOT NULL")
     # A creator's own rate. Empty for everyone to begin with, which keeps every
     # existing price exactly where it was: on the tier band.
     if "price_from" not in cols:
@@ -746,6 +749,13 @@ def fire(name, *args):
 
 def now():
     return int(time.time())
+
+
+# The newest creator edit, whatever form its stamp is in. A stamp written as text ("2026-10-29 00:37:04", by a
+# script run straight on the database) sorts above every number in SQLite, so a plain MAX(updated_at) froze on it
+# and the roster cache stopped seeing edits (2026-10-29: country changes missing from a selection).
+CREATOR_STAMP = ("MAX(CASE WHEN typeof(updated_at) = 'text' THEN CAST(strftime('%s', updated_at) AS INTEGER) "
+                 "ELSE updated_at END)")
 
 
 # ------------------------------------------------------------------ admins --

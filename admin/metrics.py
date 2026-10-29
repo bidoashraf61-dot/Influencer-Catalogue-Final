@@ -158,13 +158,15 @@ def _company_brand(campaign):
 def visibility(campaign, company=True):
     """What the client's report shows. All on unless switched off. ``company=False`` gives the campaign's own
     switches only, for the admin form that edits them (the company's switches are applied on top)."""
-    keys = {"clicks": True, "emv": True, "all_content": False, "reach": False, "audience": True}
+    keys = {"clicks": True, "emv": True, "all_content": False, "reach": False, "audience": True,
+            "scored": True}      # off: no brief or targets, so the report grades nothing (owner, 2026-10-29)
     try:
         got = json.loads(campaign["visibility"] or "{}") if "visibility" in campaign.keys() else {}
     except ValueError:
         got = {}
     out = {k: bool(got.get(k, v)) for k, v in keys.items()}
     out["reach"] = False      # reach is not shown on any client report (owner, 2026-10-18)
+    out["notes"] = str(got.get("notes") or "").strip()[:2000]     # client-facing data notes on the Goals tab
     # The company's admin may switch a section off for all their reports (/workspace/ -> Track -> Settings).
     try:
         import workspace
@@ -1526,6 +1528,28 @@ def client_report(campaign, photo=None, photo_large=None):
     for bp in ((out["goals"] or {}).get("by_platform") or {}).values():
         for g in bp["creators"]:
             g["photo"] = pics.get(g["code"])
+    # The campaign's own data notes lead the Goals tab's notes. Not scored (no brief or targets, owner 2026-10-29):
+    # no verdict, no targets (suggested ones included), so nothing on the report is graded.
+    own = [ln.strip() for ln in (vis.get("notes") or "").splitlines() if ln.strip()]
+    if not vis.get("scored", True):
+        own.append("No brief, strategy or targets were set for this campaign, so it is not scored.")
+        out["verdict"], out["targets_auto"] = {}, False
+        # No score to rank by: creators rank by video views, then engagement.
+        cr = out["creators"]
+        live = sorted([c for c in cr if c.get("rank")], key=lambda c: (-(c.get("views") or 0), -(c.get("engagement") or 0)))
+        for i, c in enumerate(live):
+            c["rank"], c["badge"] = i + 1, {1: "gold", 2: "silver", 3: "bronze"}.get(i + 1)
+        out["creators"] = live + [c for c in cr if not c.get("rank")]
+        out["progress"].update(items=[], overall=None, due=None, all_met=False)
+        for bp in ((out["goals"] or {}).get("by_platform") or {}).values():
+            if isinstance(bp.get("progress"), dict):
+                bp["progress"] = dict(bp["progress"], items=[], overall=None, due=None, all_met=False)
+    if len(r["history"] or []) < 2 and r["updated_at"]:
+        own.append("The numbers were read once (%s), so there is no day-by-day growth."
+                   % __import__("time").strftime("%-d %B %Y", __import__("time").gmtime(r["updated_at"])))
+    if vis["audience"] and not (out.get("comments") or {}).get("buckets"):
+        own.append("The comments under the posts have not been read yet.")
+    out["data_notes"] = own + list((out["goals"] or {}).get("notes") or [])     # also when there is no plan
     out["reach_basis"] = {"per_view": factors()["report_reach_per_view"]}
     if vis["clicks"]:
         cl = r["clicks"]
