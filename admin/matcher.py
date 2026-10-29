@@ -709,6 +709,15 @@ def score_all(brief, exclude=(), only=None, strict=False):
             if est.get("score") is not None:
                 s, val, basis = est, est["score"], "roster"
         if val is None:
+            if strict:
+                # Item 283 (Bido, 2026-10-29): a creator who meets every must-have but has no numbers to score stays
+                # in the shortlist, after every scored creator (biggest first), marked "No numbers yet".
+                plat = single or next((p for p in analysis.creator_platforms(c) if not wanted or p in wanted), None)
+                price = db.price_for(c, bands, plat)
+                items.append({"code": code, "score": None, "rank_score": -1, "tag": "Not scored yet", "basis": "unscored",
+                              "platform": plat, "price": list(price) if price else None, "strengths": [],
+                              "watchouts": [], "followers": c["followers"] or 0, "audience_level": 1,
+                              "band": size_of(c["followers"])})
             continue
         home, gshare = s.get("aud_home"), s.get("aud_gender")
         rank_score = val * (ESTIMATE_WEIGHT if basis == "roster" else 1.0)
@@ -758,7 +767,8 @@ def score_all(brief, exclude=(), only=None, strict=False):
     # Equal scores are common on public data; break the tie the way the goal would: reach for
     # awareness, the smaller (cheaper, closer) account otherwise.
     big_first = "Awareness" in str(objective).split("+")
-    items.sort(key=lambda i: (-i["rank_score"], -i["followers"] if big_first else i["followers"], i["code"]))
+    items.sort(key=lambda i: (i["score"] is None, -i["rank_score"], -i["followers"] if big_first or i["score"] is None
+                              else i["followers"], i["code"]))
     return items
 
 
@@ -780,6 +790,8 @@ def _mix(items, mix):
     leaves the list as it is."""
     if mix not in MIX_TIERS or not items:
         return items
+    unscored = [i for i in items if i.get("basis") == "unscored"]       # item 283: always last, whatever the mix
+    items = [i for i in items if i.get("basis") != "unscored"]
     tiers = MIX_TIERS[mix]
     if mix == "hero":
         hero = next((i for i in items if i.get("band") in BIG), None)
@@ -788,7 +800,7 @@ def _mix(items, mix):
     else:
         out = [i for t in tiers for i in items if i.get("band") in t]
     named = {id(i) for i in out}
-    return out + [i for i in items if id(i) not in named]       # no size on file: last, never dropped
+    return out + [i for i in items if id(i) not in named] + unscored     # no size on file, then no numbers: last
 
 
 # Tags that name a word of a space but are not that space: "Health & Fitness" is not health care.

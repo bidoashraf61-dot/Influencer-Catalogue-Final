@@ -1475,7 +1475,8 @@
     return root;
   };
 
-  var BASIS = { analysis: ["Measured", "pt-tag--good"], basic: ["Public data", ""], roster: ["Estimated", "pt-tag--warn"] };
+  var BASIS = { analysis: ["Measured", "pt-tag--good"], basic: ["Public data", ""], roster: ["Estimated", "pt-tag--warn"],
+                unscored: ["No numbers yet", "pt-tag--warn"] };   // item 283: meets the brief, nothing to score yet
   function scoreClass(tag) { return /Strong/.test(tag) ? "strong" : /Good/.test(tag) ? "good" : /Possible/.test(tag) ? "possible" : "no"; }
 
   function creatorCard(p) {
@@ -1491,7 +1492,7 @@
     return h("article", { class: "pt-card" }, photo,
       h("div", null, h("p", { class: "pt-name" }, c.name || p.code), h("p", { class: "pt-meta" }, meta),
         p.why ? h("p", { class: "pt-why" }, p.why) : null, tags),
-      h("div", { class: "pt-score pt-score--" + scoreClass(p.tag) }, h("b", null, String(p.score)), h("span", null, p.tag)));
+      h("div", { class: "pt-score pt-score--" + scoreClass(p.tag) }, h("b", null, p.score == null ? "–" : String(p.score)), h("span", null, p.tag)));
   }
 
   /* -- "Other": every option question also takes a short answer the client types.
@@ -1584,7 +1585,7 @@
       var d = h("details", { class: "pt-alt" }, h("summary", null, res.alternates.length + " close runners-up"));
       var ul = h("ul");
       res.alternates.forEach(function (a) {
-        ul.appendChild(h("li", null, h("span", null, (a.creator && a.creator.name) || a.code), h("span", null, a.score + " · " + price(a.price))));
+        ul.appendChild(h("li", null, h("span", null, (a.creator && a.creator.name) || a.code), h("span", null, (a.score == null ? "Not scored yet" : a.score) + " · " + price(a.price))));
       });
       d.appendChild(ul); body.appendChild(d);
     }

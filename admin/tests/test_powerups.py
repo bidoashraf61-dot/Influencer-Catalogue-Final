@@ -155,6 +155,12 @@ class Ranking(unittest.TestCase):
         no_size = list(items) + [{"code": "F", "rank_score": 99, "band": None}]
         self.assertEqual([i["code"] for i in matcher._mix(no_size, "big")][-1], "F")       # no size on file: last
 
+    def test_unscored_last_whatever_the_mix(self):      # item 283
+        items = [{"code": "U", "rank_score": -1, "band": "mega", "score": None, "basis": "unscored"},
+                 {"code": "A", "rank_score": 60, "band": "micro", "score": 60}, {"code": "B", "rank_score": 50, "band": "mega", "score": 50}]
+        for m in ("big", "micro", "hero"):
+            self.assertEqual([i["code"] for i in matcher._mix(list(items), m)][-1], "U", m)
+
     def test_fake_limit_ranks(self):              # item 282: under the limit 100, unknown neutral, over it lower
         orig = powerups._summaries
         try:
