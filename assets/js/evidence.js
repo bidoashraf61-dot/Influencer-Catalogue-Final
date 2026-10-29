@@ -518,7 +518,7 @@
   // 5 each when there are several, more when a pack has one or two competitors so the overview is not near empty.
   function visible(people) {
     if (miFocus) return people.filter(function (p) { return p.competitors[miFocus]; }).slice(0, 30);
-    var pick = {}, each = miData.competitors.length > 2 ? 5 : 14;
+    var nc = miData.competitors.length, pick = {}, each = nc > 2 ? 5 : nc === 2 ? 14 : 40;
     miData.competitors.forEach(function (c) {
       people.filter(function (p) { return p.competitors[c.name]; }).slice(0, each).forEach(function (p) { pick[p.handle] = true; });
     });
@@ -726,7 +726,7 @@
       // they did most posts for) and fans out around it. Lines to their other competitors light up on hover.
       // One competitor sits to the right of the brand, not on top of it (a zero-size oval put both hubs on the
       // centre and turned every creator's angle into NaN, so none of them were drawn).
-      var n = d.competitors.length, RX = n > 1 ? 470 : 330, RY = n > 1 ? 262 : 0;
+      var n = d.competitors.length, RX = n > 1 ? 470 : 300, RY = n > 1 ? 262 : 0;
       var maxV = Math.max.apply(null, d.competitors.map(function (c) { return c.views; }).concat([1]));
       d.competitors.forEach(function (c, i) {
         var a = n > 1 ? -Math.PI / 2 + i * 2 * Math.PI / n : 0;
@@ -743,10 +743,28 @@
       Object.keys(homes).forEach(function (k) {
         var cp = pos[k], list = homes[k], m = list.length;
         var out = RY ? Math.atan2((cp.y - cy) / RY, (cp.x - cx) / RX) : cp.a;
+        // A lone competitor has the whole right side: its creators wrap round it in rings (all but the gap
+        // facing the brand), each ring holding as many photos as its length allows.
+        var lone = n === 1, lay = [], ARC = 2 * Math.PI - 1.3;
+        if (lone) {
+          for (var start = 0, rk = 0; start < m; rk++) {
+            var rd = cp.r + 64 + rk * 84, cap = Math.max(6, Math.floor(ARC * rd / 84)), cn = Math.min(cap, m - start);
+            for (var q = 0; q < cn; q++) lay.push({ j: q, cnt: cn, dist: rd, rk: rk });
+            start += cn;
+          }
+        }
         list.forEach(function (p, i) {
-          var r = dotR(p), ring = i < 7 ? 0 : 1, j = ring ? i - 7 : i, cnt = ring ? Math.max(m - 7, 1) : Math.min(m, 7);
-          var spread = Math.min(2.6, 0.55 * cnt), a = out + (cnt > 1 ? (j / (cnt - 1) - 0.5) * spread : 0);
-          var dist = cp.r + r + 26 + ring * 80;
+          var r = dotR(p), a, dist;
+          if (lone) {
+            var L = lay[i], span = Math.min(ARC, L.cnt * 84 / L.dist);
+            a = out + (L.cnt > 1 ? (L.j / (L.cnt - 1) - 0.5) * span : 0) + (L.rk % 2 ? 0.12 : 0);
+            dist = L.dist;
+          } else {
+            var ring = i < 7 ? 0 : 1, j = ring ? i - 7 : i, cnt = ring ? Math.max(m - 7, 1) : Math.min(m, 7);
+            var spread = Math.min(2.6, 0.55 * cnt);
+            a = out + (cnt > 1 ? (j / (cnt - 1) - 0.5) * spread : 0);
+            dist = cp.r + r + 26 + ring * 80;
+          }
           var at = place(cp.x + dist * Math.cos(a), cp.y + dist * Math.sin(a), r);
           var ks = Object.keys(p.competitors).filter(function (k2) { return pos[k2]; });
           var mine = ks.map(function (k2) { var l = svg("line", { x1: at.x, y1: at.y, x2: pos[k2].x, y2: pos[k2].y, class: k2 === k ? "ev-map__own" : "ev-map__share" }); links2.appendChild(l); return l; });
