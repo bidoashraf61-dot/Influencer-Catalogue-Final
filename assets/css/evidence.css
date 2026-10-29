@@ -493,3 +493,4 @@
 .ev-strip .ev-proj--strip > span { font-size: 14px; font-weight: 700; color: #121212; }
 .ev-proj__fig .ev-tot__ic { width: 28px; height: 28px; }
 @media (max-width: 720px) { .ev-tot__s b { font-size: 32px; } .ev-strip .ev-proj--strip b { font-size: 36px; } }
+.ev-tot__s { grid-template-columns: auto auto 1fr; }
