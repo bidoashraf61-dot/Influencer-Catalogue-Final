@@ -34,13 +34,13 @@ ROLE_HELP = {
 MODS = [
     {"key": "helvi-selection", "name": "Helvi Selection", "short": "Selection",
      "what": "Browse the HelloVoice creator roster, build selections and shortlists, and request quotes.",
-     "logo": "/assets/brand/modules/helvi-selection-logo-v3.png", "mark": "/assets/brand/modules/helvi-selection-mark-v3.png"},
+     "logo": "/assets/brand/modules/helvi-selection-logo-v4.png", "mark": "/assets/brand/modules/helvi-selection-mark-v4.png"},
     {"key": "helvi-track", "name": "Helvi Track", "short": "Track",
      "what": "Track a campaign: posts, tracking links, insights and what people said.",
-     "logo": "/assets/brand/modules/helvi-track-logo-v3.png", "mark": "/assets/brand/modules/helvi-track-mark-v3.png"},
+     "logo": "/assets/brand/modules/helvi-track-logo-v4.png", "mark": "/assets/brand/modules/helvi-track-mark-v4.png"},
     {"key": "helvi-intelligence", "name": "Helvi Intelligence", "short": "Intelligence",
      "what": "Competitor evidence: which creators competitors used and how those posts did.",
-     "logo": "/assets/brand/modules/helvi-intelligence-logo-v3.png", "mark": "/assets/brand/modules/helvi-intelligence-mark-v3.png"},
+     "logo": "/assets/brand/modules/helvi-intelligence-logo-v4.png", "mark": "/assets/brand/modules/helvi-intelligence-mark-v4.png"},
 ]
 BY_KEY = {m["key"]: m for m in MODS}
 
