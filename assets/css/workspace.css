@@ -10,7 +10,7 @@
   transition: background .2s, border-color .2s, transform .15s; }
 .ws-mod:hover { border-color: var(--ink); }
 .ws-mod[aria-current="true"] { background: var(--ink); color: var(--white); border-color: var(--ink); }
-.ws-mod__mark { width: 44px; height: 44px; border-radius: 12px; background: var(--linen); display: grid; place-items: center; flex: none; overflow: hidden;
+.ws-mod__mark { width: 64px; height: 64px; border-radius: 14px; background: var(--linen); display: grid; place-items: center; flex: none; overflow: hidden;
   font-family: var(--heading); font-size: 26px; color: var(--ink); }
 .ws-mod__mark img { width: 100%; height: 100%; object-fit: contain; }
 .ws-mod__t { display: grid; gap: 2px; min-width: 0; }
@@ -84,7 +84,7 @@
 
 /* locked page */
 .ws-lockpage { max-width: 640px; margin: 24px auto; text-align: center; padding: 48px 24px; border: 2px dashed rgba(18,18,18,.2); border-radius: var(--r-lg); }
-.ws-lockpage img { width: 96px; height: 96px; object-fit: contain; filter: grayscale(1); opacity: .6; }
+.ws-lockpage img { width: 260px; max-width: 80%; height: auto; object-fit: contain; filter: grayscale(1); opacity: .6; }
 .ws-lockpage h2 { font-family: var(--heading); font-weight: 400; font-size: 44px; margin: 12px 0 6px; line-height: 1; }
 .ws-lockpage p { color: var(--gray); margin: 0 auto 20px; max-width: 46ch; }
 

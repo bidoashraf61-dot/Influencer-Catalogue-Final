@@ -53,7 +53,7 @@
   function draw() {
     var sw = $("ws-switch"); sw.textContent = "";
     D.modules.forEach(function (m) {
-      var mark = h("span", { class: "ws-mod__mark" }, m.logo ? h("img", { src: m.logo, alt: "" }) : m.short.charAt(0));
+      var mark = h("span", { class: "ws-mod__mark" }, (m.mark || m.logo) ? h("img", { src: m.mark || m.logo, alt: "" }) : m.short.charAt(0));
       var b = h("button", { class: "ws-mod", type: "button", "data-state": m.state, "aria-current": m.key === D.current ? "true" : "false",
         onclick: function () { tab = "overview"; load(m.key); history.replaceState(null, "", "#" + m.key); } },
         mark, h("span", { class: "ws-mod__t" }, h("b", null, m.name), h("span", null, stateLabel(m))));

@@ -513,7 +513,7 @@
     // The map is Helvi Intelligence; its mark says so before the headline does (Bido, 26 Oct 2026).
     var mark = document.createElement("img");
     mark.className = "ev-mi__logo"; mark.alt = "Helvi Intelligence"; mark.height = 96;
-    mark.src = "../assets/brand/modules/helvi-intelligence-480.png?v=2";
+    mark.src = "../assets/brand/modules/helvi-intelligence-logo-v3.png";
     t.appendChild(mark);
     var h = el("h1", "ev-mi__t", "Who works with your competitors"); h.id = "ev-mi-t"; t.appendChild(h);
     var scope = el("p", "ev-mi__scope"); scope.id = "ev-mi-scope"; t.appendChild(scope);

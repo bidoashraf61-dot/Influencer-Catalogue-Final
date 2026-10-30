@@ -15,7 +15,7 @@
 
 /* ---------------------------------------------------------------- header */
 .db-head { display: flex; align-items: center; gap: 16px; padding: 12px 0 10px; }
-.db-head__logo img { width: 146px; height: auto; display: block; }
+.db-head__logo img { width: 210px; height: auto; display: block; }
 .db-head__brands { display: flex; align-items: center; gap: 8px; }
 .db-head__brands img { height: 64px; width: auto; max-width: 190px; object-fit: contain; }   /* client logo bigger (owner, 2026-10-29) */
 .db-head__brands span { color: var(--gray); font-family: var(--heading); font-size: 18px; }
@@ -1007,7 +1007,7 @@
   /* header: logos on one row (room kept on the right for the account chip), the title full width, then the buttons */
   .db-head { flex-wrap: wrap; align-items: flex-start; gap: 6px 12px; padding: 8px 0 6px; }
   .db-head__logo, .db-head__brands { min-height: 64px; display: flex; align-items: center; }
-  .db-head__logo img { width: 116px; }
+  .db-head__logo img { width: 160px; }
   .db-head__brands { gap: 6px; }
   .db-head__brands img { height: 44px; max-width: 132px; }
   .db-head__title { flex: 1 1 100%; min-width: 0; }
@@ -1903,7 +1903,7 @@ body.pp-on { margin: 0 !important; padding: 0 !important; background: #fff; }
   .pp-flow::after { content: ""; display: block; height: 1px; }
   .pp-run { position: absolute; left: 16mm; right: 16mm; display: flex; align-items: center; gap: 12px; font-size: 9.5px; color: #6a665f; }
   .pp-run--h { height: 9mm; border-bottom: 1px solid rgba(18,18,18,.12); }
-  .pp-run--h img { height: 7mm; width: auto; }
+  .pp-run--h img { height: 8mm; width: auto; }
   .pp-run--h span:first-of-type { flex: 1; font-weight: 600; color: var(--ink); }
   .pp-run--f { height: 7mm; border-top: 1px solid rgba(18,18,18,.12); justify-content: space-between; }
   /* the pages are set by ppPaginate: the browser's own break rules would move things it has already placed */
@@ -1979,7 +1979,7 @@ body.pp-on { margin: 0 !important; padding: 0 !important; background: #fff; }
 
   /* page 1: the summary */
   .pp-sum__brand { display: flex; align-items: center; gap: 10px; margin: 0 0 9mm; }
-  .pp-sum__brand img { height: 12mm; width: auto; max-width: 40mm; object-fit: contain; }
+  .pp-sum__brand img { height: 16mm; width: auto; max-width: 56mm; object-fit: contain; }
   .pp-sum__brand span { color: #a29d93; font-size: 16px; }
   .pp-sum__k { margin: 0; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #6a665f; }
   .pp-sum h1 { margin: 2mm 0 2mm; font-family: var(--heading); font-weight: 400; font-size: 54px; line-height: .92; }

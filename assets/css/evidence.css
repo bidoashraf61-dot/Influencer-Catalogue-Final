@@ -462,8 +462,8 @@
 
 /* The module's mark above the headline on the competitor map (Bido, 26 Oct 2026). */
 /* Twice the size on Bido's request (29 Oct 2026); smaller on phones so the headline still fits. */
-.ev-mi__logo { display: block; height: 96px; width: auto; margin: 0 0 10px; }
-@media (max-width: 640px) { .ev-mi__logo { height: 64px; } }
+.ev-mi__logo { display: block; height: 112px; width: auto; max-width: 100%; margin: 0 0 10px; }
+@media (max-width: 640px) { .ev-mi__logo { height: 80px; } }
 
 /* Find a creator on the map (Bido, 29 Oct 2026). */
 .ev-find { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1.5px solid rgba(18, 18, 18, .14); border-radius: 999px; background: var(--white, #fff); flex: 1 1 260px; max-width: 360px; }

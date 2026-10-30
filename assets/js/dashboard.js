@@ -2050,7 +2050,7 @@
      foot keep the space for our own running header and footer on every page. Post and video links stay clickable. */
   // The report belongs to Helvi Track, so it is Track's mark on the cover and in the running
   // header, beside the client's own (Bido, 26 Oct 2026).
-  var PP_LOGO = "../../assets/brand/modules/helvi-track-480.png?v=2";
+  var PP_LOGO = "../../assets/brand/modules/helvi-track-logo-v3.png";
   function ppName(n) {   // "Dr Name | د. الاسم" → the Latin part leads, the Arabic part is kept beside it
     var s = String(n || ""), i = s.search(/[؀-ۿ]/);
     if (i <= 0) return { en: s.replace(/\s*\|\s*$/, ""), ar: "" };
