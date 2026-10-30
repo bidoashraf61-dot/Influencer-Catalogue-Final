@@ -55,7 +55,7 @@ MODULES = [
         "key": "helvi-intelligence",
         "name": "Helvi Intelligence",
         "what": "Competitor evidence: which creators already worked with their competitors, and how those posts did.",
-        "logo": "/assets/brand/modules/helvi-intelligence-logo-v4.png",
+        "logo": "/assets/brand/modules/helvi-intelligence-logo-v5.png",
         "client": ("/api/evidence",),
         "admin": ("/evidence",),
         "tables": ("evidence_packs", "evidence_posts", "evidence_roster"),

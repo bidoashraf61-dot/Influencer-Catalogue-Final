@@ -40,7 +40,7 @@ MODS = [
      "logo": "/assets/brand/modules/helvi-track-logo-v4.png", "mark": "/assets/brand/modules/helvi-track-mark-v4.png"},
     {"key": "helvi-intelligence", "name": "Helvi Intelligence", "short": "Intelligence",
      "what": "Competitor evidence: which creators competitors used and how those posts did.",
-     "logo": "/assets/brand/modules/helvi-intelligence-logo-v4.png", "mark": "/assets/brand/modules/helvi-intelligence-mark-v4.png"},
+     "logo": "/assets/brand/modules/helvi-intelligence-logo-v5.png", "mark": "/assets/brand/modules/helvi-intelligence-mark-v5.png"},
 ]
 BY_KEY = {m["key"]: m for m in MODS}
 
