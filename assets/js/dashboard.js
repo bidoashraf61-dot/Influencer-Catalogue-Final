@@ -908,7 +908,7 @@
     if (k === "buy") return r >= 0.4 ? "is-good" : r >= 0.15 ? "is-mid" : "is-bad";
     return r >= 0.6 ? "is-good" : r >= 0.3 ? "is-mid" : "is-bad";
   }
-  /* The comment browser (owner, 2026-10-19; v15): every comment in its own language, grouped by doctor then video,
+  /* The comment browser (owner, 2026-10-19; v15): every comment in its own language, grouped by influencer then video,
      filtered by doctor, video, mood, platform (icons), topic, buying questions and search, and exported as CSV. */
   var CMB = { closed: {}, items: null, busy: false, waits: [], f: { doc: "", vid: "", mood: "", plat: "", platPrev: "", theme: "", buy: false, q: "" }, open: {} };
   var CM_MOOD = { p: "pos", n: "neu", x: "neg" }, CM_MOOD_W = { p: "Positive", n: "Neutral", x: "Negative" };
@@ -973,9 +973,9 @@
   function cmDocPicker(docs, docKeys, P) {
     var f = CMB.f, total = 0; docKeys.forEach(function (c) { total += docs[c]; });
     var card = function (c) { return '<span class="cmv__av">' + ava(P.pics[c]) + '</span><span class="cmv__t"><b>' + esc(P.names[c] || c) + "</b><small>" + full(docs[c]) + " comments</small></span>"; };
-    var allCard = '<span class="cmv__all">' + IC.reach + '</span><span class="cmv__t"><b>All doctors</b><small>' + docKeys.length + " doctor" + (docKeys.length === 1 ? "" : "s") + " · " + full(total) + " comments</small></span>";
-    return '<div class="cmv cmv--doc"><button type="button" class="cmv__btn" data-cmv="1" aria-haspopup="listbox" aria-expanded="false" aria-label="Choose a doctor">' + (f.doc && docs[f.doc] ? card(f.doc) : allCard) + '<span class="cmv__chev" aria-hidden="true"></span></button>'
-      + '<ul class="cmv__list" role="listbox" aria-label="Doctors" hidden><li role="option" aria-selected="' + (!f.doc) + '"><button type="button" data-docpick="">' + allCard + "</button></li>"
+    var allCard = '<span class="cmv__all">' + IC.reach + '</span><span class="cmv__t"><b>All influencers</b><small>' + docKeys.length + " influencer" + (docKeys.length === 1 ? "" : "s") + " · " + full(total) + " comments</small></span>";
+    return '<div class="cmv cmv--doc"><button type="button" class="cmv__btn" data-cmv="1" aria-haspopup="listbox" aria-expanded="false" aria-label="Choose an influencer">' + (f.doc && docs[f.doc] ? card(f.doc) : allCard) + '<span class="cmv__chev" aria-hidden="true"></span></button>'
+      + '<ul class="cmv__list" role="listbox" aria-label="Influencers" hidden><li role="option" aria-selected="' + (!f.doc) + '"><button type="button" data-docpick="">' + allCard + "</button></li>"
       + docKeys.map(function (c) { return '<li role="option" aria-selected="' + (f.doc === c) + '"><button type="button" data-docpick="' + esc(c) + '">' + card(c) + "</button></li>"; }).join("") + "</ul></div>";
   }
   // Item 222 (owner, 2026-10-21): a video lives on one platform, so picking it sets the platform filter to that platform and
@@ -1038,7 +1038,7 @@
   function cmExport() {
     var list = cmPick2(), P = cmPeople(), posts = cmPosts();
     var cell = function (v) { v = String(v == null ? "" : v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
-    var rows = [["Doctor", "Platform", "Video", "Video link", "Mood", "Topic", "Asks to buy", "Buying question", "Comment", "Likes", "Comment date"]];
+    var rows = [["Influencer", "Platform", "Video", "Video link", "Mood", "Topic", "Asks to buy", "Buying question", "Comment", "Likes", "Comment date"]];
     list.forEach(function (it) { var p = posts[it[0]] || {};
       rows.push([P.names[it[1]] || it[1], it[2], cmVidName(p, it), p.url || "", CM_MOOD_W[it[3]] || "", it[5], it[4] ? "Yes" : "", it[6], it[7], it[9], it[10] ? new Date(it[10] * 1000).toISOString().slice(0, 10) : ""]); });
     var csv = "﻿" + rows.map(function (r) { return r.map(cell).join(","); }).join("\r\n");
@@ -1878,13 +1878,13 @@
   }
   // Posts panel: a filter bar (search, type, sort) over one collapsible section per creator. A creator with more
   // than one video lists each under its own "Video 1", "Video 2" toggle (owner, 2026-11-02). `all` = printed report: no bar, all open.
-  var PF = { doc: "", type: "", plat: "", sort: "rank" };
+  var PF = { doc: "", post: "", type: "", plat: "", sort: "rank" };
   var PF_SORT = { rank: "Creator rank", views: "Most views", inter: "Most interactions", new: "Newest first" };
   function pfType(p) { return PF.type === "video" ? !!p.video : PF.type === "other" ? !p.video : true; }
   function pfList(list) {
-    return list.filter(function (p) { return pfType(p) && (!PF.plat || p.platform === PF.plat) && (!PF.doc || p.code === PF.doc); });
+    return list.filter(function (p) { return pfType(p) && (!PF.plat || p.platform === PF.plat) && (!PF.doc || p.code === PF.doc) && (!PF.post || pieceKey(p) === PF.post); });
   }
-  // The same controls as the comments filter: a doctor picker, segmented type and platform, one sort.
+  // The same controls as the comments filter: an influencer picker, segmented type and platform, one sort.
   function pfBar(base) {
     var docs = {}, pl = {}, names = {}, pics = {};
     (R.creators || []).forEach(function (c) { names[c.code] = c.name; pics[c.code] = c.photo; });
@@ -1895,16 +1895,26 @@
     });
     var keys = Object.keys(docs).sort(function (a, b) { return docs[b] - docs[a]; }), total = 0; keys.forEach(function (k) { total += docs[k]; });
     var card = function (c) { return '<span class="cmv__av">' + ava(pics[c]) + '</span><span class="cmv__t"><b>' + esc(names[c] || c) + "</b><small>" + docs[c] + " post" + (docs[c] === 1 ? "" : "s") + "</small></span>"; };
-    var allCard = '<span class="cmv__all">' + IC.reach + '</span><span class="cmv__t"><b>All doctors</b><small>' + keys.length + " doctor" + (keys.length === 1 ? "" : "s") + " · " + total + " posts</small></span>";
+    var allCard = '<span class="cmv__all">' + IC.reach + '</span><span class="cmv__t"><b>All influencers</b><small>' + keys.length + " influencer" + (keys.length === 1 ? "" : "s") + " · " + total + " posts</small></span>";
+    var pcs = mergePieces(base.filter(function (p) { return pfType(p) && (!PF.plat || p.platform === PF.plat) && (!PF.doc || p.code === PF.doc); })), pk = {};
+    pcs.forEach(function (p) { pk[pieceKey(p)] = p; });
+    var pcard = function (p) {
+      var on = p.parts ? p.parts.map(function (x) { return x.platform; }).join(" + ") : p.platform;
+      return '<span class="cmv__th">' + (p.thumb ? fit(p.thumb) : "") + '<i class="cmv__pl">' + (p.parts ? "" : (ICONS[p.platform] || "")) + '</i></span><span class="cmv__t"><b>' + esc((ONE[p.kind] || p.kind || (p.video ? "Video" : "Post")) + " · " + on)
+        + "</b><small>" + (PF.doc ? "" : esc(p.creator) + " · ") + (p.posted_at ? day(p.posted_at) + " · " : "") + num(eng(p)) + " interactions</small></span>"; };
+    var allPost = '<span class="cmv__all">' + IC.posts + '</span><span class="cmv__t"><b>All posts</b><small>' + pcs.length + " post" + (pcs.length === 1 ? "" : "s") + "</small></span>";
+    var postPick = '<div class="cmv"><button type="button" class="cmv__btn" data-pfv="1" aria-haspopup="listbox" aria-expanded="false" aria-label="Choose a post">' + (PF.post && pk[PF.post] ? pcard(pk[PF.post]) : allPost) + '<span class="cmv__chev" aria-hidden="true"></span></button>'
+      + '<ul class="cmv__list" role="listbox" aria-label="Posts" hidden><li role="option" aria-selected="' + (!PF.post) + '"><button type="button" data-pfpost="">' + allPost + "</button></li>"
+      + pcs.map(function (p) { var k = pieceKey(p); return '<li role="option" aria-selected="' + (PF.post === k) + '"><button type="button" data-pfpost="' + esc(k) + '">' + pcard(p) + "</button></li>"; }).join("") + "</ul></div>";
     var seg = function (attr, cur, items) { return items.map(function (x) { return '<button type="button" ' + attr + '="' + esc(x[0]) + '" aria-pressed="' + (cur === x[0]) + '">' + x[1] + "</button>"; }).join(""); };
-    return '<div class="cmb-f db-pf"><div class="cmb-f__row cmb-f__docs"><div class="cmv cmv--doc"><button type="button" class="cmv__btn" data-pfv="1" aria-haspopup="listbox" aria-expanded="false" aria-label="Choose a doctor">'
+    return '<div class="cmb-f db-pf"><div class="cmb-f__row cmb-f__docs"><div class="cmv cmv--doc"><button type="button" class="cmv__btn" data-pfv="1" aria-haspopup="listbox" aria-expanded="false" aria-label="Choose an influencer">'
       + (PF.doc && docs[PF.doc] ? card(PF.doc) : allCard) + '<span class="cmv__chev" aria-hidden="true"></span></button>'
-      + '<ul class="cmv__list" role="listbox" aria-label="Doctors" hidden><li role="option" aria-selected="' + (!PF.doc) + '"><button type="button" data-pfdoc="">' + allCard + "</button></li>"
-      + keys.map(function (c) { return '<li role="option" aria-selected="' + (PF.doc === c) + '"><button type="button" data-pfdoc="' + esc(c) + '">' + card(c) + "</button></li>"; }).join("") + "</ul></div></div>"
+      + '<ul class="cmv__list" role="listbox" aria-label="Influencers" hidden><li role="option" aria-selected="' + (!PF.doc) + '"><button type="button" data-pfdoc="">' + allCard + "</button></li>"
+      + keys.map(function (c) { return '<li role="option" aria-selected="' + (PF.doc === c) + '"><button type="button" data-pfdoc="' + esc(c) + '">' + card(c) + "</button></li>"; }).join("") + "</ul></div>" + postPick + "</div>"
       + '<div class="cmb-f__row"><div class="cmb-seg" role="group" aria-label="Type of post">' + seg("data-pftype", PF.type, [["", "All"], ["video", "Videos"], ["other", "Photos"]]) + "</div>"
       + '<div class="cmb-seg cmb-seg--pl" role="group" aria-label="Platform"><button type="button" data-pfplat="" aria-pressed="' + (!PF.plat) + '">All</button>'
       + Object.keys(pl).sort(function (a, b) { return pl[b] - pl[a]; }).map(function (k) { return '<button type="button" data-pfplat="' + esc(k) + '" aria-pressed="' + (PF.plat === k) + '" title="' + esc(k) + '" aria-label="' + esc(k) + " · " + pl[k] + ' posts">' + (ICONS[k] || esc(k)) + "<small>" + pl[k] + "</small></button>"; }).join("") + "</div>"
-      + '<select data-pfsort="1" aria-label="Sort doctors">' + Object.keys(PF_SORT).map(function (k) { return '<option value="' + k + '"' + (PF.sort === k ? " selected" : "") + ">" + PF_SORT[k] + "</option>"; }).join("") + "</select>"
+      + '<select data-pfsort="1" aria-label="Sort influencers">' + Object.keys(PF_SORT).map(function (k) { return '<option value="' + k + '"' + (PF.sort === k ? " selected" : "") + ">" + PF_SORT[k] + "</option>"; }).join("") + "</select>"
       + '<div class="cmb-seg cmb-f__fold" role="group" aria-label="Open or close all"><button type="button" data-pfall="open">Expand all</button><button type="button" data-pfall="close">Collapse all</button></div></div></div>';
   }
   function pfPost(p) { return p.parts ? p.parts.map(post).join("") : post(p); }
@@ -1916,7 +1926,7 @@
       return (a.rank == null) - (b.rank == null) || (a.rank || 0) - (b.rank || 0) || (b.views || 0) - (a.views || 0); });
     order.forEach(function (c) { known[c.code] = 1; });
     Object.keys(by).forEach(function (k) { if (!known[k]) order.push({ code: k, name: by[k][0].creator, photo: by[k][0].photo, profiles: [] }); });
-    var narrowed = !all && (PF.doc || PF.type || PF.plat);
+    var narrowed = !all && (PF.doc || PF.post || PF.type || PF.plat);
     var shown = order.filter(function (c) {
       return by[c.code] || (!filtered() && !narrowed && (c.planned || 0) > (c.delivered || 0)); });
     var tot = function (c, f) { return (by[c.code] || []).reduce(function (a, p) { return a + f(p); }, 0); };
@@ -1959,16 +1969,17 @@
     var out = (all ? "" : pfBar(base)) + '<div id="db-cwl">' + body + "</div>";
     return all ? body : only ? out : '<div id="db-cwx">' + out + "</div>";
   }
-  // The bar and the list redraw together; the doctor picker closes on a pick, on a tap outside and on Esc.
+  // The bar and the list redraw together; the influencer picker closes on a pick, on a tap outside and on Esc.
   function pfRedraw() { var x = $("db-cwx"); if (x) x.innerHTML = creatorWalls(topPosts(posts()), false, true); }
   function pfShut() { [].forEach.call(document.querySelectorAll(".db-pf .cmv__list"), function (u) { if (!u.hidden) { u.hidden = true; u.parentNode.querySelector(".cmv__btn").setAttribute("aria-expanded", "false"); } }); }
   document.addEventListener("click", function (e) {
     var t = e.target; if (!t.closest) return;
-    var v = t.closest("[data-pfv]"), d = t.closest("[data-pfdoc]"), ty = t.closest("[data-pftype]"), pl = t.closest("[data-pfplat]"), al = t.closest("[data-pfall]");
+    var v = t.closest("[data-pfv]"), d = t.closest("[data-pfdoc]"), po = t.closest("[data-pfpost]"), ty = t.closest("[data-pftype]"), pl = t.closest("[data-pfplat]"), al = t.closest("[data-pfall]");
     if (v) { var ul = v.parentNode.querySelector(".cmv__list"), was = ul.hidden; pfShut(); if (was) { ul.hidden = false; v.setAttribute("aria-expanded", "true"); } return; }
-    if (d) { PF.doc = d.getAttribute("data-pfdoc"); pfRedraw(); return; }
-    if (ty) { PF.type = ty.getAttribute("data-pftype"); pfRedraw(); return; }
-    if (pl) { PF.plat = pl.getAttribute("data-pfplat"); pfRedraw(); return; }
+    if (d) { PF.doc = d.getAttribute("data-pfdoc"); PF.post = ""; pfRedraw(); return; }
+    if (po) { PF.post = po.getAttribute("data-pfpost"); pfRedraw(); return; }
+    if (ty) { PF.type = ty.getAttribute("data-pftype"); PF.post = ""; pfRedraw(); return; }
+    if (pl) { PF.plat = pl.getAttribute("data-pfplat"); PF.post = ""; pfRedraw(); return; }
     if (al) { var o = al.getAttribute("data-pfall") === "open"; [].forEach.call(document.querySelectorAll("#db-cwl details.db-cw"), function (x) { x.open = o; }); return; }
     pfShut();
   });
