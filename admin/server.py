@@ -4778,6 +4778,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 if u is not None and (u["email"] or "").lower() == email:
                     return self.send_json(400, {"ok": False, "message": "That is you: you already have access."}, self.cors())
                 new, changed = db.cinvite_add(k["id"], email, r, by)
+                if r == "edit" and k["selection_id"]:
+                    # An editor gets the campaign's selection too, as the Clients hub's Share does (2026-11-01):
+                    # before, an edit invite from the dashboard opened the dashboard but not its selection.
+                    import access
+                    sel_ = db.selection(k["selection_id"])
+                    if sel_ is not None:
+                        access.invite(sel_, email, by, by_name, send=False)
                 what = "view and edit" if r == "edit" else "view only"
                 msg = "%s can now %s." % (email, what) if not new else "Invited %s (%s)." % (email, what)
                 if changed and mailer.configured():
