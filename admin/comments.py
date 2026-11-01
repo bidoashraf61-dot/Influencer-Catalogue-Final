@@ -670,7 +670,7 @@ def _tell_flags(cid, n):
         notify.send("comment_flags", ['%d new comment%s on "%s" need a look (complaint, side-effect claim, misinformation, '
                                       'regulatory risk or abuse).' % (n, "" if n == 1 else "s", k["name"]),
                                       "Open the campaign's Comments tab in the admin to see them."],
-                    kam=db.kam_of_item("campaign", k["id"]))
+                    kam=db.effective_kam("campaign", k["id"], k["code_id"]))
     except Exception as exc:
         print("comments: flag mail skipped:", repr(exc)[:120], flush=True)
 

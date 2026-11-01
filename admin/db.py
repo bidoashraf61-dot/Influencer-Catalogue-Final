@@ -2453,9 +2453,53 @@ def kam_assign(kind, item_id, kam_email, by=""):
 
 
 def kam_of_item(kind, item_id):
+    """The KAM this one item was handed to by hand, or None. Copies made automatically from the company
+    ("auto: ...") are not a hand-over: the item follows its company instead (owner, 2026-11-01)."""
     with connect() as conn:
-        r = conn.execute("SELECT kam_email FROM item_kam WHERE kind = ? AND item_id = ?", (kind, int(item_id))).fetchone()
+        r = conn.execute("SELECT kam_email FROM item_kam WHERE kind = ? AND item_id = ? AND COALESCE(assigned_by, '') NOT LIKE 'auto:%'",
+                         (kind, int(item_id))).fetchone()
     return r[0] if r else None
+
+
+def company_kam(code_id):
+    """The KAM of the client a code belongs to: the person's own KAM, else their company account's, else their
+    company domain's (Clients hub). '' when none. Live, so a company's new KAM reaches all its work at once."""
+    import re
+    if code_id is None:
+        return ""
+    with connect() as conn:
+        u = conn.execute("SELECT * FROM users WHERE code_id = ? AND deleted_at IS NULL", (int(code_id),)).fetchone()
+        if u is None:
+            return ""
+        rows = [u]
+        if "company_code_id" in u.keys() and u["company_code_id"]:
+            m = conn.execute("SELECT * FROM users WHERE code_id = ? AND deleted_at IS NULL",
+                             (int(u["company_code_id"]),)).fetchone()
+            if m is not None:
+                rows.append(m)
+    for r in rows:
+        hit = re.search(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", r["kam"] or "")
+        if hit:
+            return hit.group(0).lower()
+    dmap = {str(k).strip().lower().lstrip("@"): str(v).strip().lower() for k, v in (setting("domain_kam") or {}).items()}
+    for r in rows:
+        if dmap.get((r["domain"] or "").lower()):
+            return dmap[(r["domain"] or "").lower()]
+    return ""
+
+
+def effective_kam(kind, item_id, code_id=None):
+    """The KAM of a selection or campaign: the one it was handed to by hand, else its company's (owner, 2026-11-01:
+    the KAM is per company, not per selection)."""
+    own = kam_of_item(kind, item_id)
+    if own:
+        return own
+    if code_id is None:
+        with connect() as conn:
+            r = conn.execute("SELECT code_id FROM %s WHERE id = ?" % ("selections" if kind == "selection" else "campaigns"),
+                             (int(item_id),)).fetchone()
+        code_id = r["code_id"] if r else None
+    return company_kam(code_id)
 
 
 def kam_item_ids(email, kind):

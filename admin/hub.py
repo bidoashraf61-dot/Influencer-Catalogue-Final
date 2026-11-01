@@ -131,21 +131,31 @@ def _sel_row(s, kam):
         n = len(json.loads(s["codes"] or "[]"))
     except ValueError:
         n = 0
+    kc = _kam_cell("selection", s, kam)
     return {"id": s["id"], "token": s["token"], "name": s["name"], "creators": n, "updated_at": s["updated_at"],
-            "status": lifecycle.chip(s), "kam": kam.get(("selection", s["id"]), ""),
+            "status": lifecycle.chip(s), "kam": kc[0], "kam_auto": kc[1],
             "link": "selection/#s=" + s["token"]}
 
 
 def _camp_row(k, kam):
+    kc = _kam_cell("campaign", k, kam)
     return {"id": k["id"], "token": k["token"], "name": k["name"], "status": k["status"],
             "draft_by_client": bool(k["origin"] == "client" and k["status"] == "draft"),
             "starts_at": k["starts_at"], "ends_at": k["ends_at"], "has_selection": bool(k["selection_id"]), "selection_id": k["selection_id"],
-            "kam": kam.get(("campaign", k["id"]), ""), "link": "campaign/dashboard/#t=" + k["token"]}
+            "kam": kc[0], "kam_auto": kc[1],
+            "link": "campaign/dashboard/#t=" + k["token"]}
 
 
 def _item_kams():
     with db.connect() as conn:
-        return {(r["kind"], r["item_id"]): r["kam_email"] for r in conn.execute("SELECT kind, item_id, kam_email FROM item_kam")}
+        return {(r["kind"], r["item_id"]): r["kam_email"] for r in conn.execute(
+            "SELECT kind, item_id, kam_email FROM item_kam WHERE COALESCE(assigned_by, '') NOT LIKE 'auto:%'")}
+
+
+def _kam_cell(kind, row, kam):
+    """(kam email, follows the company?) for one item: handed by hand wins, else the company's KAM."""
+    own = kam.get((kind, row["id"]), "")
+    return (own, False) if own else (db.company_kam(row["code_id"]), True)
 
 
 def _groups(role, a):
@@ -366,7 +376,7 @@ def _annotate(role, a, people):
     for p in people:
         for kind, key in (("selection", "selections"), ("campaign", "campaigns")):
             for it in p.get(key, []):
-                it["can_kam"] = _can_kam(role, a, codes.get((kind, it["id"])), it.get("kam"), staff)
+                it["can_kam"] = _can_kam(role, a, codes.get((kind, it["id"])), "" if it.get("kam_auto") else it.get("kam"), staff)
                 if kind == "campaign":
                     _stage(role, it)
     return _attach_packages(people)

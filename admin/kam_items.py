@@ -93,7 +93,9 @@ def card(kind, item):
     import views
     e_, u_ = views.e, views.u
     cur = db.kam_of_item(kind, item["id"]) or ""
-    opts = "<option value=''>No key account manager</option>" + "".join(
+    co = db.company_kam(item["code_id"])
+    first = ("Follows the company (%s)" % _name(co)) if co else "No key account manager"
+    opts = "<option value=''>%s</option>" % e_(first) + "".join(
         "<option value=\"%s\"%s>%s</option>" % (e_(m), " selected" if m == cur else "", e_(n or m)) for n, m in kam_options())
     route = SEL_ROUTE if kind == "selection" else CAMP_ROUTE
     return ("<div class='card' id='kam-item'><div class='hd'><h2>Key account manager</h2></div>"
@@ -103,7 +105,8 @@ def card(kind, item):
             "<div style='flex:2'><label for='kam-pick'>Account manager</label><select id='kam-pick' name='kam'>%s</select></div>"
             "<div style='align-self:end'><button class='btn small lime'>Save</button></div></form>%s</div>" % (
                 kind, e_(u_(route)), item["id"], opts,
-                ("<p class='price-hint'>Now with %s.</p>" % e_(_name(cur))) if cur else ""))
+                ("<p class='price-hint'>Now with %s.</p>" % e_(_name(cur))) if cur
+                else ("<p class='price-hint'>Follows the company's account manager, %s.</p>" % e_(_name(co))) if co else ""))
 
 
 def banner(k):
