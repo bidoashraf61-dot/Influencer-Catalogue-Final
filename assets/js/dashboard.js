@@ -1296,14 +1296,14 @@
       var tot = mine.reduce(function (a, p) { return a + seen(p); }, 0);
       var rowsHtml = mine.map(function (p, i) {
         var parts = p.parts || [p];
-        return '<div class="db-vid"><div class="db-vid__t"><b>Video ' + (i + 1) + (c.planned ? " of " + c.planned : "") + "</b><small>" + esc(day(p.posted_at)) + "</small></div>"
-          + '<div class="db-vid__n">' + num(seen(p)) + "<small>views</small></div>"
-          + '<div class="db-vid__chips">' + parts.map(function (x) {
+        return '<div class="db-vt"><div class="db-vt__t"><b>Video ' + (i + 1) + (c.planned ? " of " + c.planned : "") + "</b><small>" + esc(day(p.posted_at)) + "</small></div>"
+          + '<div class="db-vt__n">' + num(seen(p)) + "<small>views</small></div>"
+          + '<div class="db-vt__chips">' + parts.map(function (x) {
             return '<a class="db-chip" href="' + esc(x.url) + '" target="_blank" rel="noopener">' + (ICONS[x.platform] || "") + esc(x.platform) + " · " + num(seen(x)) + "</a>";
           }).join("") + "</div></div>";
       }).join("");
-      var owed = []; for (var i = mine.length; i < (c.planned || 0); i++) owed.push('<div class="db-vid is-owed"><div class="db-vid__t"><b>Video ' + (i + 1) + " of " + c.planned + "</b><small>Not published yet</small></div></div>");
-      return '<div class="db-vids"><h4>' + ava(c.photo) + "<span>" + who(c) + "</span><b>" + mine.length + (c.planned ? "/" + c.planned : "") + (mine.length === 1 && !c.planned ? " video · " : " videos · ") + num(tot) + " views</b></h4>" + rowsHtml + owed.join("") + "</div>";
+      var owed = []; for (var i = mine.length; i < (c.planned || 0); i++) owed.push('<div class="db-vt is-owed"><div class="db-vt__t"><b>Video ' + (i + 1) + " of " + c.planned + "</b><small>Not published yet</small></div></div>");
+      return '<div class="db-vts"><h4>' + ava(c.photo) + "<span>" + who(c) + "</span><b>" + mine.length + (c.planned ? "/" + c.planned : "") + (mine.length === 1 && !c.planned ? " video · " : " videos · ") + num(tot) + " views</b></h4>" + rowsHtml + owed.join("") + "</div>";
     }).join("");
     return out ? "<h3>" + vidsTitle(rows) + "</h3>" + out : "";
   }
@@ -1926,7 +1926,7 @@
         if (pieces.length > 1 && !all) {
           inner = pieces.map(function (p, k) {
             var label = p.video ? "Video " + (++nv) : (ONE[p.kind] || "Post") + " " + (++no);
-            return '<details class="db-vid"' + (k === 0 && !many ? " open" : "") + '><summary><b>' + label + "</b><span class=\"db-vid__p\">" + platIcons(p) + "</span><span class=\"db-vid__n\">"
+            return '<details class="db-vt"' + (k === 0 && !many ? " open" : "") + '><summary><b>' + label + "</b><span class=\"db-vt__p\">" + platIcons(p) + "</span><span class=\"db-vt__n\">"
               + (p.video && !p.views_hidden ? num(seen(p)) + " views · " : "") + num(eng(p)) + " interactions</span></summary>"
               + '<div class="db-wall">' + pfPost(p) + "</div></details>"; }).join("") + (owed.length ? '<div class="db-wall">' + owed.join("") + "</div>" : "");
         } else inner = mine.length || owed.length ? '<div class="db-wall">' + mine.map(post).join("") + owed.join("") + "</div>" : "";
@@ -2226,7 +2226,7 @@
   // number. Browsers apply break rules differently (Safari splits cards and drops repeated headers), this does not.
   function ppPaginate(wrap) {
     var MM = 96 / 25.4, PH = Math.round(297 * MM), HT = 20 * MM, FT = 16 * MM, BODY = PH - HT - FT; var SLACK = 40;   // Chrome rounds an A4 page to 1123px
-    var ATOM = ".pp-h, .pp-q, .pp-pod, .pp-sum__t > div, .pp-sum__f, h3, h4, tr, svg, img, .db-tv__row, .db-gauge, .db-pl, .db-post, .db-vids, .db-vid, .db-cb__row, .pp-gt, .cmp-tl__r, .db-cw__h, .db-cb__row, .db-goal-sum > div, .db-obj__t, .db-bar, .db-dn, .db-note, .db-big, .db-donut, .db-trendbox, .db-fc, .db-scorebar, .db-scorekey, .db-pl__strip, .db-pl__key, "
+    var ATOM = ".pp-h, .pp-q, .pp-pod, .pp-sum__t > div, .pp-sum__f, h3, h4, tr, svg, img, .db-tv__row, .db-gauge, .db-pl, .db-post, .db-vts, .db-vt, .db-cb__row, .pp-gt, .cmp-tl__r, .db-cw__h, .db-cb__row, .db-goal-sum > div, .db-obj__t, .db-bar, .db-dn, .db-note, .db-big, .db-donut, .db-trendbox, .db-fc, .db-scorebar, .db-scorekey, .db-pl__strip, .db-pl__key, "
       + ".cmp-quote, .cmp-who__r, .cmp-plat, .cmp-insight, .cmp-box, .cmp-mood, .cmp-say, .cmp-src, .cmp-share, .cmp-heat, .cmp-rank li, .cmp-curve, .cmp-chips, .cmp-tl__r > summary, .cmb-c, .wpd-row, .wpd-panel-hero, .wpd-insight, [class^='sl-'], p, li";
     var HEAD = "h3, h4, .pp-h, .db-sec__h, .db-sec__h--s, .db-table-title, summary, .db-cw__h";
     var flow = wrap.querySelector(".pp-flow"), toc = wrap.querySelector(".pp-toc"), secs = wrap.querySelectorAll(".pp-sec");
