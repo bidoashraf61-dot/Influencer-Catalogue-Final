@@ -6572,12 +6572,28 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def roster_refusal(self, link=""):
         """None when this browser may read the roster (and cards from it); else the reason.
         /api/roster and the paged answers below are gated by this one rule."""
+        if link[:2] == "s:" and self.selection_opens_here(link[2:]):
+            return None                        # whoever /api/selection lets in also gets that selection's cards
         if not self.viewer_code_id():
             return "locked"
         # A page that names its link asks for that link's own code once.
         if link and not self.admin_like() and not self.signed_in_client() and self.link_code(link) is None:
             return "link"
         return None
+
+    def selection_opens_here(self, token):
+        """True when /api/selection would open this token for this browser: HelloVoice staff and the KAM
+        of its client, its client's team, or someone granted it (2026-11-01: the cards were refused to
+        KAMs and grantees, so a shared selection opened with no creators)."""
+        sel = db.selection(token=token, deleted=bool(self.admin_like() or self.kam_clients() is not None))
+        if sel is None:
+            return False
+        if self.admin_like_for(sel["code_id"], sel["id"]) or (self.staff_viewer() and self.kam_clients() is None):
+            return True
+        if sel["deleted_at"]:
+            return False
+        cid = self.link_code("s:" + token) or self.signed_in_client()
+        return cid is not None and (portal.opens(int(cid), sel) or int(cid) == db.admin_code_id())
 
     def api_roster(self, link=""):
         why = self.roster_refusal(link)
