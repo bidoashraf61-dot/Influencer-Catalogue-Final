@@ -412,6 +412,7 @@ def init():
         conn.executescript(ACCESS_SCHEMA)
         conn.executescript(PUBLIC_LINKS_SCHEMA)
         _public_links_widen(conn)
+        conn.execute(BACKFILL_CAMPAIGN_GRANTS)      # campaigns shared before 2026-11-01 never opened their selection
 
 
 def migrate(conn):
@@ -2401,6 +2402,19 @@ def grant_selection(sel_id, code_id, by=""):
                      (int(sel_id), int(code_id), by, now()))
 
 
+BACKFILL_CAMPAIGN_GRANTS = (
+    "INSERT OR IGNORE INTO selection_access (selection_id, code_id, granted_by, granted_at) "
+    "SELECT c.selection_id, c.code_id, 'campaign ' || c.id, strftime('%s','now') FROM campaigns c "
+    "JOIN selections s ON s.id = c.selection_id WHERE c.code_id IS NOT NULL AND s.code_id IS NOT c.code_id")
+
+
+def grant_campaign_selection(cid):
+    """A campaign shared with an account opens the selection behind it for that account too
+    (2026-11-01): the client of a campaign who is not its selection's owner was refused the selection link."""
+    with connect() as conn:
+        conn.execute(BACKFILL_CAMPAIGN_GRANTS.replace("WHERE c.code_id", "WHERE c.id = %d AND c.code_id" % int(cid)))
+
+
 def revoke_selection(sel_id, code_id):
     with connect() as conn:
         conn.execute("DELETE FROM selection_access WHERE selection_id = ? AND code_id = ?", (int(sel_id), int(code_id)))
@@ -2639,6 +2653,8 @@ def save_campaign(cid, **fields):
         clear_campaign_sharing(cid)
     if fields.get("status") and was is not None and was["status"] != fields["status"]:
         fire("campaign_status", cid, was["status"], fields["status"])
+    if "code_id" in fields or "selection_id" in fields:
+        grant_campaign_selection(cid)
 
 
 def delete_campaign(cid):
@@ -3847,4 +3863,8 @@ def save_selection(sid, *args, **kw):
 def create_campaign(*args, **kw):
     out = _create_campaign_raw(*args, **kw)
     _auto_kam("campaign", out)
+    try:
+        grant_campaign_selection(out)
+    except Exception:
+        pass
     return out
