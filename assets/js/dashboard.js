@@ -1878,28 +1878,46 @@
   }
   // Posts panel: a filter bar (search, type, sort) over one collapsible section per creator. A creator with more
   // than one video lists each under its own "Video 1", "Video 2" toggle (owner, 2026-11-02). `all` = printed report: no bar, all open.
-  var PF = { q: "", type: "", sort: "rank" };
+  var PF = { doc: "", type: "", plat: "", sort: "rank" };
   var PF_SORT = { rank: "Creator rank", views: "Most views", inter: "Most interactions", new: "Newest first" };
+  function pfType(p) { return PF.type === "video" ? !!p.video : PF.type === "other" ? !p.video : true; }
   function pfList(list) {
-    return list.filter(function (p) { return PF.type === "video" ? p.video : PF.type === "other" ? !p.video : true; });
+    return list.filter(function (p) { return pfType(p) && (!PF.plat || p.platform === PF.plat) && (!PF.doc || p.code === PF.doc); });
   }
-  function pfBar() {
-    return '<div class="db-cwf" role="search"><input type="search" class="db-cwf__q" data-pf="q" placeholder="Search a creator" aria-label="Search a creator" value="' + esc(PF.q) + '">'
-      + '<select data-pf="type" aria-label="Type of post"><option value="">All posts</option><option value="video"' + (PF.type === "video" ? " selected" : "") + '>Videos only</option><option value="other"' + (PF.type === "other" ? " selected" : "") + ">Photos and carousels</option></select>"
-      + '<select data-pf="sort" aria-label="Sort creators">' + Object.keys(PF_SORT).map(function (k) { return '<option value="' + k + '"' + (PF.sort === k ? " selected" : "") + ">" + PF_SORT[k] + "</option>"; }).join("") + "</select>"
-      + '<span class="db-cwf__b"><button type="button" data-pfall="open">Expand all</button><button type="button" data-pfall="close">Collapse all</button></span></div>';
+  // The same controls as the comments filter: a doctor picker, segmented type and platform, one sort.
+  function pfBar(base) {
+    var docs = {}, pl = {}, names = {}, pics = {};
+    (R.creators || []).forEach(function (c) { names[c.code] = c.name; pics[c.code] = c.photo; });
+    base.forEach(function (p) {
+      if (!names[p.code]) { names[p.code] = p.creator; pics[p.code] = p.photo; }
+      if (pfType(p) && (!PF.plat || p.platform === PF.plat)) docs[p.code] = (docs[p.code] || 0) + 1;
+      if (pfType(p) && (!PF.doc || p.code === PF.doc)) pl[p.platform] = (pl[p.platform] || 0) + 1;
+    });
+    var keys = Object.keys(docs).sort(function (a, b) { return docs[b] - docs[a]; }), total = 0; keys.forEach(function (k) { total += docs[k]; });
+    var card = function (c) { return '<span class="cmv__av">' + ava(pics[c]) + '</span><span class="cmv__t"><b>' + esc(names[c] || c) + "</b><small>" + docs[c] + " post" + (docs[c] === 1 ? "" : "s") + "</small></span>"; };
+    var allCard = '<span class="cmv__all">' + IC.reach + '</span><span class="cmv__t"><b>All doctors</b><small>' + keys.length + " doctor" + (keys.length === 1 ? "" : "s") + " · " + total + " posts</small></span>";
+    var seg = function (attr, cur, items) { return items.map(function (x) { return '<button type="button" ' + attr + '="' + esc(x[0]) + '" aria-pressed="' + (cur === x[0]) + '">' + x[1] + "</button>"; }).join(""); };
+    return '<div class="cmb-f db-pf"><div class="cmb-f__row cmb-f__docs"><div class="cmv cmv--doc"><button type="button" class="cmv__btn" data-pfv="1" aria-haspopup="listbox" aria-expanded="false" aria-label="Choose a doctor">'
+      + (PF.doc && docs[PF.doc] ? card(PF.doc) : allCard) + '<span class="cmv__chev" aria-hidden="true"></span></button>'
+      + '<ul class="cmv__list" role="listbox" aria-label="Doctors" hidden><li role="option" aria-selected="' + (!PF.doc) + '"><button type="button" data-pfdoc="">' + allCard + "</button></li>"
+      + keys.map(function (c) { return '<li role="option" aria-selected="' + (PF.doc === c) + '"><button type="button" data-pfdoc="' + esc(c) + '">' + card(c) + "</button></li>"; }).join("") + "</ul></div></div>"
+      + '<div class="cmb-f__row"><div class="cmb-seg" role="group" aria-label="Type of post">' + seg("data-pftype", PF.type, [["", "All"], ["video", "Videos"], ["other", "Photos"]]) + "</div>"
+      + '<div class="cmb-seg cmb-seg--pl" role="group" aria-label="Platform"><button type="button" data-pfplat="" aria-pressed="' + (!PF.plat) + '">All</button>'
+      + Object.keys(pl).sort(function (a, b) { return pl[b] - pl[a]; }).map(function (k) { return '<button type="button" data-pfplat="' + esc(k) + '" aria-pressed="' + (PF.plat === k) + '" title="' + esc(k) + '" aria-label="' + esc(k) + " · " + pl[k] + ' posts">' + (ICONS[k] || esc(k)) + "<small>" + pl[k] + "</small></button>"; }).join("") + "</div>"
+      + '<select data-pfsort="1" aria-label="Sort doctors">' + Object.keys(PF_SORT).map(function (k) { return '<option value="' + k + '"' + (PF.sort === k ? " selected" : "") + ">" + PF_SORT[k] + "</option>"; }).join("") + "</select>"
+      + '<div class="cmb-seg cmb-f__fold" role="group" aria-label="Open or close all"><button type="button" data-pfall="open">Expand all</button><button type="button" data-pfall="close">Collapse all</button></div></div></div>';
   }
   function pfPost(p) { return p.parts ? p.parts.map(post).join("") : post(p); }
   function creatorWalls(list, all, only) {
+    var base = list;
     if (!all) list = pfList(list);
     var by = {}; list.forEach(function (p) { (by[p.code] = by[p.code] || []).push(p); });
     var known = {}, order = (R.creators || []).slice().sort(function (a, b) {
       return (a.rank == null) - (b.rank == null) || (a.rank || 0) - (b.rank || 0) || (b.views || 0) - (a.views || 0); });
     order.forEach(function (c) { known[c.code] = 1; });
     Object.keys(by).forEach(function (k) { if (!known[k]) order.push({ code: k, name: by[k][0].creator, photo: by[k][0].photo, profiles: [] }); });
-    var narrowed = !all && (PF.q || PF.type);
+    var narrowed = !all && (PF.doc || PF.type || PF.plat);
     var shown = order.filter(function (c) {
-      if (!all && PF.q && (c.name || "").toLowerCase().indexOf(PF.q.toLowerCase()) < 0) return false;
       return by[c.code] || (!filtered() && !narrowed && (c.planned || 0) > (c.delivered || 0)); });
     var tot = function (c, f) { return (by[c.code] || []).reduce(function (a, p) { return a + f(p); }, 0); };
     if (!all && PF.sort !== "rank") {
@@ -1910,9 +1928,8 @@
     var body;
     if (!shown.length) body = '<p class="db-note">No creator matches.</p>';
     else {
-      var many = shown.length > 3, nav = shown.length > 1 ? '<nav class="db-cw__nav" aria-label="Jump to a creator">' + shown.map(function (c) {
-        return '<button type="button" data-cw="' + esc(c.code) + '">' + ava(c.photo) + "<span>" + esc(c.name) + "</span><b>" + pieceCount(by[c.code] || []) + "</b></button>"; }).join("") + "</nav>" : "";
-      body = nav + shown.map(function (c) {
+      var many = shown.length > 3;
+      body = shown.map(function (c) {
         var mine = topPosts(by[c.code] || []), vids = pieceCount(mine);
         if (!all && PF.sort === "new") mine.sort(function (a, b) { return (b.posted_at || 0) - (a.posted_at || 0); });
         else if (!all && PF.sort === "inter") mine = topByEngagement(mine);
@@ -1939,17 +1956,24 @@
           + '<i class="db-cw__chev" aria-hidden="true"></i></summary>' + inner + "</details>";
       }).join("");
     }
-    return all || only ? body : pfBar() + '<div id="db-cwl">' + body + "</div>";
+    var out = (all ? "" : pfBar(base)) + '<div id="db-cwl">' + body + "</div>";
+    return all ? body : only ? out : '<div id="db-cwx">' + out + "</div>";
   }
-  // The bar redraws only the list under it, so the search box keeps focus while typing.
-  function pfRedraw() { var l = $("db-cwl"); if (l) l.innerHTML = creatorWalls(topPosts(posts()), false, true); }
-  document.addEventListener("input", function (e) { var t = e.target; if (t.matches && t.matches("[data-pf=q]")) { PF.q = t.value.trim(); pfRedraw(); } });
-  document.addEventListener("change", function (e) { var t = e.target; if (t.matches && t.matches("select[data-pf]")) { PF[t.getAttribute("data-pf")] = t.value; pfRedraw(); } });
+  // The bar and the list redraw together; the doctor picker closes on a pick, on a tap outside and on Esc.
+  function pfRedraw() { var x = $("db-cwx"); if (x) x.innerHTML = creatorWalls(topPosts(posts()), false, true); }
+  function pfShut() { [].forEach.call(document.querySelectorAll(".db-pf .cmv__list"), function (u) { if (!u.hidden) { u.hidden = true; u.parentNode.querySelector(".cmv__btn").setAttribute("aria-expanded", "false"); } }); }
   document.addEventListener("click", function (e) {
-    var b = e.target.closest && e.target.closest("[data-pfall]"); if (!b) return;
-    var open = b.getAttribute("data-pfall") === "open";
-    [].forEach.call(document.querySelectorAll("#db-cwl details.db-cw"), function (d) { d.open = open; });
+    var t = e.target; if (!t.closest) return;
+    var v = t.closest("[data-pfv]"), d = t.closest("[data-pfdoc]"), ty = t.closest("[data-pftype]"), pl = t.closest("[data-pfplat]"), al = t.closest("[data-pfall]");
+    if (v) { var ul = v.parentNode.querySelector(".cmv__list"), was = ul.hidden; pfShut(); if (was) { ul.hidden = false; v.setAttribute("aria-expanded", "true"); } return; }
+    if (d) { PF.doc = d.getAttribute("data-pfdoc"); pfRedraw(); return; }
+    if (ty) { PF.type = ty.getAttribute("data-pftype"); pfRedraw(); return; }
+    if (pl) { PF.plat = pl.getAttribute("data-pfplat"); pfRedraw(); return; }
+    if (al) { var o = al.getAttribute("data-pfall") === "open"; [].forEach.call(document.querySelectorAll("#db-cwl details.db-cw"), function (x) { x.open = o; }); return; }
+    pfShut();
   });
+  document.addEventListener("change", function (e) { var t = e.target; if (t.matches && t.matches("select[data-pfsort]")) { PF.sort = t.value; pfRedraw(); } });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") pfShut(); });
   document.addEventListener("click", function (e) {
     var b = e.target.closest && e.target.closest("[data-cw]"); if (!b) return;
     var t = document.getElementById("cw-" + b.getAttribute("data-cw"));
