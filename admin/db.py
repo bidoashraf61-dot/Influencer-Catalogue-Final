@@ -997,12 +997,12 @@ def admit_device(code_row, device, ip=None, user_agent=None):
         return True, "new"
 
 
-UNLIMITED_DEVICE_DOMAINS = ("blueholding.co.uk",)
+UNLIMITED_DEVICE_DOMAINS = ("blueholding.co.uk", "hellovoice.co.uk")
 
 
 def unlimited_device_domains():
     """Email domains whose accounts open on any number of devices (owner, 2026-11-02: every
-    BlueHolding address). Setting unlimited_device_domains overrides the default list."""
+    BlueHolding and HelloVoice address). Setting unlimited_device_domains overrides the default list."""
     v = setting("unlimited_device_domains")
     return tuple(str(d).strip().lower() for d in v) if isinstance(v, list) else UNLIMITED_DEVICE_DOMAINS
 
