@@ -983,6 +983,8 @@ def admit_device(code_row, device, ip=None, user_agent=None):
                          "WHERE id = ?", (now(), ip, (user_agent or "")[:300], known["id"]))
             return True, "known"
         limit = code_row["max_devices"] if "max_devices" in code_row.keys() else None
+        if limit is not None and unlimited_devices(conn, code_row["id"]):
+            limit = None
         if limit is not None:
             used = conn.execute("SELECT COUNT(*) FROM code_devices WHERE code_id = ?",
                                 (code_row["id"],)).fetchone()[0]
@@ -993,6 +995,22 @@ def admit_device(code_row, device, ip=None, user_agent=None):
             "VALUES (?,?,?,?,?,?)",
             (code_row["id"], device, now(), now(), ip, (user_agent or "")[:300]))
         return True, "new"
+
+
+UNLIMITED_DEVICE_DOMAINS = ("blueholding.co.uk",)
+
+
+def unlimited_device_domains():
+    """Email domains whose accounts open on any number of devices (owner, 2026-11-02: every
+    BlueHolding address). Setting unlimited_device_domains overrides the default list."""
+    v = setting("unlimited_device_domains")
+    return tuple(str(d).strip().lower() for d in v) if isinstance(v, list) else UNLIMITED_DEVICE_DOMAINS
+
+
+def unlimited_devices(conn, code_id):
+    """True when this code is the personal code of an account on an unlimited-devices domain."""
+    row = conn.execute("SELECT email FROM users WHERE code_id = ?", (code_id,)).fetchone()
+    return row is not None and (row["email"] or "").rsplit("@", 1)[-1].lower() in unlimited_device_domains()
 
 
 def device_allowed(code_id, device):

@@ -443,6 +443,8 @@ def create_user(email, name, company, job_title="", phone="", ip=None):
     status = "pending" if signup_mode() == "approval" else "active"
     token = secrets.token_hex(32)
     max_dev = db.setting("user_max_devices", 5)
+    if email.rsplit("@", 1)[1] in db.unlimited_device_domains():
+        max_dev = None                          # BlueHolding addresses: no device cap
     try:
         with db.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
@@ -451,7 +453,8 @@ def create_user(email, name, company, job_title="", phone="", ip=None):
             cur = conn.execute(
                 "INSERT INTO codes (code_hash, hint, label, created_at, max_devices, revoked_at) VALUES (?,?,?,?,?,?)",
                 (hashlib.sha256(("hv-user:" + token).encode()).hexdigest(), "····", "Client: " + email, db.now(),
-                 max_dev if isinstance(max_dev, int) and max_dev > 0 else 5, db.now() if status == "pending" else None))
+                 None if max_dev is None else max_dev if isinstance(max_dev, int) and max_dev > 0 else 5,
+                 db.now() if status == "pending" else None))
             code_id = cur.lastrowid
             cur = conn.execute(
                 "INSERT INTO users (email, name, company, job_title, phone, domain, code_id, status, created_at, signup_ip) "
