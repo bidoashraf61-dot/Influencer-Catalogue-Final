@@ -212,6 +212,11 @@
 .hvb-lane--approved     { --hvb-lane: #f3fbd0; --hvb-strip: #b9d400; }
 .hvb-lane--live         { --hvb-lane: #e3f4e9; --hvb-strip: #14884a; }
 .hvb-lane--completed    { --hvb-lane: #ebebea; --hvb-strip: #121212; }
+/* Item 313: the Intelligence board's lanes */
+.hvb-lane--requested    { --hvb-lane: #efede8; --hvb-strip: #a79e90; --hvb-on: var(--ink); }
+.hvb-lane--running      { --hvb-lane: #fff1e2; --hvb-strip: #e2780f; --hvb-on: var(--ink); }
+.hvb-lane--ready        { --hvb-lane: #f3fbd0; --hvb-strip: #b9d400; --hvb-on: var(--ink); }
+.hvb-lane--shared       { --hvb-lane: #e3f4e9; --hvb-strip: #14884a; --hvb-on: var(--white); }
 .hvb-lane { position: relative; padding-top: 20px;
   background: linear-gradient(var(--hvb-strip), var(--hvb-strip)) top / 100% 6px no-repeat, var(--hvb-lane); }
 .hvb-tab::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--hvb-strip, var(--gray)); }
@@ -682,3 +687,21 @@ div.hvb-q__head { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); cursor
 .hvb-sug__use[disabled] { cursor: default; opacity: .7; }
 .hvb-sug.is-done { border-style: solid; border-color: #14884a; background: #e7f7ed; }
 .hvb-sug.is-done .hvb-sug__use { background: transparent; border-color: transparent; color: #0f6b3a; opacity: 1; }
+
+/* Items 312 + 313: the module board pages (/selections/, /intelligence/) */
+.mb-mark__logo { width: 150px; }
+body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
+.mb-main { padding-top: clamp(28px, 4vw, 48px); padding-bottom: 64px; }
+.mb-head { margin-bottom: 24px; max-width: 72ch; }
+.mb-title { font-family: var(--heading); font-weight: 400; font-size: clamp(2.75rem, 1.6rem + 3.6vw, 5rem); line-height: .9; margin: 0 0 12px; color: var(--ink); }
+.mb-lede { margin: 0; font-size: 17px; line-height: 1.55; color: var(--graphite, #383838); }
+.mb-sum { margin: 10px 0 0; font-size: 14px; font-weight: 600; color: var(--ink); }
+.mb-sum:empty { display: none; }
+.mb-board[hidden] { display: none; }
+@media (max-width: 640px) {
+  .mb-mark__logo, body[data-board="intelligence"] .mb-mark__logo { width: 112px; }
+  .mb-lede { font-size: 15px; }
+}
+.mb-say { min-height: 0; margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink); opacity: 0; transition: opacity .2s ease; }
+.mb-say.is-on { opacity: 1; min-height: 22px; margin: 0 0 14px; }
+.mb-say.is-bad { color: #c01010; }

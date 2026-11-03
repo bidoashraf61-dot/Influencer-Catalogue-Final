@@ -457,6 +457,15 @@ class PortalMixin(connect_api.ConnectMixin):
             else:
                 self.send_json(200, dict(board.brief_view(self, k), ok=True), self.cors() + [("Cache-Control", "no-store")])
             return True
+        if path == "/api/evidence/board":
+            # The Helvi Intelligence board (item 313): competitor studies by stage, scoped like the campaign board.
+            import intel_board
+            got = intel_board.payload(self, self._srv().CLIENT_LOGOS)
+            if got is None:
+                self.send_json(401, {"ok": False, "reason": "signin"}, self.cors())
+            else:
+                self.send_json(200, dict(got, ok=True), self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path in ("/api/board", "/api/board/targets"):
             # The campaign board (item 174/176): admins every campaign, a KAM hers, a client their own (read-only).
             import board
@@ -685,6 +694,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/board/stage": self.api_board_stage, "/api/board/live": self.api_board_live,
             "/api/board/pin": self.api_board_pin, "/api/board/attach": self.api_board_attach,
             "/api/board/selection-stage": self.api_board_selection_stage,
+            "/api/evidence/board/stage": self.api_intel_stage,
             "/api/analysis/decide": self.api_analysis_decide,
             "/api/board/edit": self.api_board_edit, "/api/board/logo": self.api_board_logo,
             "/api/board/detach": self.api_board_detach, "/api/board/save": self.api_board_save, "/api/board/plan": self.api_board_plan,
@@ -1333,6 +1343,19 @@ class PortalMixin(connect_api.ConnectMixin):
         history.set_actor(board._me(self) or "client")
         ok, msg, extra = board.move_selection(self, sel, str(b.get("to") or ""))
         self._board_done(ok, msg, extra)
+
+    def api_intel_stage(self):
+        """{id, to}: move a competitor study on the Intelligence board (item 313). Admins only; intel_board.move checks."""
+        import board
+        import intel_board
+        b = self.json_body() or {}
+        try:
+            pid = int(b.get("id"))
+        except (TypeError, ValueError):
+            self.send_json(404, {"ok": False, "message": "That study is not here any more."}, self.cors())
+            return
+        ok, msg = intel_board.move(self, pid, str(b.get("to") or ""), board._me(self))
+        self.send_json(200 if ok else 403, {"ok": ok, "message": msg}, self.cors())
 
     def api_board_live(self):
         """{t | id, on}: Live / Unlive (admins only)."""

@@ -197,6 +197,16 @@ def _kam_label(email):
     return n if n and "@" not in n else (str(email).split("@")[0].replace(".", " ").title() or None)
 
 
+def _study_of(sel_id, client_only):
+    """{title, posts} of the selection's competitor study, or None."""
+    try:
+        import evidence
+        pk = evidence.for_selection(sel_id, client_only=client_only)
+    except Exception:
+        return None
+    return {"title": pk["title"], "id": pk["id"]} if pk is not None else None
+
+
 def summary(user, code_id, secret=b"", logo_dir=None):
     """Everything /account/ shows, in one payload. Client-safe: no costs,
     margins or internal notes ever leave here."""
@@ -272,6 +282,8 @@ def summary(user, code_id, secret=b"", logo_dir=None):
                            "created_at": s["created_at"], "client": sclient,
                            "kam": _kam_label(s["kam"]),
                            "campaigns": [{"name": k["name"], "token": k["token"], "live": k["status"] == "live"} for k in held][:3],
+                           # Item 312: its competitor study (Helvi Intelligence), when there is one this viewer may open.
+                           "study": _study_of(s["id"], not (is_admin or kam_sc is not None)),
                            "name": s["name"], "token": s["token"], "creators": len(codes), "updated_at": s["updated_at"],
                            "id": s["id"], "admin_delete": is_admin, "mine": s["code_id"] == code_id, "owner": None if s["code_id"] == code_id else (s["owner"] or s["code_label"] or "A colleague"),
                            # Only the client's own work can be deleted: not a colleague's, not HelloVoice's.

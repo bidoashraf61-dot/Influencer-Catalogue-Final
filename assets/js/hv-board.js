@@ -51,6 +51,11 @@
     st_approved: '<circle cx="12" cy="12" r="8.6"/><path d="M8.3 12.3l2.5 2.5 5-5.2"/>',
     st_live: '<circle cx="12" cy="12" r="1.9"/><path d="M8.2 8.2a5.4 5.4 0 0 0 0 7.6M15.8 8.2a5.4 5.4 0 0 1 0 7.6M5.3 5.3a9.5 9.5 0 0 0 0 13.4M18.7 5.3a9.5 9.5 0 0 1 0 13.4"/>',
     st_completed: '<path d="M8 4h8v5.2a4 4 0 0 1-8 0z"/><path d="M8 6H5.2a3 3 0 0 0 3.1 4M16 6h2.8a3 3 0 0 1-3.1 4M12 13.2V17M8.5 20h7M9.8 17h4.4"/>',
+    // Item 313: the Intelligence board's lanes (Requested, Running, Ready, Shared).
+    st_requested: '<path d="M6 3.5h9l4 4v13H6z"/><path d="M15 3.5v4h4"/><path d="M12.5 11v5M10 13.5h5"/>',
+    st_running: '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/><path d="M10.5 7.5v3l2 1.5"/>',
+    st_ready: '<circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/><path d="M8 10.7l1.8 1.8 3.3-3.4"/>',
+    st_shared: '<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M8.2 10.8l7.6-4.1M8.2 13.2l7.6 4.1"/>',
     grip: '<circle cx="9" cy="7" r="1.2"/><circle cx="15" cy="7" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="17" r="1.2"/><circle cx="15" cy="17" r="1.2"/>'
   };
 
@@ -166,9 +171,31 @@
       figures: [["Creators", String(k.creators || 0)], ["Approved", String(k.approved || 0)], ["To review", String(k.review || 0)]],
       links: (s.campaigns || []).map(function (c) {
         return { label: c.name, sub: c.live ? "Live" : "Campaign", live: c.live, href: c.live ? ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token) : ROOT + "campaign/" };
-      }),
-      linksLabel: "Campaigns using this selection", empty: "",
+      }).concat(s.study ? [{ label: s.study.title, sub: "Competitor study", live: false, href: ROOT + "market/#s=" + encodeURIComponent(s.token) }] : []),
+      linksLabel: s.study ? "Campaigns and competitor study" : "Campaigns using this selection", empty: "",
       updated: s.updated_at, raw: s
+    };
+  }
+
+  // Item 313: a competitor study from /api/evidence/board. It opens the study map for its selection, and links
+  // to that selection and to every campaign holding it.
+  function fromStudy(st) {
+    var sel = st.selection;
+    var map = sel ? ROOT + "market/#s=" + encodeURIComponent(sel.token) : "";
+    return {
+      key: String(st.id), name: st.title, stage: st.stage, moves: st.moves || [], client: st.client || "",
+      logos: st.logos || [], href: map, open: map ? "Open study" : "",
+      key1: [String(st.competitors || 0), st.competitors === 1 ? "competitor" : "competitors"],
+      sels: sel ? [{ label: sel.name, button: "Selection", href: ROOT + "selection/#s=" + encodeURIComponent(sel.token) }] : [],
+      dash: (st.campaigns || []).filter(function (c) { return c.live; }).map(function (c) { return ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token); })[0] || "",
+      when: st.manual ? "Moved by hand" : "", kam: st.kam || "", badge: st.visible ? null : h("span", { class: "lc-chip lc-chip--draft" }, h("i", { "aria-hidden": "true" }), "Staff only"),
+      figures: [["Posts", String(st.posts || 0)], ["Creators", String(st.creators || 0)], ["On roster", String(st.matched || 0)]],
+      links: (sel ? [{ label: sel.name, sub: "Selection", live: false, href: ROOT + "selection/#s=" + encodeURIComponent(sel.token) }] : [])
+        .concat((st.campaigns || []).map(function (c) {
+          return { label: c.name, sub: c.live ? "Live" : "Campaign", live: c.live, href: c.live ? ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token) : ROOT + "campaign/" };
+        })),
+      linksLabel: "Selection and campaigns", empty: sel ? "" : "Not filed under a selection yet.",
+      updated: st.updated_at, raw: st
     };
   }
 
@@ -787,7 +814,7 @@
     actB.addEventListener("click", function () { activityPanel(it, B, actB); });
     // Item 214: the top row is the logos and the arrow only, so HelloVoice × the client's logo always has room.
     // Pin and Activity sit at the end of the button row instead.
-    var tools = h("span", { class: "hvb-card__tools" }, pin || null, actB);
+    var tools = h("span", { class: "hvb-card__tools" }, pin || null, B.noun === "study" ? null : actB);
     top.appendChild(tog);
     el.appendChild(top);
     el.appendChild(h("h3", { class: "hvb-card__name" }, it.href ? h("a", { href: it.href }, it.name) : it.name));
@@ -1292,5 +1319,5 @@
     return v && (!only || only.indexOf(v) >= 0) && VIEWS.some(function (x) { return x[0] === v; }) ? v : "board";
   }
 
-  window.HVBoard = { mount: mount, fromCampaign: fromCampaign, fromSelection: fromSelection, viewSwitch: viewSwitch, viewOf: viewOf };
+  window.HVBoard = { mount: mount, fromCampaign: fromCampaign, fromSelection: fromSelection, fromStudy: fromStudy, viewSwitch: viewSwitch, viewOf: viewOf };
 })();

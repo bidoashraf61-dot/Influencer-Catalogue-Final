@@ -7652,6 +7652,8 @@ def main():
     creators_private.ensure()               # the owner column and the triggers that keep a private creator private
     team.init()
     evidence.init()
+    import intel_board
+    intel_board.init()                      # the Intelligence board's hand-set stages (item 313)
     import push
     push.init()
     apify.start_scheduler()
