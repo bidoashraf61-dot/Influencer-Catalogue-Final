@@ -68,7 +68,11 @@
   function logo(name, big) {
     var s = el("span", "ss-logo" + (big ? " ss-logo--lg" : "")), u = LOGO[name];
     s.title = name || "";
-    if (u) { var i = el("img"); i.src = API + u; i.alt = name || ""; i.decoding = "async"; s.appendChild(i); }
+    if (u) {
+      var i = el("img"); i.src = API + u; i.alt = name || ""; i.decoding = "async";
+      i.addEventListener("error", function () { s.className += " ss-logo--txt"; s.textContent = name || ""; });
+      s.appendChild(i);
+    }
     else { s.className += " ss-logo--txt"; s.textContent = name || ""; }
     return s;
   }
@@ -162,7 +166,9 @@
     if (q.paid_boost) { var bb = el("span", "ss-badge ss-badge--boost"); bb.appendChild(icon("boost")); bb.appendChild(document.createTextNode("Likely boosted")); a.appendChild(bb); }
     var pl = el("span", "ss-thumb__play"); pl.appendChild(icon("play")); a.appendChild(pl);
     var bt = el("span", "ss-thumb__bt"); bt.appendChild(el("b", null, q.views != null ? num(q.views) : (q.likes != null ? num(q.likes) + " likes" : "")));
-    bt.appendChild(el("span", null, [who, q.er != null ? pct(q.er) + " engagement" : "", fmtDate(q.date)].filter(Boolean).join(" · ")));
+    if (who) { var w2 = el("span", "ss-thumb__who", who); w2.dir = "auto"; bt.appendChild(w2); }
+    var t0 = day(q.date);
+    bt.appendChild(el("span", "ss-thumb__meta", [q.er != null ? pct(q.er) + " eng." : "", t0 == null ? "" : new Date(t0).toLocaleDateString("en-GB", { month: "short", year: "numeric" })].filter(Boolean).join(" · ")));
     a.appendChild(bt);
     return a;
   }
@@ -319,11 +325,16 @@
     if (v.recent) bd.appendChild(recentBadge(v.recent));
     ph.appendChild(bd); a.appendChild(ph);
     var body = el("div", "ss-card__b"), nm = el("div", "ss-card__nm");
-    nm.appendChild(el("b", null, c.name || "@" + c.handle)); nm.appendChild(el("span", null, "@" + c.handle + (c.followers ? " · " + num(c.followers) + " followers" : "")));
+    var nb = el("b", null, c.name || "@" + c.handle); nb.title = c.name || "@" + c.handle; nm.appendChild(nb);
+    var hs = el("span", null, "@" + c.handle + (c.followers ? " · " + num(c.followers) + " followers" : "")); hs.title = "@" + c.handle; nm.appendChild(hs);
     body.appendChild(nm);
     var ns = el("div", "ss-nums");
-    [[num(v.best), "Best views"], [pct(v.er), "Engagement"], [String(v.posts.length), v.posts.length === 1 ? "Competitor post" : "Competitor posts"]]
-      .forEach(function (x) { var d = el("div"); d.appendChild(el("b", null, x[0])); d.appendChild(el("span", null, x[1])); ns.appendChild(d); });
+    [[num(v.best), "Best views"], [pct(v.er), "Engagement"], [String(v.posts.length), v.posts.length === 1 ? "Post" : "Posts"]]
+      .forEach(function (x) {
+        var d = el("div"), lb = el("span", null, x[1]); d.appendChild(el("b", null, x[0]));
+        if (x[1] === "Engagement") lb.setAttribute("data-short", "Eng. rate");          // phones (study-share.css)
+        d.appendChild(lb); ns.appendChild(d);
+      });
     body.appendChild(ns); body.appendChild(el("p", "ss-why", why(v)));
     var lg = el("div", "ss-logos"), names = Object.keys(v.comps);
     names.slice(0, 3).forEach(function (n) { lg.appendChild(logo(n)); });
@@ -407,7 +418,7 @@
       var peak = Math.max.apply(null, cnt), lc = el("div"); lc.appendChild(logo(c.name)); tl.appendChild(lc);
       cnt.forEach(function (n, j) {
         var cell = el("div", "cell");
-        if (n) { var d = el("span", "ss-dot" + (n === peak && peak > 1 ? " hot" : ""), String(n)), sz = Math.min(16 + n * 5, 42) + "px"; d.style.width = d.style.height = sz;
+        if (n) { var d = el("span", "ss-dot" + (n === peak && peak > 1 ? " hot" : ""), String(n)), sz = Math.min(18 + n * 3, 32) + "px"; d.style.width = d.style.height = sz;
                  d.title = n + (n === 1 ? " post in " : " posts in ") + months[j].toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }); cell.appendChild(d); }
         tl.appendChild(cell);
       });
