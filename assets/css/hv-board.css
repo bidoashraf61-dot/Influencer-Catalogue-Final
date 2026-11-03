@@ -752,6 +752,7 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
   /* Phones: the character stands beside the title only; everything else runs full width under them. */
   .mb-cover__in { grid-template-columns: minmax(0, 1fr) 96px; align-items: start; gap: 0 8px; padding-top: 16px; }
   .mb-cover__main { display: contents; }
+  .mb-cover__title, .mb-cover__lede, .mb-cover__stats, .mb-pipe { grid-area: auto; }
   .mb-cover__title { grid-column: 1; grid-row: 1; align-self: center; margin: 0; font-size: clamp(2.6rem, 2rem + 4vw, 3.4rem); }
   .mb-cover__char { grid-column: 2; grid-row: 1; width: 96px; margin: 0; align-self: end; }
   .mb-cover__lede, .mb-cover__stats, .mb-pipe { grid-column: 1 / -1; }
@@ -765,7 +766,9 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
 .mb-main--covered { padding-top: 18px; }
 .mx-list--covered { padding-top: 0 !important; }
 .mx-list--covered .mx-list__title, .mx-list--covered .mx-list__lede { display: none; }
-.mx-list--covered .cat-container { padding-top: 18px; }
+.mx-list--covered > .cat-pad > .cat-container { padding-top: 18px; }
+.mx-list--covered .mx-sum:empty { display: none; }
+.mx-list--covered .mx-bd-bar { margin-bottom: 12px; }
 .mb-pipe .hvb-stico svg { width: 12px; height: 12px; stroke-width: 2.1; }
 /* The campaigns page bar: the account dock is fixed at the top right, so the switcher keeps clear of it,
    and "Full catalogue" gives way first (the HELVi Track logo already links back). */
@@ -778,3 +781,4 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
 }
 /* audit: the Completed stage mark is ink, invisible on the cover's ink */
 .mb-pipe .hvb-stico.hvb-lane--completed { background: rgba(255,255,255,.22); color: var(--white); }
+.mx-list--covered .mx-list__items { margin-top: 0; gap: 0; }
