@@ -1024,15 +1024,15 @@
   }
 
   // The PDF is the report itself, printed (Bido 2026-11-03: same structure and data as the report). The page is
-  // printed on a large sheet in A4 proportions so the desktop layout holds; every picture is loaded first; every page
+  // printed on A4 with the desktop layout scaled to the page (creator.css); every picture is loaded first; every page
   // carries who, when the numbers were read, and page n of N.
   function printPdf(btn) {
     var root = document.documentElement, c = D.creator, title = document.title;
     var st = $("pp-pagesize") || document.head.appendChild(Object.assign(document.createElement("style"), { id: "pp-pagesize" }));
     var asof = (window.HVReport && window.HVReport.asOf ? window.HVReport.asOf() : "").replace(/"/g, "");
     var who = ((c.name || c.code) + " · " + (PLAT || "") + " analysis").replace(/"/g, "");
-    st.textContent = '@page { size: 380mm 537mm; margin: 14mm 14mm 20mm; @bottom-left { content: "' + who + " · " + asof + ' · HELVi Intelligence by HelloVoice"; font: 13px "DM Sans", Arial, sans-serif; color: #383838; }'
-      + ' @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 13px "DM Sans", Arial, sans-serif; color: #383838; } }';
+    st.textContent = '@page { size: A4; margin: 10mm 10mm 14mm; @bottom-left { content: "' + who + " · " + asof + ' · HELVi Intelligence by HelloVoice"; font: 8.5px "DM Sans", Arial, sans-serif; color: #383838; }'
+      + ' @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8.5px "DM Sans", Arial, sans-serif; color: #383838; } }';
     root.classList.add("rs-printing", "pp-printing");
     if (btn) btn.disabled = true;
     var imgs = [].slice.call(document.querySelectorAll(".pp img"));

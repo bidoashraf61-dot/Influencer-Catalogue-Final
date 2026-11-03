@@ -584,7 +584,7 @@
   }
 
   /* ---------- PDF: the study itself, printed (Bido 2026-11-03: same structure and data as the report) ----------
-     Printed on a large sheet in A4 proportions so the desktop layout holds; every tier opened out; filters, sorting and
+     Printed on A4 with the desktop layout scaled to the page (study-share.css); every tier opened out; filters, sorting and
      buttons left off; every picture loaded first; each page says who, when and page n of N. Links stay live in the file. */
   HV.pdf = function (btn) {
     if (!D) return;
@@ -592,8 +592,8 @@
     state.open = { 1: true, 2: true, 3: true }; drawBoard(false);
     var st = document.getElementById("ss-pagesize") || document.head.appendChild(Object.assign(document.createElement("style"), { id: "ss-pagesize" }));
     var asof = (typeof HV.asOf === "function" ? HV.asOf() : "").replace(/"/g, ""), brand = String(D.brand || "").replace(/"/g, "");
-    st.textContent = '@page { size: 380mm 537mm; margin: 14mm 14mm 20mm; @bottom-left { content: "Competitor study' + (brand ? " · " + brand : "") + " · " + asof
-      + ' · HELVi Intelligence by HelloVoice"; font: 13px "DM Sans", Arial, sans-serif; color: #383838; } @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 13px "DM Sans", Arial, sans-serif; color: #383838; } }';
+    st.textContent = '@page { size: A4; margin: 10mm 10mm 14mm; @bottom-left { content: "Competitor study' + (brand ? " · " + brand : "") + " · " + asof
+      + ' · HELVi Intelligence by HelloVoice"; font: 8.5px "DM Sans", Arial, sans-serif; color: #383838; } @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8.5px "DM Sans", Arial, sans-serif; color: #383838; } }';
     html.classList.add("rs-printing", "ss-pageprint");
     if (btn) btn.disabled = true;
     var imgs = Array.prototype.slice.call(document.querySelectorAll("#ss img"));

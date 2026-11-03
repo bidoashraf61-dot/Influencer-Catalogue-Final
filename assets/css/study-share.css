@@ -386,3 +386,23 @@ html.ss-on #ev-market { display: none; }
   html.ss-pageprint .ss-stamp, html.ss-pageprint .ss-card { animation: none !important; transform: none !important; opacity: 1 !important; }
   html.ss-pageprint * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+/* A4: the desktop layout scaled to the page (zoom), with the narrow-screen rules (max-width 760px, which match A4's
+   width) set back to the desktop ones. */
+@media print {
+  html.ss-pageprint body { zoom: .61; }
+  html.ss-pageprint .ss-facts div { flex-basis: 140px !important; }
+  html.ss-pageprint .ss-facts div:nth-child(3) { padding-left: 18px !important; border-left: 1px solid var(--rule) !important; }
+  html.ss-pageprint .ss-facts div:nth-child(n+3) { border-top: 0 !important; }
+  html.ss-pageprint .ss-facts b { font-size: 40px !important; }
+  html.ss-pageprint .ss-grid { grid-template-columns: repeat(4, 1fr) !important; gap: 14px !important; padding: 14px !important; border-radius: 28px !important; }
+  html.ss-pageprint .ss-card__b { padding: initial; }
+  html.ss-pageprint .ss-nums { grid-template-columns: repeat(3, 1fr) !important; }
+  html.ss-pageprint .ss-nums div:nth-child(3) { display: block !important; }
+  html.ss-pageprint .ss-nums span[data-short] { font-size: inherit !important; }
+  html.ss-pageprint .ss-nums span[data-short]::after { content: none !important; }
+  html.ss-pageprint .ss-why { display: block !important; }
+  html.ss-pageprint .ss-logos > :nth-child(n+2):not(.ss-more) { display: inline-flex !important; }
+  html.ss-pageprint .ss-kinds { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important; }
+  html.ss-pageprint .ss-wall { grid-template-columns: repeat(4, 1fr) !important; }
+  html.ss-pageprint .ss-tl { overflow: visible !important; margin-right: 0 !important; }
+}
