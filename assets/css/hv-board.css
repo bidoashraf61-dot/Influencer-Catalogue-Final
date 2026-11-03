@@ -722,7 +722,7 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
 .mb-cover__title { font-family: var(--heading); font-weight: 400; font-size: clamp(3rem, 1.6rem + 4.4vw, 6rem); line-height: .88; margin: 0 0 14px; color: var(--white); }
 .mb-cover__lede { margin: 0 0 26px; max-width: 58ch; font-size: 17px; line-height: 1.55; color: rgba(255,255,255,.78); }
 .mb-cover__stats { display: flex; flex-wrap: wrap; gap: 12px 40px; margin: 0 0 28px; }
-.mb-cover__stats div { display: flex; flex-direction: column-reverse; }
+.mb-cover__stats div { display: flex; flex-direction: column; gap: 4px; }
 .mb-cover__stats dd { margin: 0; font-family: var(--heading); font-size: clamp(2.6rem, 1.9rem + 1.8vw, 3.6rem); line-height: .95; color: var(--lime); }
 .mb-cover__stats dt { font-size: 13px; font-weight: 500; letter-spacing: .04em; color: rgba(255,255,255,.72); }
 .mb-cover__char { display: block; width: clamp(240px, 26vw, 365px); height: auto; align-self: end; margin-bottom: -4px;
@@ -743,14 +743,17 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
 .mb-pipe__lab .hvb-stico { flex: none; }
 @media (prefers-reduced-motion: reduce) { .mb-cover__char, .mb-pipe__bar { animation: none; } }
 @media (max-width: 760px) {
-  .mb-cover__in { grid-template-columns: minmax(0, 1fr); gap: 0; position: relative; }
-  .mb-cover__char { position: absolute; right: -6px; top: 18px; width: 120px; margin: 0; }
-  .mb-cover__title { padding-right: 112px; }
-  .mb-cover__lede { font-size: 15px; }
-  .mb-cover__stats { gap: 10px 26px; }
-  .mb-pipe { overflow-x: auto; grid-auto-columns: minmax(64px, 1fr); padding-bottom: 4px; }
+  /* Phones: the character stands beside the title only; everything else runs full width under them. */
+  .mb-cover__in { grid-template-columns: minmax(0, 1fr) 108px; align-items: start; gap: 0 8px; padding-top: 22px; }
+  .mb-cover__main { display: contents; }
+  .mb-cover__title { grid-column: 1; grid-row: 1; align-self: center; margin: 0; font-size: clamp(2.6rem, 2rem + 4vw, 3.4rem); }
+  .mb-cover__char { grid-column: 2; grid-row: 1; width: 108px; margin: 0; align-self: end; }
+  .mb-cover__lede, .mb-cover__stats, .mb-pipe { grid-column: 1 / -1; }
+  .mb-cover__lede { margin: 14px 0 20px; font-size: 15px; }
+  .mb-cover__stats { gap: 10px 26px; margin-bottom: 22px; }
+  .mb-pipe { overflow-x: auto; grid-auto-columns: minmax(78px, 1fr); padding-bottom: 26px; margin-bottom: 0; }
   .mb-pipe__st { grid-template-rows: auto 48px auto; }
-  .mb-pipe__lab { font-size: 12px; }
+  .mb-pipe__lab .hvb-stico { display: none; }
 }
 /* the page below the cover */
 .mb-main--covered { padding-top: 28px; }
@@ -758,3 +761,12 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
 .mx-list--covered .mx-list__title, .mx-list--covered .mx-list__lede { display: none; }
 .mx-list--covered > .cat-container { padding-top: 28px; }
 .mb-pipe .hvb-stico svg { width: 12px; height: 12px; stroke-width: 2.1; }
+/* The campaigns page bar: the account dock is fixed at the top right, so the switcher keeps clear of it,
+   and "Full catalogue" gives way first (the HELVi Track logo already links back). */
+@media (min-width: 641px) { body[data-page="campaign"] .mx-top__in:has(.hv-mods) { padding-right: 136px; } }
+@media (max-width: 1180px) { body[data-page="campaign"] .mx-top:has(.hv-mods) #mx-catalogue { display: none; } }
+@media (max-width: 640px) {
+  body[data-page="campaign"] .mx-top__in:has(.hv-mods) { flex-wrap: wrap; row-gap: 10px; }
+  body[data-page="campaign"] .mx-top__links:has(.hv-mods) { flex: 1 1 100%; justify-content: flex-start; }
+  body[data-page="campaign"] .mx-top:has(.hv-mods) #mx-catalogue { display: none; }
+}
