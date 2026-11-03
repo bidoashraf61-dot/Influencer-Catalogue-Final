@@ -355,8 +355,8 @@
     btn.setAttribute("aria-haspopup", "dialog");
     btn.setAttribute("aria-expanded", "false");
     btn.addEventListener("click", function () { if (pop && !pop.hidden) close(); else open(); });
-    var roi = inRow ? s.querySelector(".cx-btn--roi") : null;
-    if (roi) s.insertBefore(btn, roi); else s.appendChild(btn);
+    var after = inRow ? document.getElementById("mg-btn") || document.getElementById("aa-btn") : null;
+    if (after && after.parentNode === s) s.insertBefore(btn, after.nextSibling); else s.appendChild(btn);
     return true;
   }
 
