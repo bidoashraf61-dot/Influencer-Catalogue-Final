@@ -1301,3 +1301,12 @@ body:has(#mx-report:not([hidden])) .mx-top .mx-link:hover { color: var(--lime); 
   #mx-say .mx-topic .mx-bar__k small { font-size: 15px !important; }
 }
 @media screen and (max-width: 700px) { #mx-say .mx-topic, #mx-say .mx-topic .mx-bar__k > span { font-size: 16px !important; } #mx-say .mx-topic .mx-bar__k small { font-size: 14px !important; } }
+/* PDF (2026-11-03): small Watch on icons so five fit a card's line; a gap between the dark header and the contents. */
+@media print {
+  .mx-post__ics { gap: 3mm 2mm !important; }
+  .mx-post__ic { min-width: 0 !important; }
+  .mx-post__icb { width: 7mm !important; height: 7mm !important; }
+  .mx-post__icb svg { width: 3.5mm !important; height: 3.5mm !important; }
+  .mx-post__ic b { font-size: 8px !important; }
+  #mx-report .mx-toc { padding-top: 7mm !important; }
+}
