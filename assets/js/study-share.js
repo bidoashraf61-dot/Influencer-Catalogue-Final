@@ -627,7 +627,12 @@
       document.title = "Competitor study" + (brand ? " - " + brand : "");
       window.print();
     };
-    Promise.all(waits).then(function () { setTimeout(go, 300); }, go); setTimeout(go, 12000);
+    // 150+ creators means hundreds of pictures: the button counts them down, and the PDF waits up to a minute for them.
+    var label = btn ? btn.innerHTML : "", left = waits.length;
+    var tick = function () { if (btn && !done) { left = imgs.filter(function (i) { return !i.complete; }).length; var sp = btn.querySelector("span"); if (sp) sp.textContent = left ? "Preparing PDF… " + left + " pictures left" : "Preparing PDF…"; } };
+    var timer = setInterval(tick, 500); tick();
+    var go2 = function () { clearInterval(timer); if (btn) btn.innerHTML = label; go(); };
+    Promise.all(waits).then(function () { setTimeout(go2, 300); }, go2); setTimeout(go2, 60000);
   };
   HV.studyReady = function () { return !!(D && refs.board && refs.board.querySelector(".ss-card")); };
 })();
