@@ -978,7 +978,7 @@
     return '<section class="mx-next" aria-label="Coming next"><h3 class="mx-next__h">Coming next · ' + owed.length + (owed.length === 1 ? " video" : " videos") + "</h3><ul>"
       + owed.map(function (x) {
         var c = x.c, when = whenText(c);
-        return "<li>" + ava(c.photo) + "<span><b>" + esc(c.name) + "</b><small>Post " + x.n + " of " + c.planned + "</small></span><em" + (late(c.pending_date) ? ' class="mx-late"' : "") + ">" + esc(when) + "</em></li>";
+        return "<li>" + ava(c.photo) + "<span><b>" + esc(splitName(c.name).en) + "</b><small>Post " + x.n + " of " + c.planned + "</small></span><em" + (late(c.pending_date) ? ' class="mx-late"' : "") + ">" + esc(when) + "</em></li>";
       }).join("") + "</ul></section>";
   }
   function pendingCard(x) {
