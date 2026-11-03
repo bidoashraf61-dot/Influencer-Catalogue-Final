@@ -92,7 +92,13 @@
     root.classList.add("rs-printing");
     var done = function () { root.classList.remove("rs-printing"); window.removeEventListener("afterprint", done); };
     window.addEventListener("afterprint", done);
-    setTimeout(function () { window.print(); }, 60);
+    // Pictures below the fold are lazy and would print blank: load them all first (at most 6s), then print.
+    var waits = [].slice.call(document.querySelectorAll('img[loading="lazy"]')).map(function (im) {
+      im.loading = "eager";
+      return im.complete ? null : new Promise(function (ok) { im.addEventListener("load", ok); im.addEventListener("error", ok); });
+    }).filter(Boolean);
+    Promise.race([Promise.all(waits), new Promise(function (ok) { setTimeout(ok, 6000); })])
+      .then(function () { setTimeout(function () { window.print(); }, 60); });
   };
 
   // A print-only head for pages that print themselves (selection, competitor study): the module mark,
