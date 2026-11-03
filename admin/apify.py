@@ -1272,6 +1272,11 @@ def refresh_run(run):
             note = "Results kept, but no post numbers were recognised in them."
     except ApifyError as ex:
         note = "Run finished but the results could not be read: " + str(ex)
+    if job and job["kind"] == "post_urls" and job["platform"] == "Snapchat":
+        read = snapchat_fallback(run, job)
+        if read:
+            saved += read
+            note = "%d read from the Snapchat page itself (the actor left them without numbers)." % read
     if job and job["actor"] == REEL_ACTOR:
         try:
             saved = reels_rollup(run["id"])
@@ -1286,6 +1291,25 @@ def refresh_run(run):
             private_profile.apply_run(run, job)       # followers, name and picture onto the company's private creators
         except Exception as ex:
             print("private profile apply failed:", repr(ex)[:160], flush=True)
+
+
+def snapchat_fallback(run, job):
+    """Spotlights this run left without numbers today are read from their public page (snapreader). Returns how many."""
+    import snapreader
+    hmap = json.loads(run["handle_map"] or "{}")
+    with db.connect() as conn:
+        done = {str(r[0]) for r in conn.execute("SELECT content_id FROM snapshots WHERE at >= ?", (run["started_at"],))}
+        urls = {r["id"]: r["url"] for r in conn.execute(
+            "SELECT id, url FROM content WHERE id IN (%s)" % ",".join("?" * len(hmap)), [int(c) for c in hmap.values()])} if hmap else {}
+    saved = 0
+    for cid in hmap.values():
+        if str(cid) in done or int(cid) not in urls:
+            continue
+        item = snapreader.read(urls[int(cid)])
+        if item:
+            saved += ingest_posts(run, job, [item], {urls[int(cid)]: cid})
+        time.sleep(1)
+    return saved
 
 
 def _finish(run, status, results, saved, cost, message):
