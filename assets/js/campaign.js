@@ -486,8 +486,8 @@
 
   /* ------------------------------------------------------ section jump bar */
 
-  // Every section is on the page; the bar only scrolls to one. It must not
-  // touch the URL hash, which carries the report token.
+  // One row of buttons (Bido 2026-11-03): a button shows only its part of the report, "Whole report" shows them all.
+  // The PDF always prints everything. It must not touch the URL hash, which carries the report token.
   var SECS = ["overview", "leaderboard", "content", "performance", "say", "clicks", "timeline"];
   var LOCK = 0;
   SECS.forEach(function (k) {
@@ -498,13 +498,19 @@
   document.querySelector(".mx-tabs__in").addEventListener("click", function (e) {
     var a = e.target.closest(".mx-tab"); if (!a) return;
     e.preventDefault();
-    var key = a.getAttribute("data-tab"), sec = $("sec-" + key);
-    LOCK = Date.now() + 900;          // let the scroll finish before the observer takes over
-    markTab(key);
-    if (sec) sec.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    showOnly(a.getAttribute("data-tab"));
   });
+  function showOnly(key) {
+    var all = key === "all" || !$("sec-" + key);
+    SECS.forEach(function (k) { var sec = $("sec-" + k); if (sec) sec.classList.toggle("is-only", !all && k === key); });
+    if (all) delete document.body.dataset.only; else document.body.dataset.only = key;
+    markTab(all ? "all" : key);
+    // Back to the top of the report, just under the buttons.
+    var bar = document.querySelector(".mx-tabs"), top = bar.getBoundingClientRect().top + window.scrollY - (parseFloat(getComputedStyle(bar).top) || 0);
+    if (window.scrollY > top) window.scrollTo({ top: top, behavior: "auto" });
+  }
   function markTab(key) {
-    SECS.forEach(function (k) { var a = $("tab-" + k); if (a) a.classList.toggle("is-on", k === key); });
+    ["all"].concat(SECS).forEach(function (k) { var a = $("tab-" + k); if (a) { a.classList.toggle("is-on", k === key); a.setAttribute("aria-pressed", k === key ? "true" : "false"); } });
     var on = $("tab-" + key); if (on && on.scrollIntoView && on.parentNode.scrollWidth > on.parentNode.clientWidth)
       on.parentNode.scrollLeft = on.offsetLeft - 16;
   }
@@ -516,7 +522,7 @@
     ticking = true;
     requestAnimationFrame(function () {
       ticking = false;
-      if (Date.now() < LOCK) return;
+      if (Date.now() < LOCK || true) return;      // the buttons show what is selected, not the scroll position (2026-11-03)
       var cur = null;
       SECS.forEach(function (k) { var el = $("sec-" + k); if (el && !el.hidden && el.getBoundingClientRect().top <= 120) cur = k; });
       if (cur) markTab(cur);
@@ -692,7 +698,7 @@
   document.addEventListener("click", function (e) {
     var a = e.target.closest && e.target.closest("[data-toc]"); if (!a) return;
     e.preventDefault();
-    var sec = $("sec-" + a.getAttribute("data-toc")); if (sec) { LOCK = Date.now() + 900; markTab(a.getAttribute("data-toc")); sec.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    showOnly(a.getAttribute("data-toc"));
   });
   // The PDF footer on every page: who, when the numbers were read, page n of N (Chrome's @page margin boxes).
   function pageFooter() {
@@ -755,8 +761,19 @@
   function renderProgress(c) {
     var steps = c.steps || [];
     $("mx-dates").innerHTML = c.starts_at ? "<b>" + day(c.starts_at) + "</b> → <b>" + day(c.ends_at) + "</b>" : "";
+    // The update (Bido 2026-11-03): a card from Helvi Track — what is happening now, the steps in progress and how far along.
     $("mx-note").hidden = !c.status_note;
-    $("mx-note").textContent = c.status_note || "";
+    if (c.status_note) {
+      var nowSteps = steps.filter(function (s) { return s.state === "active"; }), doneN = steps.filter(function (s) { return s.state === "done"; }).length;
+      var fill = steps.length ? Math.round(doneN / steps.length * 100) : 0;
+      $("mx-note").innerHTML = '<img class="mx-upd__face" src="../assets/brand/modules/helvi-track-char-440.webp" alt="" width="365" height="440">'
+        + '<span class="mx-upd__body"><span class="mx-upd__tag"><i aria-hidden="true"></i>Latest update</span>'
+        + '<span class="mx-upd__txt">' + esc(c.status_note) + "</span>"
+        + (nowSteps.length || steps.length ? '<span class="mx-upd__foot">'
+          + nowSteps.map(function (s) { return '<span class="mx-upd__now">Now · ' + esc(s.label) + "</span>"; }).join("")
+          + (steps.length ? '<span class="mx-upd__prog"><span class="mx-upd__bar"><i style="width:' + fill + '%"></i></span>' + doneN + " of " + steps.length + " steps done</span>" : "")
+          + "</span>" : "") + "</span>";
+    }
     if ($("mx-rail")) $("mx-rail").innerHTML = steps.map(function (s) {
       return '<li class="is-' + s.state + '"' + (s.state === "active" ? ' aria-current="step"' : "") + "><b>" + esc(s.label) + "</b>"
         + (s.start ? "<span>" + short(s.start, s.end) + "</span>" : "") + "</li>";

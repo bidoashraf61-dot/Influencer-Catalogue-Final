@@ -120,7 +120,9 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     </header>
 
     <!-- section jump bar: every section is on the page; these scroll to it -->
-    <nav class="mx-tabs cat-pad" aria-label="Jump to a section"><div class="cat-container mx-tabs__in">
+    <!-- One row of buttons (Bido 2026-11-03): each shows only its part of the report; Whole report shows everything. -->
+    <nav class="mx-tabs cat-pad" aria-label="Show a part of the report"><div class="cat-container mx-tabs__in">
+      <a class="mx-tab mx-tab--all is-on" href="#mx-report" data-tab="all" id="tab-all" aria-pressed="true">Whole report</a>
       <a class="mx-tab" href="#sec-overview" data-tab="overview" id="tab-overview">Overview</a>
       <a class="mx-tab" href="#sec-leaderboard" data-tab="leaderboard" id="tab-leaderboard">Leaderboard</a>
       <a class="mx-tab" href="#sec-content" data-tab="content" id="tab-content">Content</a>
