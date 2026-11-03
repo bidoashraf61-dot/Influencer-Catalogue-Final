@@ -18,7 +18,7 @@ html.ss-on #ev-market { display: none; }
 /* brands are logos on a white chip; the name only when HelloVoice has no approved logo yet */
 .ss-logo { display: inline-flex; align-items: center; justify-content: center; background: #fff; border: 1px solid var(--rule, rgba(18,18,18,.12)); border-radius: 999px; height: 30px; padding: 0 10px; flex: none; max-width: 140px; }
 .ss-logo img { display: block; height: 16px; width: auto; max-width: 88px; object-fit: contain; }
-.ss-logo--txt { font: 600 11.5px/1 var(--body, Arial); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #121212; }
+.ss-logo--txt { font: 600 12px/1 var(--body, Arial); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #121212; }
 .ss-logo--lg { height: 44px; padding: 0 16px; }
 .ss-logo--lg img { height: 24px; max-width: 120px; }
 .ss-logo--lg.ss-logo--txt { font-size: 14px; }
@@ -361,7 +361,7 @@ html.ss-on #ev-market { display: none; }
 .ss-dstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 0; border: 1px solid rgba(18,18,18,.1); border-radius: 14px; overflow: hidden; }
 .ss-dstats > div { margin: 0; padding: 8px 10px; border-right: 1px solid rgba(18,18,18,.08); border-bottom: 1px solid rgba(18,18,18,.08); min-width: 0; }
 .ss-dstats > div:nth-child(3n) { border-right: 0; }
-.ss-dstats dt { font: 500 10.5px/1.2 "DM Sans", Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #5a5a5a; }
+.ss-dstats dt { font: 500 12px/1.2 "DM Sans", Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #5a5a5a; }
 .ss-dstats dd { margin: 3px 0 0; font: 400 20px/1 Bebasneue, "Bebas Neue", Arial, sans-serif; letter-spacing: .02em; color: #121212; }
 .ss-dstats__er { background: #e8ff76; }
 .ss-dpost__meta { margin: 0; font: 500 12px/1.35 "DM Sans", Arial, sans-serif; color: #5a5a5a; }
@@ -457,3 +457,4 @@ html.ss-on #ev-market { display: none; }
 @media (max-width: 640px) { .ss-tab .ss-logo { height: 40px; } .ss-tab .ss-logo img { height: 22px; } }
 /* Audit 2026-11-03: filter buttons are 44px tall on phones. */
 @media (max-width: 640px) { .ss-seg button { min-height: 44px; } }
+@media (max-width: 640px) { .ss-btn { min-height: 44px !important; } .ss-sort select { min-height: 44px; } }

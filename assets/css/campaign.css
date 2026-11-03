@@ -1057,7 +1057,7 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
 .mx-tcd:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 3px; }
 .mx-tcd__ch { font-family: var(--heading); font-size: 20px; letter-spacing: .04em; line-height: 1; }
 .mx-tcd__ch::before { content: counter(tc, decimal-leading-zero) "  "; color: var(--gray); }
-.mx-tcd__term { margin-top: 8px; font: 500 11.5px/1.3 var(--body); letter-spacing: .12em; text-transform: uppercase; color: #4a4038; }
+.mx-tcd__term { margin-top: 8px; font: 500 12px/1.3 var(--body); letter-spacing: .12em; text-transform: uppercase; color: #4a4038; }
 .mx-tcd__fig { font-family: var(--heading); font-weight: 400; font-size: 52px; line-height: .9; }
 .mx-tcd--good .mx-tcd__fig { color: #0f6b3a; } .mx-tcd--moderate .mx-tcd__fig { color: #a85507; } .mx-tcd--low .mx-tcd__fig { color: #c01010; }
 .mx-tcd__line { font-size: 13.5px; line-height: 1.45; color: #2b2622; }
@@ -1394,3 +1394,9 @@ body[data-only] #mx-report .mx-sec:not(.is-only) { display: none !important; }
 }
 /* Audit 2026-11-03: the creator's post chips are 44px tall on phones. */
 @media (max-width: 700px) { .mx-cc__chips a { min-height: 44px; } }
+/* Audit 2026-11-03 (round 2): profile links beside a creator keep their 26px look with a 44px tap area; the name is a 44px row. */
+@media (max-width: 700px) {
+  .mx-tc__links a { position: relative; }
+  .mx-tc__links a::after { content: ""; position: absolute; inset: -9px; }
+  .mx-cc__name { display: inline-flex; align-items: center; min-height: 44px; }
+}

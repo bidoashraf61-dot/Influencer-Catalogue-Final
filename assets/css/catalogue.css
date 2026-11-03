@@ -1337,7 +1337,7 @@ body[data-page="selection"] .cat-card__check { display: none; }
 }
 .cat-fit--good { background: var(--go); color: var(--white); }
 .cat-fit--maybe { background: #f5d77a; color: var(--ink); }
-.cat-fit--no { background: var(--vivid-red); color: var(--white); }
+.cat-fit--no { background: #c01010; color: var(--white); }   /* 5.9:1 (vivid red was 4.4:1) */
 .cat-role {
   display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 12px; font-weight: 600;
   border: 1px solid var(--ink); color: var(--ink); line-height: 1.4;
@@ -1361,19 +1361,19 @@ body[data-page="selection"] .cat-card__check { display: none; }
 
 /* The matching score: a stamp on the photo, and the card that explains it. */
 .cat-score {
-  position: absolute; left: 12px; bottom: 12px; z-index: 3; width: 58px; height: 58px; border-radius: 50%;
+  position: absolute; left: 12px; bottom: 12px; z-index: 3; width: 66px; height: 66px; border-radius: 50%;
   display: grid; place-content: center; text-align: center; cursor: pointer; padding: 0;
   border: 3px solid var(--white); color: var(--white); background: #14884a;
   box-shadow: 0 2px 10px rgba(0,0,0,.35); transform: rotate(-8deg); font-family: inherit;
 }
 .cat-score b { font-size: 21px; line-height: 1; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
 .cat-score__pct { font-style: normal; font-size: .58em; font-weight: 800; margin-left: 1px; vertical-align: .32em; letter-spacing: 0; }
-.cat-score small { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; opacity: .9; margin-top: 2px; }
+.cat-score small { font-size: 12px; line-height: 1; letter-spacing: .04em; text-transform: uppercase; font-weight: 700; opacity: .9; margin-top: 2px; }
 .cat-score--g { background: #14884a; }
-.cat-score--l { background: #7d8f00; }
+.cat-score--l { background: #5c6a00; }   /* white at 5.5:1 (was 3.6:1) */
 .cat-score--a { background: #d99a00; color: #121212; }
 .cat-score--r { background: #d02424; }
-.cat-score--none { background: rgba(60,60,60,.85); border-style: dashed; width: 64px; height: 64px; }
+.cat-score--none { background: rgba(60,60,60,.85); border-style: dashed; width: 66px; height: 66px; }
 .cat-score--none b { font-size: 18px; } .cat-score--none small { font-size: 12px; }
 .cat-score:hover, .cat-score:focus-visible { transform: rotate(0) scale(1.06); outline: 3px solid var(--lime); outline-offset: 2px; }
 .cat-score-tip {
@@ -1383,7 +1383,7 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cat-score-tip[hidden] { display: none; }
 .cst-head { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
 .cst-head > b { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-size: 19px; font-weight: 800; color: #fff; background: #14884a; flex: none; }
-.cst-head b.l, .cst-bar b.l { background: #7d8f00; } .cst-head b.a, .cst-bar b.a { background: #d99a00; } .cst-head b.r, .cst-bar b.r { background: #d02424; }
+.cst-head b.l, .cst-bar b.l { background: #5c6a00; } .cst-head b.a, .cst-bar b.a { background: #d99a00; } .cst-head b.r, .cst-bar b.r { background: #d02424; }
 .cst-head strong { display: block; font-size: 15px; } .cst-head small { opacity: .7; }
 .cst-h { margin: 12px 0 4px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; opacity: .6; font-weight: 700; }
 .cst-g, .cst-w { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
@@ -1460,7 +1460,7 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cat-selhead__stats dt { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; opacity: .65; margin: 0 0 4px; }
 .cat-selhead__stats dd { margin: 0; font-family: var(--heading); font-size: 34px; line-height: 1; letter-spacing: .01em; }
 .cat-selhead__stats .is-range dd { font-size: 24px; font-family: inherit; font-weight: 800; line-height: 1.15; }
-.cat-selhead__stats .is-strong { background: #14884a; } .cat-selhead__stats .is-good { background: #7d8f00; }
+.cat-selhead__stats .is-strong { background: #14884a; } .cat-selhead__stats .is-good { background: #5c6a00; }
 .cat-selhead__stats .is-low { background: #5b5b5b; }
 .cat-selhead__stats .is-range { background: var(--lime); color: var(--ink); }
 .cat-selhead__actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
@@ -2393,7 +2393,7 @@ body.sel-fsheet-open .cat-controls--selection { z-index: 126; }
 .sel-geo__head b.sel-num { margin-left: auto; font-size: 16px; }
 .sel-stack { height: 24px; }
 .sel-stack i { display: flex; align-items: center; justify-content: center; color: var(--white); overflow: hidden; }
-.sel-stack i b { font: 700 11.5px var(--body); font-variant-numeric: tabular-nums; }
+.sel-stack i b { font: 700 12px var(--body); font-variant-numeric: tabular-nums; }
 .sel-legend li { grid-template-columns: 12px 1fr auto; }
 .sel-legend li b.sel-num { font-size: 14px; }
 
@@ -2517,7 +2517,7 @@ body[data-page="selection"] .cat-group__sub { flex-basis: 100%; order: 10; margi
 .sel-info { display: inline; }
 .sel-info__btn { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 4px; padding: 0; vertical-align: -3px;
   border: 1px solid rgba(18,18,18,.35); border-radius: 50%; background: var(--white); color: var(--ink);
-  font: italic 700 11px Georgia, serif; cursor: pointer; }
+  font: italic 700 12px Georgia, serif; cursor: pointer; }
 .sel-info__btn:hover, .sel-info.is-open .sel-info__btn { background: var(--ink); color: var(--lime); border-color: var(--ink); }
 .sel-info__btn:focus-visible { outline: 3px solid var(--vivid-orange); outline-offset: 2px; }
 .sel-info__pop { position: absolute; left: 10px; right: 10px; bottom: calc(100% - 6px); z-index: 20; display: none;
@@ -2686,3 +2686,5 @@ html.hv-shared body[data-page="selection"] .cat-hero--desk .cat-cover__body { pa
   .cat-card__mark { position: relative; }
   .cat-card__mark::after { content: ""; position: absolute; inset: -7px; }
 }
+/* Audit 2026-11-03 (round 2): the selection's filter line is 44px tall on phones. */
+@media (max-width: 640px) { .sel-line__b { min-height: 44px; } }

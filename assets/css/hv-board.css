@@ -326,7 +326,7 @@
 .hvb-band__n { font-size: 13px; color: var(--gray); }
 .hvb-band__dots { display: inline-flex; gap: 4px; margin-left: auto; }
 .hvb-band__dot { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 999px; background: var(--hvb-lane);
-  font: 700 11px/1 var(--body); font-style: normal; color: var(--ink); opacity: .45; }
+  font: 700 12px/1 var(--body); font-style: normal; color: var(--ink); opacity: .45; }
 .hvb-band__dot.is-on { background: var(--hvb-strip); color: var(--white); opacity: 1; }
 .hvb-band__dot.hvb-lane--approved.is-on { color: var(--ink); }
 .hvb-band__head:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: -3px; border-radius: var(--r-md); }
@@ -354,7 +354,7 @@
 .hvb-t { width: 100%; min-width: 1320px; border-collapse: separate; border-spacing: 0; font-size: 14px; }
 .hvb-t thead th { position: sticky; top: 0; z-index: 1; background: #faf8f4; border-bottom: 1px solid var(--hvb-line); padding: 0; text-align: left; white-space: nowrap; }
 .hvb-t__sort { display: inline-flex; align-items: center; gap: 4px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; background: transparent; color: var(--gray);
-  font: 600 11px/1 var(--body); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+  font: 600 12px/1 var(--body); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
 .hvb-t__sort:hover, th[aria-sort] .hvb-t__sort { color: var(--ink); }
 .hvb-t__sort svg.is-up { transform: rotate(180deg); }
 .hvb-t__sort:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: -3px; }
@@ -461,7 +461,7 @@ div.hvb-q__head { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); cursor
 .hvb-q__req { font-style: normal; color: var(--hvb-red-text); }
 .hvb-q__a { font-weight: 600; text-align: right; overflow-wrap: anywhere; }
 .hvb-q__a.is-empty { font-weight: 400; color: #666; }
-.hvb-q__hv { margin-right: 2px; padding: 1px 7px; border-radius: var(--r-pill); background: var(--lime); font: 700 11px/1.4 var(--body); font-style: normal; color: var(--ink); }
+.hvb-q__hv { margin-right: 2px; padding: 1px 7px; border-radius: var(--r-pill); background: var(--lime); font: 700 12px/1.4 var(--body); font-style: normal; color: var(--ink); }
 .hvb-q__chev { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; color: #666; transition: transform .2s cubic-bezier(.2,.8,.2,1); }
 .hvb-q__head[aria-expanded="true"] .hvb-q__chev { transform: rotate(180deg); }
 .hvb-q__body { display: grid; gap: 10px; padding: 2px 0 16px; }

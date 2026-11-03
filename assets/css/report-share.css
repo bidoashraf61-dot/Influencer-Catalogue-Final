@@ -280,7 +280,7 @@ div.rs-ln__row { cursor: default; }
 .rs-date { display: inline-flex; align-items: center; gap: 9px; padding: 5px 12px 5px 5px; border-radius: 999px; border: 1px solid var(--rs-rule); background: var(--rs-white); }
 .rs-date > svg { flex: none; width: 28px; height: 28px; padding: 6px; border-radius: 50%; background: var(--rs-lime); color: var(--rs-ink); box-sizing: border-box; }
 .rs-date > span { display: grid; line-height: 1.15; }
-.rs-date small { font: 600 9.5px/1.2 var(--rs-body); letter-spacing: .1em; text-transform: uppercase; color: var(--rs-graphite); }
+.rs-date small { font: 600 12px/1.2 var(--rs-body); letter-spacing: .1em; text-transform: uppercase; color: var(--rs-graphite); }
 .rs-date b { font: 700 13.5px/1.25 var(--rs-body) !important; letter-spacing: 0 !important; color: var(--rs-ink); margin: 0 !important; }
 .rs-date i { font: 700 12px/1 var(--rs-body); font-style: normal; padding: 5px 9px; border-radius: 999px; background: var(--rs-green-soft); color: #0e6b39; margin-left: 2px; }   /* 6:1 on the soft green */
 .rs-date--until > svg { background: var(--rs-ink); color: var(--rs-lime); }
