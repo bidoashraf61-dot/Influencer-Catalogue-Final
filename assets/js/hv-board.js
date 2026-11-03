@@ -1345,8 +1345,9 @@
       var bar = h("span", { class: "mb-pipe__bar" + (HOT[st.key] ? " is-hot" : "") + (n ? "" : " is-zero") });
       bar.style.setProperty("--h", max ? Math.max(n / max, n ? .08 : 0).toFixed(3) : "0");
       pipe.appendChild(h("li", { class: "mb-pipe__st", "aria-hidden": "true" },
-        h("b", { class: "mb-pipe__n" }, String(n)), h("span", { class: "mb-pipe__well" }, bar),
-        h("span", { class: "mb-pipe__lab" }, stageIcon(st.key, "hvb-stico--mini"), st.label)));
+        // The stage mark sits inside its well, so the label underneath is text only and never collides.
+        h("b", { class: "mb-pipe__n" }, String(n)), h("span", { class: "mb-pipe__well" }, stageIcon(st.key, "hvb-stico--mini"), bar),
+        h("span", { class: "mb-pipe__lab" }, st.label)));
     });
     var stats = h("dl", { class: "mb-cover__stats" });
     (o.stats || []).forEach(function (x) {
