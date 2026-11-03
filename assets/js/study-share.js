@@ -210,13 +210,6 @@
     });
 
   var refs = {};
-  // The competitors studied, as logos (cover and PDF cover).
-  function comps() {
-    var w = el("div", "ss-comps"), row = el("div", "ss-comps__row");
-    w.appendChild(el("span", "ss-comps__k", "Competitors studied"));
-    (D.competitors || []).forEach(function (c) { row.appendChild(logo(c.name, true)); });
-    w.appendChild(row); return w;
-  }
   function draw() {
     root.textContent = "";
     // cover
@@ -228,8 +221,10 @@
     var h1 = el("h1"); h1.id = "ss-h1";
     h1.appendChild(document.createTextNode("Who to book, ")); h1.appendChild(el("em", null, "already proven")); h1.appendChild(document.createTextNode(" on your competitors"));
     tx.appendChild(h1);
-    // the cover is the detective alone (item 309) with the brands he studied: competitor logos only, no machines
-    tx.appendChild(comps()); hero.appendChild(tx);
+    // the cover is the detective alone (item 309) beside how to read the page; the logos live in the tabs below (Bido)
+    tx.appendChild(el("p", "ss-hero__lede", "The creators in your selection who already posted for your competitors, ranked by the "
+      + (BY_ENG ? "likes and comments" : "views") + " those posts got. Tap any view count or post to open it."));
+    hero.appendChild(tx);
     var art = el("img", "ss-hero__art ss-hero__char");
     art.src = ROOT + "assets/brand/modules/helvi-intel-character-480.webp";
     art.srcset = ROOT + "assets/brand/modules/helvi-intel-character-480.webp 1x, " + ROOT + "assets/brand/modules/helvi-intel-character-960.webp 2x";
@@ -246,7 +241,24 @@
     root.appendChild(f);
     // tabs + board (sticky only over the board)
     var wrap = el("div", "ss-boardwrap"), nav = el("nav", "ss-tabs-wrap"); nav.setAttribute("aria-label", "Competitors and filters");
-    refs.tabs = el("div", "ss-tabs"); refs.tabs.setAttribute("role", "tablist"); nav.appendChild(refs.tabs);
+    // one row of competitors that slides with the arrows; nobody scrolls sideways (Bido 2026-11-03)
+    var sSlide = el("div", "ss-slide");
+    refs.tabs = el("div", "ss-tabs"); refs.tabs.setAttribute("role", "tablist");
+    var sPrev = el("button", "ss-slide__btn ss-slide__btn--prev"), sNext = el("button", "ss-slide__btn ss-slide__btn--next");
+    sPrev.type = sNext.type = "button"; sPrev.setAttribute("aria-label", "Previous competitors"); sNext.setAttribute("aria-label", "More competitors");
+    sPrev.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+    sNext.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>';
+    var sStep = function (d) { refs.tabs.scrollBy({ left: d * Math.max(200, refs.tabs.clientWidth * 0.8), behavior: "smooth" }); };
+    sPrev.addEventListener("click", function () { sStep(-1); }); sNext.addEventListener("click", function () { sStep(1); });
+    refs.slideArrows = function () {
+      var t = refs.tabs, max = t.scrollWidth - t.clientWidth - 2;
+      sPrev.hidden = t.scrollLeft <= 2; sNext.hidden = t.scrollLeft >= max;
+      sSlide.classList.toggle("is-start", sPrev.hidden); sSlide.classList.toggle("is-end", sNext.hidden);
+    };
+    refs.tabs.addEventListener("scroll", refs.slideArrows, { passive: true });
+    if (window.ResizeObserver) new ResizeObserver(function () { refs.slideArrows(); }).observe(refs.tabs);
+    else window.addEventListener("resize", refs.slideArrows);
+    sSlide.appendChild(sPrev); sSlide.appendChild(refs.tabs); sSlide.appendChild(sNext); nav.appendChild(sSlide);
     var tools = el("div", "ss-tools");
     refs.plat = seg("Platform", [["all", "All"], ["instagram", null, "ig", "Instagram"], ["tiktok", null, "tt", "TikTok"]], "plat");
     var kinds = {}; allPosts().forEach(function (x) { kinds[kindOf(x.q)] = 1; });
@@ -297,6 +309,9 @@
       b.addEventListener("click", function () { state.comp = c.name; state.open = {}; drawTabs(); drawBoard(true); });
       t.appendChild(b);
     });
+    var on = t.querySelector('[aria-selected="true"]');
+    if (on && on.scrollIntoView && (on.offsetLeft < t.scrollLeft || on.offsetLeft + on.offsetWidth > t.scrollLeft + t.clientWidth)) t.scrollLeft = on.offsetLeft - 48;
+    if (refs.slideArrows) requestAnimationFrame(refs.slideArrows);
   }
   function drawBoard(deal) {
     var b = refs.board; b.textContent = "";

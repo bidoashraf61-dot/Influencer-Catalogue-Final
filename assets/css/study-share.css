@@ -49,10 +49,6 @@ html.ss-on #ev-market { display: none; }
 .ss-hero:has(.ss-hero__char) { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-right: var(--pad); }
 .ss-hero:has(.ss-hero__char) .ss-hero__txt { flex: 1 1 auto; min-width: 0; padding-bottom: clamp(24px, 3vw, 44px); }
 .ss-hero__char.ss-hero__art { flex: none; width: auto; height: clamp(240px, 26vw, 400px); max-width: none; margin: 0; }
-.ss-comps { display: flex; flex-direction: column; gap: 10px; }
-.ss-comps__k { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.6); }
-.ss-comps__row { display: flex; flex-wrap: wrap; gap: 10px; }
-.ss-comps .ss-logo { border-color: transparent; }
 @media (max-width: 640px) {
   .ss-hero:has(.ss-hero__char) { gap: 8px; }
   .ss-hero__char.ss-hero__art { height: 190px; margin-right: -16px; }
@@ -307,8 +303,7 @@ html.ss-on #ev-market { display: none; }
 .ss-pcover p { font-size: 12.5px; color: rgba(255,255,255,.72); max-width: 56ch; }
 .ss-pcover__art { display: block; width: 100%; height: auto; margin: 4mm 0 0; }
 .ss-pcover__row { display: flex; align-items: flex-end; justify-content: space-between; gap: 8mm; margin-top: 6mm; }
-.ss-pcover__row .ss-comps { padding-bottom: 6mm; }
-.ss-pcover__char { display: block; height: 128mm; width: auto; flex: none; }
+.ss-pcover__row .ss-pcover__char { display: block; height: 128mm; width: auto; flex: none; }
 .ss-pfacts { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 6mm; border-top: 2px solid #e8ff76; }
 .ss-pfacts div { padding: 4mm 4mm 0 0; }
 .ss-pfacts div + div { padding-left: 4mm; border-left: 1px solid rgba(255,255,255,.16); }
@@ -425,15 +420,9 @@ html.ss-on #ev-market { display: none; }
   .ss-facts div, .ss-facts div + div, .ss-facts div:nth-child(3), .ss-facts div:nth-child(n+3) { padding: 12px 14px 10px; border: 0; }
   .ss-facts b { font-size: 38px; }
 }
-.ss-tabs { flex-wrap: wrap; overflow: visible; margin: 0; padding: 2px 0; scroll-snap-type: none; }
 .ss-tab { height: 60px; }
 .ss-tab .ss-logo { height: 48px; padding: 0 14px; }
 .ss-tab .ss-logo img { height: 28px; max-width: 130px; }
-.ss-comps .ss-logo--lg { height: 56px; padding: 0 20px; max-width: 200px; }
-.ss-comps .ss-logo--lg img { height: 32px; max-width: 150px; }
-.ss-comps__row { gap: 12px; }
-/* the tab bar only sticks while it is one or two rows; on tablets and phones it scrolls away with the page */
-@media (max-width: 1100px) { .ss-tabs-wrap { position: static; } }
 @media (max-width: 640px) {
   /* phones: brand on top, the title with the detective standing beside it, the logos full width under both */
   .ss-hero:has(.ss-hero__char) { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 6px; row-gap: 16px;
@@ -441,15 +430,8 @@ html.ss-on #ev-market { display: none; }
   .ss-hero:has(.ss-hero__char) .ss-hero__txt { display: contents; }
   .ss-hero:has(.ss-hero__char) .ss-brand { grid-column: 1 / -1; grid-row: 1; }
   .ss-hero:has(.ss-hero__char) h1 { grid-column: 1; grid-row: 2; align-self: end; }
+  .ss-hero:has(.ss-hero__char) .ss-hero__lede { grid-column: 1 / -1; grid-row: 3; }
   .ss-hero__char.ss-hero__art { grid-column: 2; grid-row: 2; align-self: end; height: 170px; margin: 0 -6px 0 0; }
-  .ss-hero:has(.ss-hero__char) .ss-comps { grid-column: 1 / -1; grid-row: 3; }
-  .ss-comps .ss-logo--lg { height: 44px; padding: 0 14px; max-width: calc(50% - 6px); }
-  .ss-comps .ss-logo--lg img { height: 24px; max-width: 100%; }
-  .ss-comps__row { gap: 8px; }
-  .ss-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .ss-tab { height: auto; min-height: 52px; padding: 6px 10px 6px 6px; gap: 8px; min-width: 0; }
-  .ss-tab .ss-logo { height: 38px; padding: 0 8px; min-width: 0; flex: 0 1 auto; }
-  .ss-tab .ss-logo img { height: 20px; max-width: 100%; }
 }
 /* In the A4 print the gradient tiles stay four across, without the old strip's dividers. */
 @media print {
@@ -457,3 +439,19 @@ html.ss-on #ev-market { display: none; }
   html.ss-pageprint .ss-facts div, html.ss-pageprint .ss-facts div:nth-child(3), html.ss-pageprint .ss-facts div:nth-child(n+3) { border: 0 !important; padding: 14px 20px 12px !important; }
   html.ss-pageprint .ss-facts div::after { display: none; }
 }
+.ss-hero__lede { margin: 0; max-width: 56ch; font-size: 16px; line-height: 1.55; color: rgba(255,255,255,.78); }
+/* The competitors on one sliding row: arrows move it, the edges fade where more is waiting (Bido 2026-11-03). */
+.ss-slide { position: relative; display: flex; align-items: center; }
+.ss-slide .ss-tabs { flex: 1 1 auto; min-width: 0; margin: 0; padding: 2px 0; overflow-x: auto; scroll-behavior: smooth; }
+.ss-slide:not(.is-start) .ss-tabs { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 64px); mask-image: linear-gradient(90deg, transparent 0, #000 64px); }
+.ss-slide:not(.is-end) .ss-tabs { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 64px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 64px), transparent); }
+.ss-slide:not(.is-start):not(.is-end) .ss-tabs { -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 64px, #000 calc(100% - 64px), transparent); mask-image: linear-gradient(90deg, transparent 0, #000 64px, #000 calc(100% - 64px), transparent); }
+.ss-slide__btn { position: absolute; top: 50%; z-index: 2; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 50%; border: 0;
+  display: inline-flex; align-items: center; justify-content: center; background: #121212; color: #e8ff76; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+.ss-slide__btn[hidden] { display: none; }
+.ss-slide__btn--prev { left: -6px; } .ss-slide__btn--next { right: -6px; }
+.ss-slide .ss-slide__btn { color: #e8ff76; }
+.ss-slide__btn svg { stroke: #e8ff76; }
+.ss-slide__btn:hover { background: #2a2a2a; }
+.ss-slide__btn:focus-visible { outline: 3px solid #e8ff76; outline-offset: 2px; }
+@media (max-width: 640px) { .ss-tab .ss-logo { height: 40px; } .ss-tab .ss-logo img { height: 22px; } }
