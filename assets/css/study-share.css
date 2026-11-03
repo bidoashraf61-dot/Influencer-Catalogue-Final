@@ -44,12 +44,12 @@ html.ss-on #ev-market { display: none; }
 .ss-brand .ss-logo { border-color: transparent; }
 .ss-hero h1 { margin: 0; font: 400 clamp(2.3rem, 1.1rem + 3vw, 3.75rem)/.95 var(--disp); letter-spacing: .005em; text-wrap: pretty; color: #fff; }
 .ss-hero h1 em { font-style: normal; background: var(--lime); color: var(--ink); padding: 0 .12em; border-radius: 8px; white-space: nowrap; }
-.ss-hero__art { display: block; width: 100%; height: auto; max-height: 72vh; object-fit: cover; object-position: 50% 80%; margin-top: 8px; }
+.ss-hero__art { display: block; width: 100%; max-width: 1600px; height: auto; margin: 12px auto 0; object-fit: contain; }
 .ss-hero__art.in { animation: ss-rise 1s var(--ease) both; }
 @keyframes ss-rise { from { transform: translateY(28px) scale(1.03); } to { transform: none; } }
 .ss-top { padding: 28px var(--pad) 22px; }
 .ss-top p { margin: 0; max-width: 62ch; font-size: 17px; color: var(--graphite); }
-.ss-facts { margin: 0 var(--pad); display: flex; flex-wrap: wrap; border-top: 2px solid var(--ink); border-bottom: 1px solid var(--rule); }
+.ss-facts { margin: 28px var(--pad) 0; display: flex; flex-wrap: wrap; border-top: 2px solid var(--ink); border-bottom: 1px solid var(--rule); }
 .ss-facts div { flex: 1 1 140px; padding: 14px 18px 12px 0; }
 .ss-facts div + div { padding-left: 18px; border-left: 1px solid var(--rule); }
 .ss-facts b { display: block; font: 400 40px/1 var(--disp); }
@@ -87,7 +87,7 @@ html.ss-on #ev-market { display: none; }
 @keyframes ss-press { from { transform: rotate(calc(var(--r) - 6deg)) scale(1.3); filter: blur(2px); } to { transform: rotate(var(--r)) scale(1); filter: none; } }
 .ss-tier__rule { font-size: 14px; color: var(--graphite); max-width: 60ch; }
 .ss-tier__n { margin-left: auto; font: 400 22px/1 var(--disp); color: var(--graphite); }
-.ss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; padding: 14px; border-radius: 28px; background: var(--linen); }
+.ss-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; padding: 14px; border-radius: 28px; background: var(--linen); }
 .ss-tier--3 .ss-grid { background: var(--stone); }
 .ss-moreall { margin: 14px auto 0; display: flex; }
 .ss-tier { scroll-margin-top: calc(var(--rs-bar-h, 0px) + 150px); }
@@ -95,8 +95,8 @@ html.ss-on #ev-market { display: none; }
 .ss-card:hover { transform: translateY(-3px); box-shadow: 0 14px 28px -12px rgba(18,18,18,.28); }
 .ss-card.deal { animation: ss-deal .5s var(--ease) both; animation-delay: calc(var(--i) * 35ms); }
 @keyframes ss-deal { from { transform: translateY(14px); } to { transform: none; } }
-.ss-card__ph { position: relative; aspect-ratio: 16 / 11; background: var(--linen); overflow: hidden; }
-.ss-card__ph > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ss-card__ph { position: relative; aspect-ratio: 4 / 5; background: var(--linen); overflow: hidden; }
+.ss-card__ph > img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; display: block; }
 .ss-card__ph > .ss-av { position: absolute; inset: 0; display: grid; place-items: center; font: 400 54px/1 var(--disp); color: rgba(18,18,18,.28); }
 .ss-card__ph > .ss-plat { position: absolute; right: 10px; top: 10px; }
 .ss-card__ph > .ss-plat span { background: rgba(255,255,255,.92); }
@@ -175,6 +175,13 @@ html.ss-on #ev-market { display: none; }
 .ss-dot.hot { background: #ff691e; }
 .ss-gaps { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
 .ss-gap { padding: 16px; border-radius: 20px; border: 1px solid rgba(18,18,18,.12); display: flex; flex-direction: column; gap: 10px; background: #fff; }
+.ss-gap__pic { position: relative; display: block; margin: -16px -16px 2px; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 20px 20px 0 0; background: #2a2a2a; }
+.ss-gap__pic img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .5s cubic-bezier(.16,1,.3,1); }
+.ss-gap__pic:hover img { transform: scale(1.04); }
+.ss-gap__pic.is-none { background: linear-gradient(160deg, #3a3a3a, #161616); }
+.ss-gap__pic .ss-plat { position: absolute; right: 10px; top: 10px; }
+.ss-gap__pic .ss-plat span { background: rgba(255,255,255,.92); }
+.ss-gap__pic + .ss-gap__hd .ss-gap__av { display: none; }
 .ss-gap__hd { display: flex; align-items: center; gap: 10px; }
 .ss-gap__av { width: 44px; height: 44px; border-radius: 50%; flex: none; display: grid; place-items: center; background: #e9dcd2; font: 400 18px/1 Bebasneue, Arial, sans-serif; color: rgba(18,18,18,.55); }
 .ss-gap__hd b { display: block; font: 400 22px/1 Bebasneue, Arial, sans-serif; overflow-wrap: anywhere; }
@@ -183,7 +190,7 @@ html.ss-on #ev-market { display: none; }
 .ss-gap__n b { font: 400 24px/1 Bebasneue, Arial, sans-serif; color: #14884a; display: block; }
 .ss-gap__n span { font-size: 10.5px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: #383838; }
 .ss-gap .ss-btn { align-self: flex-start; }
-.ss-foot { margin: 48px var(--pad) 0; padding: 18px 0 60px; border-top: 1px solid var(--rule); display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 12.5px; color: var(--graphite); }
+.ss-end { height: 72px; }
 
 /* creator dossier: side panel on desktop, bottom sheet on phones */
 .ss-scrim { position: fixed; inset: 0; z-index: 900; background: rgba(18,18,18,.38); opacity: 0; transition: opacity .3s cubic-bezier(.16,1,.3,1); }
@@ -228,7 +235,7 @@ html.ss-on #ev-market { display: none; }
   .ss-facts div:nth-child(n+3) { border-top: 1px solid var(--rule); }
   .ss-facts b { font-size: 34px; }
   .ss-hero h1 { line-height: 1.06; }
-  .ss-hero__art { aspect-ratio: 5 / 4; object-position: 78% 70%; margin-top: 4px; }
+  .ss-hero__art { margin-top: 10px; }
   .ss-tabs-wrap { position: static; }
   .ss-sort { margin-left: 0; }
   .ss-grid { grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; border-radius: 20px; }
@@ -336,4 +343,5 @@ html.ss-on #ev-market { display: none; }
 .ss-page .ss-tl { grid-template-columns: 30mm repeat(var(--m), minmax(0, 1fr)); }
 .ss-pgaps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3mm; }
 .ss-pgaps .ss-gap { padding: 4mm; border-radius: 12px; gap: 2mm; }
+.ss-pgaps .ss-gap__pic { margin: -4mm -4mm 1mm; aspect-ratio: 16 / 7; border-radius: 12px 12px 0 0; }
 @media screen { html.ss-printing .ss-print { display: block; position: absolute; left: -10000px; top: 0; } }

@@ -896,13 +896,17 @@ def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locke
         if r["code"] or r["competitor"] not in comp_names:
             continue
         f = far.setdefault(r["handle"], {"handle": r["handle"], "name": r["name"], "type": _ctype(r["creator_type"]),
-                                         "followers": r["followers"], "competitors": {}, "views": [], "posts": 0})
+                                         "followers": r["followers"], "competitors": {}, "views": [], "posts": 0, "best": None})
         f["competitors"][r["competitor"]] = f["competitors"].get(r["competitor"], 0) + 1
         f["posts"] += 1
         if not r["likely_paid_boost"] and r["views"] is not None:
             f["views"].append(r["views"])
+        # Their best post is their picture on the study link (item 303): no roster photo exists for them.
+        if f["best"] is None or (r["views"] or 0) > f["best"][0]:
+            f["best"] = (r["views"] or 0, r["id"], r["url"])
     outside = sorted([{"handle": f["handle"], "name": f["name"], "type": f["type"], "followers": f["followers"],
-                       "competitors": f["competitors"], "posts": f["posts"], "median_views": _med(f["views"])}
+                       "competitors": f["competitors"], "posts": f["posts"], "median_views": _med(f["views"]),
+                       "post_id": f["best"][1] if f["best"] else None, "post_url": f["best"][2] if f["best"] else None}
                       for f in far.values() if f["views"]], key=lambda f: -(f["median_views"] or 0))[:24]
     sel_n = len(set(selection_codes or ()) - set(removed or ()))
     n_rejected = sum(1 for p in out if p["status"] == "rejected")

@@ -146,7 +146,7 @@
   }
   function allPosts() { var out = []; (D.creators || []).forEach(function (c) { (c.posts || []).forEach(function (q) { out.push({ q: q, c: c }); }); }); return out; }
   function photoEl(c, cls, large) {
-    var u = (large && c.photo_large) || c.photo;
+    var u = c.photo_large || c.photo;          // the large photo everywhere: thumbs pixelate at card size
     var fb = el("span", cls || "ss-av", initials(c.name || c.handle));
     if (!u) return fb;
     var i = el("img"); i.src = u; i.alt = ""; i.loading = "lazy"; i.decoding = "async";
@@ -209,19 +209,15 @@
     h1.appendChild(document.createTextNode("Who to book, ")); h1.appendChild(el("em", null, "already proven")); h1.appendChild(document.createTextNode(" on your competitors"));
     tx.appendChild(h1); hero.appendChild(tx);
     var art = el("img", "ss-hero__art");
-    art.src = ROOT + "assets/brand/modules/helvi-intelligence-cover.webp";
-    art.srcset = ROOT + "assets/brand/modules/helvi-intelligence-cover-1200.webp 1200w, " + ROOT + "assets/brand/modules/helvi-intelligence-cover.webp 2400w";
-    art.sizes = "100vw"; art.width = 2400; art.height = 1357;
+    art.src = ROOT + "assets/brand/modules/helvi-intelligence-cover-v2.webp";
+    art.srcset = ROOT + "assets/brand/modules/helvi-intelligence-cover-v2-1200.webp 1200w, " + ROOT + "assets/brand/modules/helvi-intelligence-cover-v2.webp 2400w";
+    art.sizes = "100vw"; art.width = 2400; art.height = 1350;
     art.alt = "Helvy the detective, magnifier in hand, inspecting creator cards as they come off the HELVi Intelligence machine line";
     hero.appendChild(art); root.appendChild(hero);
     requestAnimationFrame(function () { art.classList.add("in"); });
     // answer + facts
     var cs = D.creators || [], posts = 0, views = 0;
     cs.forEach(function (c) { (c.posts || []).forEach(function (q) { posts++; if (!q.paid_boost && q.views) views += q.views; }); });
-    var top = el("section", "ss-top");
-    top.appendChild(el("p", null, cs.length + (cs.length === 1 ? " creator" : " creators") + " in your selection have already posted for " + (D.competitors || []).length
-      + " of your competitors. We ranked them by the " + (BY_ENG ? "likes and comments" : "views") + " those posts got, so the ones worth booking first are at the top."));
-    root.appendChild(top);
     var f = el("div", "ss-facts");
     [[(D.competitors || []).length, "Competitors studied"], [cs.length, "Creators in your selection"], [posts, "Competitor posts found"], [num(views), "Views on those posts"]]
       .forEach(function (x) { var d = el("div"); d.appendChild(el("b", null, String(x[0]))); d.appendChild(el("span", null, x[1])); f.appendChild(d); });
@@ -250,10 +246,7 @@
     var w = wallSection(); if (w) root.appendChild(w);
     var t = timelineSection(); if (t) root.appendChild(t);
     if ((D.outside || []).length) root.appendChild(gapsSection());
-    var ft = el("footer", "ss-foot");
-    ft.appendChild(el("span", null, "Numbers leave out posts that look paid-boosted; those carry a “Likely boosted” badge."));
-    ft.appendChild(el("span", null, "Your HelloVoice contact sees when this report is opened."));
-    root.appendChild(ft);
+    root.appendChild(el("div", "ss-end"));
   }
   function seg(label, opts, key) {
     var g = el("div", "ss-seg"); g.setAttribute("role", "group"); g.setAttribute("aria-label", label);
@@ -437,6 +430,13 @@
     rootEl.textContent = "";
     (D.outside || []).slice(0, cap || 999).forEach(function (o) {
       var g = el("div", "ss-gap"), hd = el("div", "ss-gap__hd");
+      if (o.post_id != null) {
+        var u = safeUrl(o.post_url), pic = el(u ? "a" : "div", "ss-gap__pic");
+        if (u) { pic.href = u; pic.target = "_blank"; pic.rel = "noopener noreferrer"; pic.setAttribute("aria-label", "Watch @" + o.handle + "\u2019s best competitor post"); }
+        var pim = el("img"); pim.src = thumbSrc(o.post_id); pim.alt = ""; pim.loading = print ? "eager" : "lazy"; pim.decoding = "async";
+        pim.addEventListener("error", function () { pic.classList.add("is-none"); pim.remove(); });
+        pic.appendChild(pim); pic.appendChild(platIconsFor(o)); g.appendChild(pic);
+      }
       hd.appendChild(el("span", "ss-gap__av", initials(o.name || o.handle)));
       var nm = el("div"); nm.appendChild(el("b", null, o.name || "@" + o.handle)); nm.appendChild(el("span", null, "@" + o.handle + (o.followers ? " · " + num(o.followers) + " followers" : "")));
       hd.appendChild(nm); g.appendChild(hd);
@@ -449,6 +449,7 @@
       rootEl.appendChild(g);
     });
   }
+  function platIconsFor(o) { return platIcons(o.post_url && /tiktok\.com/.test(o.post_url) ? ["tiktok"] : ["instagram"]); }
   function gapsSection() {
     var s = el("section", "ss-sec"), hd = el("div", "ss-sec__hd"), h = el("h2", null, "Not on our roster yet"); h.id = "ss-gap";
     s.setAttribute("aria-labelledby", "ss-gap");
@@ -581,7 +582,7 @@
     var h = el("h1"); h.appendChild(document.createTextNode("Who to book, ")); h.appendChild(el("em", null, "already proven")); h.appendChild(document.createTextNode(" on your competitors")); cv.appendChild(h);
     cv.appendChild(el("p", null, "Competitor study · " + (D.objective || "Awareness") + ". The creators in your selection who already posted for your competitors, ranked by the "
       + (BY_ENG ? "likes and comments" : "views") + " those posts got. Tap any view count or post to open it."));
-    var art = el("img", "ss-pcover__art"); art.src = ROOT + "assets/brand/modules/helvi-intelligence-cover.webp"; art.alt = ""; cv.appendChild(art);
+    var art = el("img", "ss-pcover__art"); art.src = ROOT + "assets/brand/modules/helvi-intelligence-cover-v2.webp"; art.alt = ""; cv.appendChild(art);
     var pf = el("div", "ss-pfacts"), posts = 0, views = 0;
     all.forEach(function (v) { posts += v.posts.length; v.organic.forEach(function (q) { views += q.views || 0; }); });
     [[(D.competitors || []).length, "Competitors studied"], [all.length, "Creators in your selection"], [posts, "Competitor posts found"], [num(views), "Views on those posts"]]

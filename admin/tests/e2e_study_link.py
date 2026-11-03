@@ -101,6 +101,9 @@ class StudyLink(unittest.TestCase):
         self.assertTrue(any(c["handle"] == "noha" for c in m["creators"]))
         self.assertTrue(all("url" in q for c in m["creators"] for q in c["posts"]))
         self.assertFalse(m["can_add"])
+        # creators off the roster carry their best post as their picture (item 303)
+        self.assertTrue(m["outside"], "the pack has creators HelloVoice has not signed")
+        self.assertTrue(all(o.get("post_id") and o.get("post_url", "").startswith("https://") for o in m["outside"]))
         self.assertEqual(self.call("GET", "/api/evidence/map?s=" + self.token, link=False)[0], 401)
 
     def test_2_notes_round_trip_and_tell_the_kam(self):
