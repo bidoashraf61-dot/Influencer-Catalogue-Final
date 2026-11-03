@@ -4914,6 +4914,7 @@
       paintPicks();
 
       $("sel-title").textContent = selectionName;
+      if (window.hvFitSelTitle) window.hvFitSelTitle();
       document.title = selectionName + " — HELVi Select";
       if (REFUSED && !selected.length) { if (!$("cat-empty").querySelector(".sel-reqaccess")) refusedPanel($("cat-empty")); }
       else $("cat-empty").textContent = selected.length
@@ -5505,4 +5506,31 @@
   if (mount()) return;
   var tries = 0, mo = new MutationObserver(function () { if (mount() || ++tries > 400) mo.disconnect(); });
   mo.observe(document.body, { childList: true, subtree: true });
+
+})();
+
+(function () {
+  // Item 309: the title block hugs its widest line, so Helvi Select stands right after the name, not after an
+  // empty column (wrapped lines leave the box wider than the words).
+  var fitSelTimer = 0;
+  var fitSelTitle = window.hvFitSelTitle = function () {
+    var t = document.getElementById("sel-title"), lock = t && t.closest(".sel-headrow .cat-selhead__lock");
+    if (!lock) return;
+    lock.style.width = "";
+    var r = document.createRange(); r.selectNodeContents(t);
+    var rs = [].slice.call(r.getClientRects()).filter(function (x) { return x.width; });
+    if (!rs.length) return;
+    var w = Math.max.apply(null, rs.map(function (x) { return x.right; })) - lock.getBoundingClientRect().left;
+    lock.style.width = Math.ceil(w + 2) + "px";
+    // the drawn shortlist takes the room left of the character's right, never touching him
+    var desk = document.querySelector('[data-page="selection"] .cat-hero--desk .cat-desk'), ch = document.querySelector(".sel-char");
+    if (!desk || !ch) return;
+    var hero = desk.parentNode.getBoundingClientRect(), gap = 32, right = Math.max(8, Math.min(56, hero.width * 0.025));
+    var room = hero.right - right - ch.getBoundingClientRect().right - gap;
+    desk.style.right = right + "px";
+    if (room < 220) { desk.style.display = "none"; return; }
+    desk.style.display = ""; desk.style.width = Math.min(480, Math.floor(room)) + "px";
+  };
+  window.addEventListener("resize", function () { clearTimeout(fitSelTimer); fitSelTimer = setTimeout(fitSelTitle, 120); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitSelTitle);
 })();

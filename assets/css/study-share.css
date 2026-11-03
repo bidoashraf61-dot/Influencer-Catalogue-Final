@@ -406,3 +406,54 @@ html.ss-on #ev-market { display: none; }
   html.ss-pageprint .ss-wall { grid-template-columns: repeat(4, 1fr) !important; }
   html.ss-pageprint .ss-tl { overflow: visible !important; margin-right: 0 !important; }
 }
+
+/* Item 316 (Bido): the four numbers wear the competitor map's projected-reach gradient (lime to gold, with its
+   shine); the competitor tabs wrap onto rows instead of scrolling sideways, and every logo is bigger. */
+.ss-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; border: 0; }
+.ss-facts div, .ss-facts div + div { position: relative; overflow: hidden; padding: 14px 20px 12px; border: 0; border-radius: 16px; color: #121212;
+  background: linear-gradient(120deg, #e8ff76 0%, #f6f9a8 35%, #ffd84d 70%, #e8ff76 100%);
+  box-shadow: 0 0 0 3px rgba(232,255,118,.35), 0 8px 22px rgba(201,160,18,.30); }
+.ss-facts div::after { content: ""; position: absolute; inset: 0; pointer-events: none; transform: translateX(-120%);
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.45) 50%, transparent 60%); animation: ss-shine 3.2s ease-in-out infinite; }
+.ss-facts div:nth-child(2)::after { animation-delay: .4s; } .ss-facts div:nth-child(3)::after { animation-delay: .8s; } .ss-facts div:nth-child(4)::after { animation-delay: 1.2s; }
+@keyframes ss-shine { 0%, 55% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+@media (prefers-reduced-motion: reduce) { .ss-facts div::after { display: none; } }
+.ss-facts b { font-size: 48px; }
+.ss-facts span { color: #121212; font-weight: 700; }
+@media (max-width: 720px) {
+  .ss-facts { grid-template-columns: 1fr 1fr; }
+  .ss-facts div, .ss-facts div + div, .ss-facts div:nth-child(3), .ss-facts div:nth-child(n+3) { padding: 12px 14px 10px; border: 0; }
+  .ss-facts b { font-size: 38px; }
+}
+.ss-tabs { flex-wrap: wrap; overflow: visible; margin: 0; padding: 2px 0; scroll-snap-type: none; }
+.ss-tab { height: 60px; }
+.ss-tab .ss-logo { height: 48px; padding: 0 14px; }
+.ss-tab .ss-logo img { height: 28px; max-width: 130px; }
+.ss-comps .ss-logo--lg { height: 56px; padding: 0 20px; max-width: 200px; }
+.ss-comps .ss-logo--lg img { height: 32px; max-width: 150px; }
+.ss-comps__row { gap: 12px; }
+/* the tab bar only sticks while it is one or two rows; on tablets and phones it scrolls away with the page */
+@media (max-width: 1100px) { .ss-tabs-wrap { position: static; } }
+@media (max-width: 640px) {
+  /* phones: brand on top, the title with the detective standing beside it, the logos full width under both */
+  .ss-hero:has(.ss-hero__char) { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 6px; row-gap: 16px;
+    padding: clamp(28px, 4vw, 52px) var(--pad) 28px; }
+  .ss-hero:has(.ss-hero__char) .ss-hero__txt { display: contents; }
+  .ss-hero:has(.ss-hero__char) .ss-brand { grid-column: 1 / -1; grid-row: 1; }
+  .ss-hero:has(.ss-hero__char) h1 { grid-column: 1; grid-row: 2; align-self: end; }
+  .ss-hero__char.ss-hero__art { grid-column: 2; grid-row: 2; align-self: end; height: 170px; margin: 0 -6px 0 0; }
+  .ss-hero:has(.ss-hero__char) .ss-comps { grid-column: 1 / -1; grid-row: 3; }
+  .ss-comps .ss-logo--lg { height: 44px; padding: 0 14px; max-width: calc(50% - 6px); }
+  .ss-comps .ss-logo--lg img { height: 24px; max-width: 100%; }
+  .ss-comps__row { gap: 8px; }
+  .ss-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .ss-tab { height: auto; min-height: 52px; padding: 6px 10px 6px 6px; gap: 8px; min-width: 0; }
+  .ss-tab .ss-logo { height: 38px; padding: 0 8px; min-width: 0; flex: 0 1 auto; }
+  .ss-tab .ss-logo img { height: 20px; max-width: 100%; }
+}
+/* In the A4 print the gradient tiles stay four across, without the old strip's dividers. */
+@media print {
+  html.ss-pageprint .ss-facts { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+  html.ss-pageprint .ss-facts div, html.ss-pageprint .ss-facts div:nth-child(3), html.ss-pageprint .ss-facts div:nth-child(n+3) { border: 0 !important; padding: 14px 20px 12px !important; }
+  html.ss-pageprint .ss-facts div::after { display: none; }
+}

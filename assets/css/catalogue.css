@@ -2614,20 +2614,23 @@ body:has(#cat-tray:not([hidden])) .sel-arr { bottom: 112px; }
 .sel-arr__save { background: #e8ff76; color: #111; }
 .sel-arr button[disabled] { opacity: .6; cursor: default; }
 
-/* Helvi Select brands the selection hero (item 309): the character alone, cut out, standing right beside the
-   name on the hero's own grid; the drawn shortlist stays on the right. */
-.sel-headrow { display: flex; align-items: flex-end; gap: clamp(8px, 1.5vw, 24px); }
-.sel-headrow .cat-selhead__lock { min-width: 0; }
-.sel-char { display: block; flex: none; width: auto; height: clamp(150px, 15vw, 230px); margin-bottom: -4px;
-  -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
+/* Helvi Select brands the selection hero (item 309): the whole character, cut out, standing on the line above
+   the brief right after the name; the drawn shortlist sits higher and bigger on the right. */
+[data-page="selection"] .cat-hero--desk .cat-selhead { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: clamp(8px, 1.5vw, 24px); }
+[data-page="selection"] .cat-hero--desk .cat-selhead > .cat-selhead__client { grid-column: 1 / -1; grid-row: 2; }
+[data-page="selection"] .cat-hero--desk .cat-selhead > :not(.sel-headrow):not(.cat-selhead__client) { grid-column: 1 / -1; }
+.sel-headrow { display: contents; }
+.sel-headrow .cat-selhead__lock { grid-column: 1; grid-row: 1; min-width: 0; max-width: min(760px, 58vw); align-self: end; }
+.sel-char { grid-column: 2; grid-row: 1 / span 2; align-self: end; justify-self: start; display: block; width: auto;
+  height: clamp(260px, 24vw, 340px); margin-bottom: -54px; position: relative; z-index: 1; }
 [data-page="selection"] .cat-hero--desk { min-height: 0; }
 [data-page="selection"] .cat-hero--desk .cat-cover__body { padding-top: 110px; }
 [data-page="selection"] .cat-hero--desk .cat-desk {
-  top: auto; bottom: 128px; transform: none; z-index: 0; opacity: 1;
-  right: clamp(8px, 4vw, 80px); width: clamp(240px, 22vw, 330px);
+  top: 84px; bottom: auto; transform: none; z-index: 0; opacity: 1;
+  right: clamp(8px, 2.5vw, 56px); width: clamp(300px, calc(100vw - 1080px), 480px);
 }
-@media screen and (max-width: 1100px) { [data-page="selection"] .cat-hero--desk .cat-desk { display: none; } }
-@media screen and (max-width: 600px) { .sel-char { height: 110px; } }
+@media screen and (max-width: 767px) { [data-page="selection"] .cat-hero--desk .cat-desk { display: none !important; } }
+@media screen and (max-width: 600px) { .sel-char { height: 200px; } }
 .cat-hero__logo--select { width: 150px; }
 /* Decisions so far: approved (green) and rejected (red) against the selection, the rest is still to decide. */
 .sel-dec3 { display: flex; height: 8px; margin-top: 10px; border-radius: 99px; overflow: hidden; background: rgba(18,18,18,.1); }
@@ -2669,3 +2672,5 @@ body:has(#cat-tray:not([hidden])) .sel-arr { bottom: 112px; }
   .hv-mod { flex-direction: column; justify-content: center; gap: 3px; min-width: 62px; min-height: 56px; padding: 4px 6px 5px; border-radius: 15px; font-size: 13px; }
   .hv-mod img { width: 30px; height: 30px; }
 }
+/* the name fills its column so Helvi Select stands right after its last word (balanced lines left a gap) */
+[data-page="selection"] .cat-hero--desk .sel-headrow .cat-selhead__title { text-wrap: wrap; }
