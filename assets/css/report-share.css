@@ -271,3 +271,26 @@ div.rs-ln__row { cursor: default; }
   html.rs-printing [data-page="selection"] .sel-glance__title { font-size: 26px !important; margin: 0 0 2mm !important; }
   html.rs-printing [data-page="selection"] .cat-summary .cat-container > * + * { margin-top: 3mm !important; }
 }
+
+/* The share bar (Bido 2026-11-03): left-aligned across the full width; the dates as pills, not free text. */
+.rs-bar__in { max-width: none; padding: 10px clamp(16px, 2.5vw, 32px); }
+.rs-bar__meta { align-items: center; gap: 8px 18px; }
+.rs-bar__meta span + span::before { content: none; }
+.rs-dates { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rs-date { display: inline-flex; align-items: center; gap: 9px; padding: 5px 12px 5px 5px; border-radius: 999px; border: 1px solid var(--rs-rule); background: var(--rs-white); }
+.rs-date > svg { flex: none; width: 28px; height: 28px; padding: 6px; border-radius: 50%; background: var(--rs-lime); color: var(--rs-ink); box-sizing: border-box; }
+.rs-date > span { display: grid; line-height: 1.15; }
+.rs-date small { font: 600 9.5px/1.2 var(--rs-body); letter-spacing: .1em; text-transform: uppercase; color: var(--rs-graphite); }
+.rs-date b { font: 700 13.5px/1.25 var(--rs-body) !important; letter-spacing: 0 !important; color: var(--rs-ink); margin: 0 !important; }
+.rs-date i { font: 700 12px/1 var(--rs-body); font-style: normal; padding: 5px 9px; border-radius: 999px; background: var(--rs-green-soft); color: var(--rs-green); margin-left: 2px; }
+.rs-date--until > svg { background: var(--rs-ink); color: var(--rs-lime); }
+.rs-date.is-soon i { background: #fde8e8; color: var(--rs-red-text); }
+.rs-date[hidden] { display: none; }
+@media (max-width: 700px) {
+  .rs-dates { gap: 6px; }
+  .rs-date { padding: 3px 9px 3px 3px; gap: 7px; }
+  .rs-date > svg { width: 24px; height: 24px; padding: 5px; }
+  .rs-date b { font-size: 12px !important; }
+  .rs-date small { font-size: 8.5px; }
+  .rs-date i { font-size: 11px; padding: 4px 7px; }
+}

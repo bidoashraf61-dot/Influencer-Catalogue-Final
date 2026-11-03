@@ -66,9 +66,11 @@
   HV.ref = ref;
   // When the numbers on screen were read: the moment the page loaded its data.
   HV.asOf = function () { return "Data as of " + stamp(loadedAt); };
-  HV.markLoaded = function () { loadedAt = new Date(); var s = document.getElementById("rs-asof"); if (s) s.textContent = HV.asOf(); };
+  HV.markLoaded = function () { loadedAt = new Date(); var s = document.querySelector("#rs-asof b"); if (s) s.textContent = stamp(loadedAt); };
 
   var I_DOWN = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>';
+  var I_CLOCK = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>';
+  var I_CAL = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>';
   var I_LINK = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4.5 4.5 0 0 0 6.4 0l3.2-3.2a4.5 4.5 0 0 0-6.4-6.4L12 5.6"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3.2 3.2a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/></svg>';
 
   // Download PDF: the page's own PDF when it has one (Track's printAll, the analysis), else the page printed
@@ -168,7 +170,11 @@
       bar.setAttribute("aria-label", "Shared report");
       bar.innerHTML = '<div class="rs-bar__in">'
         + '<img class="rs-bar__mark" src="' + ROOT + "assets/brand/modules/" + here[2] + '" alt="' + esc(here[3]) + '">'
-        + '<div class="rs-bar__meta"><b id="rs-for">Shared report</b><span id="rs-asof">' + esc(HV.asOf()) + '</span><span id="rs-until"></span></div>'
+        // The two dates as pills (Bido 2026-11-03): when the numbers were read, and how long the link stays open.
+        + '<div class="rs-bar__meta"><b id="rs-for">Shared report</b><div class="rs-dates">'
+        + '<span class="rs-date" id="rs-asof">' + I_CLOCK + "<span><small>Data as of</small><b>" + esc(stamp(loadedAt)) + "</b></span></span>"
+        + '<span class="rs-date rs-date--until" id="rs-until" hidden>' + I_CAL + "<span><small>Link open until</small><b></b></span><i></i></span>"
+        + "</div></div>"
         // A shared selection is for deciding, not downloading (Bido 2026-11-03): no PDF in its bar.
         + (here[0] === "selection" ? "" : '<button type="button" class="rs-btn rs-btn--lime" id="rs-pdf">' + I_DOWN + "<span>Download PDF</span></button>") + "</div>";
       document.body.insertBefore(bar, document.body.firstChild);
@@ -182,7 +188,12 @@
         if (res.st !== 200 || !meta.ok) return ended(meta.reason);
         if (meta.label) document.getElementById("rs-for").textContent = "For " + meta.label;
         else if (meta.title) document.getElementById("rs-for").textContent = meta.title;
-        if (meta.expires_at) document.getElementById("rs-until").textContent = "Link open until " + day(meta.expires_at);
+        if (meta.expires_at) {
+          var u = document.getElementById("rs-until"), d = Math.max(0, Math.ceil((meta.expires_at - Date.now() / 1000) / 86400));
+          u.querySelector("b").textContent = day(meta.expires_at);
+          u.querySelector("i").textContent = d <= 1 ? "Ends today" : d + " days left";
+          u.classList.toggle("is-soon", d <= 3); u.hidden = false;
+        }
       });
     });
 
