@@ -3359,6 +3359,7 @@
 
     /* -- an action the assistant prepared: nothing happens until the client confirms -- */
     function actionCard(a) {
+      if (a.tool === "run_plan" && a.steps) return planCard(a);
       var box = h("div", { class: "hv-msg hv-msg--ai hv-act", role: "group", "aria-label": "Confirm this change" });
       box.appendChild(h("p", { class: "hv-act__what" }, a.text + "?"));
       // A new selection: the client can type its name here before confirming.
@@ -3388,6 +3389,56 @@
       });
       no.addEventListener("click", function () {
         settle("Cancelled"); api("POST", "/api/chat/dismiss", { token: a.token });
+      });
+      row("ai", box);
+    }
+
+    /* -- a plan (item 292): every step on one card, one Confirm, then each step's real answer as it runs -- */
+    var PLAN_SAY = { pending: "Waiting", running: "Working", done: "Done", failed: "Not done", skipped: "Not run" };
+    function planCard(a) {
+      var box = h("div", { class: "hv-msg hv-msg--ai hv-act hv-plan", role: "group", "aria-label": "Confirm this plan" });
+      box.appendChild(h("p", { class: "hv-act__what" }, (a.title || "Plan") + ": " + a.steps.length + " step" + (a.steps.length === 1 ? "" : "s")));
+      var ol = h("ol", { class: "hv-plan__steps" }), items = [];
+      a.steps.forEach(function (t, i) {
+        var msg = h("span", { class: "hv-plan__msg" }), st = h("span", { class: "hv-plan__st" }, PLAN_SAY.pending);
+        var li = h("li", { class: "hv-plan__step is-pending" }, h("i", { class: "hv-plan__dot", "aria-hidden": "true" }),
+          h("span", { class: "hv-plan__body" }, h("span", { class: "hv-plan__t" }, (i + 1) + ". " + t), msg), st);
+        items.push({ li: li, msg: msg, st: st }); ol.appendChild(li);
+      });
+      box.appendChild(ol);
+      var yes = h("button", { class: "hv-act__yes", type: "button" }, "Confirm all"), no = h("button", { class: "hv-act__no", type: "button" }, "Cancel");
+      var row_ = h("div", { class: "hv-act__btns" }, yes, no), live = h("p", { class: "hv-plan__sum", "aria-live": "polite" });
+      box.appendChild(row_); box.appendChild(live);
+      function paint(steps) {
+        (steps || []).forEach(function (s, i) {
+          var it = items[i]; if (!it) return;
+          it.li.className = "hv-plan__step is-" + s.state; it.st.textContent = PLAN_SAY[s.state] || s.state;
+          it.msg.textContent = s.state === "pending" || s.state === "running" ? "" : (s.message || "");
+        });
+      }
+      function poll(pid, n) {
+        api("POST", "/api/chat/plan", { plan: pid }).then(function (r) {
+          var res = r.b || {};
+          if (!res.ok) { if (n < 3) return setTimeout(function () { poll(pid, n + 1); }, 2500); live.textContent = res.message || "Lost track of the plan: check the page."; return; }
+          paint(res.steps);
+          if (!res.done) return setTimeout(function () { poll(pid, 0); }, 1500);
+          box.classList.add("is-done"); live.textContent = res.summary || "Finished.";
+          box.classList.toggle("is-stopped", !res.all_done);
+        });
+      }
+      yes.addEventListener("click", function () {
+        yes.disabled = no.disabled = true; yes.textContent = "Starting…";
+        api("POST", "/api/chat/confirm", { token: a.token }).then(function (r) {
+          var res = r.b || {};
+          row_.remove();
+          if (!res.ok || !res.plan) { box.classList.add("is-done", "is-stopped"); live.textContent = res.message || "That didn't start. Please try again."; return; }
+          paint(res.steps); live.textContent = res.message || "Running.";
+          poll(res.plan, 0);
+        });
+      });
+      no.addEventListener("click", function () {
+        row_.remove(); box.classList.add("is-done"); live.textContent = "Cancelled: nothing was changed.";
+        api("POST", "/api/chat/dismiss", { token: a.token });
       });
       row("ai", box);
     }

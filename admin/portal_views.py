@@ -687,14 +687,24 @@ SUGGESTIONS = [
 COPILOT_JS = r"""
 (function(){
   var log=document.getElementById('cp-log'), box=document.getElementById('cp-text'), form=document.getElementById('cp-form'),
-      thread=null, busy=false, URL_CHAT=%(chat)s, URL_OK=%(ok)s, URL_NO=%(no)s;
+      thread=null, busy=false, URL_CHAT=%(chat)s, URL_OK=%(ok)s, URL_NO=%(no)s, URL_PLAN=%(plan)s;
   function esc(s){return s.replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
   function md(t){ var h=esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>');
     var out=[],inl=false; h.split('\n').forEach(function(l){ if(/^\s*[-*] /.test(l)){ if(!inl){out.push('<ul>');inl=true;} out.push('<li>'+l.replace(/^\s*[-*] /,'')+'</li>'); }
       else { if(inl){out.push('</ul>');inl=false;} out.push(l?'<p>'+l+'</p>':''); } }); if(inl) out.push('</ul>'); return out.join(''); }
   function add(role,html){ var d=document.createElement('div'); d.className='cp-m cp-'+role; d.innerHTML=html; log.appendChild(d); log.scrollTop=log.scrollHeight; return d; }
   function post(url,body){ return fetch(url,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json();}); }
+  var SAY={pending:'Waiting',running:'Working',done:'Done',failed:'Not done',skipped:'Not run'};
+  function plan(q){
+    var d=add('act','<div><b>'+esc(q.title||'Plan')+'</b> <span class="muted">'+q.steps.length+' steps, one Confirm</span><ol class="cp-plan">'+q.steps.map(function(t){return '<li class="is-pending"><span>'+esc(t)+'<small></small></span><em>Waiting</em></li>';}).join('')+'</ol><p class="cp-sum" aria-live="polite"></p></div><div class="cp-btns"><button class="btn small lime">Confirm all</button> <button class="btn small ghost">Dismiss</button></div>');
+    var b=d.querySelectorAll('button'), li=d.querySelectorAll('.cp-plan li'), sum=d.querySelector('.cp-sum');
+    function paint(st){ (st||[]).forEach(function(s,i){ if(!li[i])return; li[i].className='is-'+s.state; li[i].querySelector('em').textContent=SAY[s.state]||s.state; li[i].querySelector('small').textContent=(s.state==='done'||s.state==='failed'||s.state==='skipped')?(s.message||''):''; }); }
+    function poll(pid,n){ post(URL_PLAN,{plan:pid}).then(function(r){ if(!r.ok){ if(n<3) return setTimeout(function(){poll(pid,n+1);},2500); sum.textContent=r.message||'Lost track of the plan: check the page.'; return; }
+      paint(r.steps); if(!r.done) return setTimeout(function(){poll(pid,0);},1500); sum.textContent=(r.summary||'Finished.')+(r.all_done?' Undo any step from History.':''); d.classList.toggle('is-stopped',!r.all_done); }).catch(function(){ setTimeout(function(){poll(pid,n+1);},2500); }); }
+    b[0].onclick=function(){ b[0].disabled=b[1].disabled=true; post(URL_OK,{token:q.token}).then(function(r){ d.querySelector('.cp-btns').remove(); if(!r.ok||!r.plan){ sum.textContent='Not started: '+(r.error||r.message||'Unknown error'); d.classList.add('is-stopped'); return; } paint(r.steps); sum.textContent=r.message||'Running.'; poll(r.plan,0); }); };
+    b[1].onclick=function(){ post(URL_NO,{token:q.token}).then(function(){ d.querySelector('.cp-btns').remove(); sum.textContent='Dismissed: nothing was changed.'; }); }; }
   function queued(list){ (list||[]).forEach(function(q){
+    if(q.tool==='run_plan'&&q.steps){ plan(q); return; }
     var d=add('act','<div><b>Waiting for you</b><p>'+esc(q.text)+'</p></div><div class="cp-btns"><button class="btn small lime">Confirm</button> <button class="btn small ghost">Dismiss</button></div>');
     var b=d.querySelectorAll('button');
     b[0].onclick=function(){ b[0].disabled=b[1].disabled=true; post(URL_OK,{token:q.token}).then(function(r){ d.innerHTML=r.ok?'<b>Done.</b> '+esc(q.text)+' <span class="muted">Undo it from History &amp; undo.</span>':'<b>Not done.</b> '+esc(r.error||'Unknown error'); }); };
@@ -720,8 +730,13 @@ def copilot_page(email, configured, embed=False):
            ".cp-act{align-self:flex-start;background:var(--amber-soft);border:1px solid var(--amber);width:78%}.cp-btns{margin-top:8px}"
            ".cp-err{color:var(--red)}#cp-form{display:flex;gap:10px;margin-top:12px}#cp-text{flex:1;min-height:46px;max-height:140px;border-radius:14px;padding:10px 14px;font:inherit;border:1px solid var(--line-strong)}"
            ".cp-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.cp-chip{border:1px solid var(--line-strong);background:#fff;border-radius:999px;padding:6px 14px;font:inherit;font-size:var(--t-sm,13px);cursor:pointer}"
-           ".cp-chip:hover{border-color:var(--ink)}</style>")
-    js = COPILOT_JS % {"chat": json.dumps(u("/ai/chat")), "ok": json.dumps(u("/ai/confirm")), "no": json.dumps(u("/ai/dismiss"))}
+           ".cp-chip:hover{border-color:var(--ink)}"
+           ".cp-plan{list-style:none;margin:8px 0 6px;padding:0;max-height:340px;overflow:auto}.cp-plan li{display:flex;gap:10px;justify-content:space-between;padding:6px 0;border-top:1px solid rgba(18,18,18,.08);font-size:13.5px}"
+           ".cp-plan li:first-child{border-top:0}.cp-plan span{min-width:0;overflow-wrap:anywhere}.cp-plan small{display:block;color:var(--muted,#6b6b6b);font-size:12px}.cp-plan small:empty{display:none}"
+           ".cp-plan em{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;color:var(--muted,#6b6b6b)}"
+           ".cp-plan .is-running em{color:var(--ink)}.cp-plan .is-done em{color:#14884a}.cp-plan .is-failed em,.cp-plan .is-failed small{color:#c01010}.cp-plan .is-skipped span{color:var(--muted,#6b6b6b)}"
+           ".cp-sum{margin:4px 0 0;font-weight:600}.cp-sum:empty{display:none}.cp-act.is-stopped .cp-sum{color:#c01010}</style>")
+    js = COPILOT_JS % {"chat": json.dumps(u("/ai/chat")), "ok": json.dumps(u("/ai/confirm")), "no": json.dumps(u("/ai/dismiss")), "plan": json.dumps(u("/ai/plan"))}
     body = (css + ui.header("AI copilot", "Ask about your data, build selections, check client activity, or ask it to make a change. "
                             "Changes are never made until you press Confirm, and each one appears in History so you can undo it.")
             + off + "<div class='cp'><div class='cp-chips'>" + chips + "</div><div id='cp-log'><div class='cp-m cp-bot'>Hi. What would you like to look at or change?</div></div>"

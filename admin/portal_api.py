@@ -669,7 +669,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/auth/profile": self.api_auth_profile, "/api/auth/logout": self.api_auth_logout,
             "/api/me/unlock": self.api_me_unlock, "/api/me/as-client": self.api_me_as_client, "/api/me/update": self.api_me_update, "/api/brief/parse": self.api_brief_parse,
             "/api/brief/run": self.api_brief_run, "/api/brief/reasons": self.api_brief_reasons, "/api/chat": self.api_chat, "/api/chat/stream": self.api_chat_stream,
-            "/api/chat/confirm": self.api_chat_confirm, "/api/chat/dismiss": self.api_chat_dismiss,
+            "/api/chat/confirm": self.api_chat_confirm, "/api/chat/dismiss": self.api_chat_dismiss, "/api/chat/plan": self.api_chat_plan,
             "/api/brief/guess": self.api_brief_guess, "/api/brief/attach": self.api_brief_attach,
             "/api/brief/claim": self.api_brief_claim,
             "/api/selection/delete": self.api_selection_delete, "/api/brief/delete": self.api_brief_delete,
@@ -2072,17 +2072,32 @@ class PortalMixin(connect_api.ConnectMixin):
         b = self.json_body()
         cookie = drop = None
         admin_email = self.chat_admin_email(cid)
+        plan = assistant.pending_tool(b.get("token")) == "run_plan"
         if admin_email:
-            cookie, drop = self.loopback_admin_cookie(admin_email)
-        try:
-            res = assistant.confirm_client(str(b.get("token") or ""), cid, b.get("name"), cookie)
-        finally:
-            if drop:
+            # A plan runs on in the background after this answer, so its session lives until the last step is done.
+            cookie, drop = self.loopback_admin_cookie(admin_email, 1800 if plan else 300)
+
+        def release(tok=drop):
+            if tok:
                 with db.connect() as conn:
-                    conn.execute("DELETE FROM sessions WHERE token = ?", (drop,))
+                    conn.execute("DELETE FROM sessions WHERE token = ?", (tok,))
+        started = False
+        try:
+            res = assistant.confirm_client(str(b.get("token") or ""), cid, b.get("name"), cookie, release=release)
+            started = bool(res.get("plan"))
+        finally:
+            if not started:
+                release()
         if res.get("ok"):
             db.log("chat_action", cid, self.client_ip(), self._ua(), res.get("message", "")[:80])
         return self.send_json(200, res, self.cors())
+
+    def api_chat_plan(self):
+        """{plan}: where a confirmed plan has got to, step by step (the card polls this)."""
+        who = self._need_viewer()
+        if not who:
+            return
+        return self.send_json(200, assistant.plan_status(self.json_body().get("plan"), "client:%d" % who[0]), self.cors())
 
     def api_chat_dismiss(self):
         who = self._need_viewer()
@@ -2254,6 +2269,8 @@ class PortalMixin(connect_api.ConnectMixin):
         if path == "/ai/confirm":
             token = str(self.json_body().get("token") or "")
             return self.send_json(200, assistant.confirm(token, email, self.headers.get("Cookie")))
+        if path == "/ai/plan":
+            return self.send_json(200, assistant.plan_status(self.json_body().get("plan"), email))
         if path == "/ai/dismiss":
             return self.send_json(200, {"ok": assistant.dismiss(str(self.json_body().get("token") or ""), email)})
         if path.startswith("/portal/"):

@@ -99,7 +99,7 @@ def can(who, method, path, query=None):
     # POST
     if role == "viewer":
         return any(path.startswith(p) for p in _VIEWER_POST)
-    if path == "/ai/confirm":
+    if path in ("/ai/confirm", "/ai/plan"):
         return False                                     # copilot changes are confirmed by owners and admins
     return not any(path == p or path.startswith(p + "/") or path.startswith(p) for p in _KAM_DENY_POST)
 

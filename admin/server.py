@@ -1615,7 +1615,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_reauth(who)
         if path.startswith("/team/") or path.startswith("/account/2fa/"):
             return self.post_team(path, who)
-        if path in ("/ai/chat", "/ai/confirm", "/ai/dismiss") or path.startswith("/portal/"):
+        if path in ("/ai/chat", "/ai/confirm", "/ai/plan", "/ai/dismiss") or path.startswith("/portal/"):
             if path == "/portal/keys":
                 team.log("key", who["email"], (self.form_body().get("which") or "") + " " + (self.form_body().get("action") or "save"), self.client_ip())
             return self.portal_admin_post(path, who)
@@ -2145,7 +2145,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return None
         return a["email"]
 
-    def loopback_admin_cookie(self, email):
+    def loopback_admin_cookie(self, email, ttl=300):
         """A short admin session for the assistant's own call back into this server, for an admin who is
         confirming from the portal. Returns (Cookie header, token to drop afterwards), or (None, None) when
         two-step sign-in is on and they have no admin session open: they sign in to the admin once instead."""
@@ -2154,7 +2154,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         row = db.admin_by_email(email)
         if row is None or row["disabled_at"] or row["totp_on"] or team.must_use_2fa(row):
             return None, None
-        token = db.create_session(row["id"], 300)
+        token = db.create_session(row["id"], ttl)
         return "%s=%s" % (ADMIN_COOKIE, auth.sign(token, SECRET)), token
 
     def pending_2fa(self):

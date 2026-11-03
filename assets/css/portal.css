@@ -1185,6 +1185,29 @@ body.has-previewbar { padding-top: 36px; }
 }
 .pt-namer__go:disabled, .pt-namer__in:disabled { opacity: .6; cursor: default; }
 .hv-act .pt-namer { margin: 0 0 10px; }
+/* A plan (item 292): numbered steps, each with its live state and the portal's own answer. */
+.hv-plan__steps { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 2px; max-height: 320px; overflow-y: auto; }
+.hv-plan__step { display: grid; grid-template-columns: 16px 1fr auto; gap: 8px; align-items: start; padding: 6px 0; border-top: 1px solid rgba(18,18,18,.07); }
+.hv-plan__step:first-child { border-top: 0; }
+.hv-plan__dot { width: 12px; height: 12px; margin-top: 3px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px rgba(18,18,18,.3); }
+.hv-plan__body { min-width: 0; display: grid; gap: 2px; }
+.hv-plan__t { font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.hv-plan__msg { font-size: 12px; line-height: 1.35; color: var(--hv-gray); overflow-wrap: anywhere; }
+.hv-plan__msg:empty { display: none; }
+.hv-plan__st { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--hv-gray); white-space: nowrap; padding-top: 2px; }
+.hv-plan__step.is-running .hv-plan__dot { box-shadow: inset 0 0 0 2px var(--hv-ink); background: var(--hv-lime); animation: hv-plan-pulse 1s ease-in-out infinite alternate; }
+.hv-plan__step.is-running .hv-plan__st { color: var(--hv-ink); }
+.hv-plan__step.is-done .hv-plan__dot { background: #14884a; box-shadow: none; }
+.hv-plan__step.is-done .hv-plan__st { color: #14884a; }
+.hv-plan__step.is-failed .hv-plan__dot { background: #ee1515; box-shadow: none; }
+.hv-plan__step.is-failed .hv-plan__st, .hv-plan__step.is-failed .hv-plan__msg { color: #c01010; }
+.hv-plan__step.is-skipped .hv-plan__t { color: var(--hv-gray); }
+.hv-plan__step.is-skipped .hv-plan__dot { box-shadow: inset 0 0 0 1.5px rgba(18,18,18,.2); background: repeating-linear-gradient(45deg, rgba(18,18,18,.15) 0 2px, transparent 2px 4px); }
+.hv-plan__sum { margin: 0; font-size: 13px; font-weight: 600; line-height: 1.4; }
+.hv-plan__sum:empty { display: none; }
+.hv-plan.is-stopped .hv-plan__sum { color: #c01010; }
+@keyframes hv-plan-pulse { from { opacity: .55; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .hv-plan__step.is-running .hv-plan__dot { animation: none; } }
 
 /* "Other" on the brief questions: a short typed answer under the options. */
 .pt-other {
