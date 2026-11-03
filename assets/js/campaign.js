@@ -940,14 +940,13 @@
       var img = pic ? '<img class="hv-fill" src="' + esc(pic) + '" alt="" aria-hidden="true" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">'
         + '<img class="' + (p.thumb ? "hv-fit" : "hv-face") + '" src="' + esc(pic) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : "";
       var plats = '<span class="mx-post__plats-ic">' + parts.map(function (x) { return icon(x.platform); }).join("") + "</span>";
-      // One link per platform it went out on: a compact row of chips, each with that platform's views (2026-10-23).
-      var links = parts.length === 1
-        ? '<a class="mx-post__go" href="' + esc(p.url) + '" target="_blank" rel="noopener">Watch on ' + esc(p.platform)
-          + ' <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>'
-        : '<div class="mx-post__links"><span class="mx-post__lbl">Watch on</span>' + parts.map(function (x) {
-            return '<a class="mx-post__lk" href="' + esc(x.url) + '" target="_blank" rel="noopener">' + icon(x.platform) + "<span>" + esc(x.platform) + "</span>"
-              + (x.video && x.views != null ? "<b>" + num(x.views) + "</b>" : "") + "</a>";
-          }).join("") + "</div>";
+      // Watch on (Bido 2026-11-03): one round platform icon per place it went out, its views under it, for every post.
+      var links = '<div class="mx-post__links mx-post__links--ic"><span class="mx-post__lbl">Watch on</span><div class="mx-post__ics">' + parts.map(function (x) {
+            var v = x.video && x.views != null ? num(x.views) : "";
+            return '<a class="mx-post__ic" href="' + esc(x.url) + '" target="_blank" rel="noopener" title="Watch on ' + esc(x.platform) + (v ? " · " + v + " views" : "")
+              + '" aria-label="Watch on ' + esc(x.platform) + (v ? ", " + v + " views" : "") + '"><span class="mx-post__icb">' + icon(x.platform) + "</span>"
+              + (v ? "<b>" + v + "</b>" : "") + "</a>";
+          }).join("") + "</div></div>";
       return '<article class="mx-post' + (p.thumb ? "" : " mx-post--nothumb") + '"><div class="mx-post__media"><div class="mx-post__plate"></div>' + img
         + '<span class="mx-post__tag">' + plats + "<span>" + (p.parts ? p.parts.length + " platforms" : esc(KIND[p.kind] || p.kind)) + '</span></span><span class="mx-post__sig">'
         + sig(h.grade, healthTitle(h)) + '</span></div><div class="mx-post__body"><div class="mx-who">' + ava(p.photo)
@@ -1162,16 +1161,17 @@
     var t = R.total, parts = [["Likes", t.likes, "#14884a"], ["Comments", t.comments, "#ff691e"], ["Saves", t.saves, "#b9d400"], ["Shares", t.shares, "#7048e8"]]
       .filter(function (p) { return p[1]; });
     var sum = parts.reduce(function (s, p) { return s + p[1]; }, 0);
-    if (sum) mix.push('<div class="mx-panel"><h3>What people did</h3><div class="mx-stack" role="img" aria-label="Interactions breakdown">'
-      + parts.map(function (p) { return '<i style="width:' + (p[1] / sum * 100) + "%;background:" + p[2] + '"></i>'; }).join("")
-      + '</div><div class="mx-key">' + parts.map(function (p) {
-        return '<div><span class="mx-cs" style="background:' + p[2] + '"></span>' + p[0] + "<b>" + full(p[1]) + "</b></div>";
-      }).join("") + "</div></div>");
+    if (sum) mix.push('<div class="mx-panel"><h3>What people did</h3><div class="mx-dn">'
+      + donut(parts, num(sum), "interactions", parts.map(function (p) { return Math.round(p[1] / sum * 100) + "% " + p[0].toLowerCase(); }).join(", "))
+      + '<div class="mx-key">' + parts.map(function (p) {
+        return '<div><span class="mx-sw" style="background:' + p[2] + '"></span>' + p[0] + "<b>" + full(p[1]) + "</b></div>";
+      }).join("") + "</div></div></div>");
     // The comments take the old audience slot (owner, 2026-10-23): the mood and what viewers ask, with the full read below.
     var ct = sayTotals();
-    if (ct && ct.n) mix.push('<div class="mx-panel mx-saybox"><h3>What people say</h3>' + moodBar(ct)
-      + '<div class="mx-key">' + [["Comments read", full(ct.n)], ["Positive", sayPct(ct.pos, ct.n)], ["Ask how to buy", sayPct(ct.intent, ct.n)]].map(function (x) {
-        return "<div>" + x[0] + "<b>" + x[1] + "</b></div>"; }).join("") + '</div><a class="mx-saybox__go" href="#sec-say">Read the analysis ›</a></div>');
+    if (ct && ct.n) mix.push('<div class="mx-panel mx-saybox"><h3>What people say</h3><div class="mx-dn">' + moodDonut(ct, num(ct.n), "comments")
+      + '<div class="mx-key">' + MOOD.map(function (m) {
+          return '<div><span class="mx-sw" style="background:' + m[2] + '"></span>' + m[1] + "<b>" + sayPct(ct[m[0]], ct.n) + "</b></div>"; }).join("")
+      + '<div class="mx-key__x">Ask how to buy<b>' + sayPct(ct.intent, ct.n) + "</b></div></div></div></div>");
     $("mx-mix").innerHTML = mix.join("");
     decorateH3("mx-mix");
   }
@@ -1190,6 +1190,23 @@
   }
   function sayPct(x, n) { if (!n) return "0%"; var v = x / n * 100; return x && v < 1 ? "<1%" : Math.round(v) + "%"; }
   var MOOD = [["pos", "Positive", "#14884a"], ["neu", "Neutral", "#ff691e"], ["neg", "Negative", "#ee1515"]];
+  // A donut (Bido 2026-11-03): parts [[label, value, colour]] around a centre figure, for the interactions and the mood.
+  function donut(parts, centre, sub, label) {
+    var sum = parts.reduce(function (a, p) { return a + (p[1] || 0); }, 0), r = 42, C = 2 * Math.PI * r, at = 0;
+    var arcs = sum ? parts.map(function (p) {
+      var len = (p[1] || 0) / sum * C; if (!len) return "";
+      var gap = parts.filter(function (q) { return q[1]; }).length > 1 ? Math.min(1.6, len / 3) : 0;
+      var o = '<circle r="' + r + '" cx="50" cy="50" fill="none" stroke="' + p[2] + '" stroke-width="13" stroke-dasharray="' + Math.max(0, len - gap).toFixed(2) + " " + C.toFixed(2)
+        + '" stroke-dashoffset="' + (-at).toFixed(2) + '" transform="rotate(-90 50 50)"></circle>';
+      at += len; return o;
+    }).join("") : "";
+    return '<div class="mx-donut" role="img" aria-label="' + esc(label) + '"><svg viewBox="0 0 100 100" aria-hidden="true"><circle r="' + r + '" cx="50" cy="50" fill="none" stroke="#efece6" stroke-width="13"></circle>'
+      + arcs + '</svg><div class="mx-donut__c"><b>' + centre + "</b><span>" + sub + "</span></div></div>";
+  }
+  function moodDonut(t, centre, sub) {
+    return donut(MOOD.map(function (m) { return [m[1], t[m[0]], m[2]]; }), centre, sub,
+      MOOD.map(function (m) { return sayPct(t[m[0]], t.n) + " " + m[1].toLowerCase(); }).join(", "));
+  }
   function moodBar(t) {
     return '<div class="mx-mood" role="img" aria-label="' + MOOD.map(function (m) { return sayPct(t[m[0]], t.n) + " " + m[1].toLowerCase(); }).join(", ") + '">'
       + MOOD.map(function (m) { var w = t.n ? t[m[0]] / t.n * 100 : 0; return w ? '<i style="width:' + w.toFixed(1) + "%;background:" + m[2] + '">' + (w >= 9 ? Math.round(w) + "%" : "") + "</i>" : ""; }).join("")
@@ -1204,15 +1221,15 @@
       : z >= 0.3 ? "Viewers are divided" : p >= 0.6 ? "Viewers love it" : "Mostly neutral";
     var AR = C.theme_ar || {}, peak = th.length ? t.themes[th[0]] : 1;
     var topics = th.slice(0, 6).map(function (q, i) {
-      return '<div class="mx-bar"><span class="mx-bar__k">' + esc(q) + (AR[q] ? ' <small dir="rtl" lang="ar">' + esc(AR[q]) + "</small>" : "") + '</span><i style="--w:' + (t.themes[q] / peak * 100).toFixed(1)
+      return '<div class="mx-bar mx-topic"><span class="mx-bar__k"><span>' + esc(q) + "</span>" + (AR[q] ? '<small dir="rtl" lang="ar">' + esc(AR[q]) + "</small>" : "") + '</span><i style="--w:' + (t.themes[q] / peak * 100).toFixed(1)
         + "%;--c:" + PALETTE[i % PALETTE.length] + '"></i><b>' + sayPct(t.themes[q], t.n) + "</b></div>";
     }).join("");
     $("mx-say").innerHTML = '<div class="mx-say__top"><aside class="mx-say__helvi"><img src="../assets/brand/helvy-connect/helvy-icon-180.png" alt="" width="56" height="56"><div><p>Helvi read ' + full(t.n) + " comments</p><b>" + esc(head) + "</b>"
       + (th[0] ? "<span>Most of the talk is about " + esc(th[0].toLowerCase()) + "</span>" : "") + "</div></aside>"
       + '<dl class="mx-say__nums"><div><dt>Comments read</dt><dd>' + full(t.n) + "</dd></div><div><dt>Positive</dt><dd>" + sayPct(t.pos, t.n) + "</dd></div><div><dt>Ask how to buy</dt><dd>" + sayPct(t.intent, t.n)
       + "</dd></div><div><dt>Videos</dt><dd>" + t.videos + "</dd></div></dl></div>"
-      + '<div class="mx-say__grid"><div class="mx-panel"><h3>' + IC.say + "The mood</h3>" + moodBar(t) + '<div class="mx-key">' + MOOD.map(function (m) {
-          return '<div><span class="mx-cs" style="background:' + m[2] + '"></span>' + m[1] + "<b>" + full(t[m[0]]) + "</b></div>"; }).join("") + "</div></div>"
+      + '<div class="mx-say__grid"><div class="mx-panel"><h3>' + IC.say + "The mood</h3><div class=\"mx-dn\">" + moodDonut(t, sayPct(t.pos, t.n), "positive") + '<div class="mx-key">' + MOOD.map(function (m) {
+          return '<div><span class="mx-sw" style="background:' + m[2] + '"></span>' + m[1] + "<b>" + full(t[m[0]]) + " <small>" + sayPct(t[m[0]], t.n) + "</small></b></div>"; }).join("") + "</div></div></div>"
       + '<div class="mx-panel"><h3>What they talk about</h3>' + (topics || '<p class="mx-panel__note">Topics appear once the comments are read.</p>') + "</div></div>"
       + "";
     // Our reading of the comments only, never the comments themselves (owner, 2026-11-03, item 294).

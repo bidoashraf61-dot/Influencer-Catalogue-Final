@@ -1231,3 +1231,57 @@ body:has(#mx-report:not([hidden])) .mx-top .mx-link:hover { color: var(--lime); 
   .mx-bug__char { width: 46mm; }
   .mx-bug__brands img { height: 36px; }
 }
+/* the objective bar on the dark header: its labels and legend in light type */
+.mx-bug .mx-delivery span:not(.mx-sig) { color: rgba(255,255,255,.72); }
+.mx-bug .mx-delivery b { color: var(--white); }
+
+/* Report polish (Bido 2026-11-03). Watch on: a round icon per platform with its views under it. */
+.mx-post__links--ic { display: grid; gap: 8px; }
+.mx-post__ics { display: flex; flex-wrap: wrap; gap: 10px 14px; }
+.mx-post__ic { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; min-width: 48px; color: var(--ink); text-decoration: none; }
+.mx-post__icb { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--lime);
+  transition: background-color .2s ease, transform .15s ease; }
+.mx-post__icb svg { width: 20px; height: 20px; }
+.mx-post__ic b { font: 700 12.5px/1 var(--body); font-variant-numeric: tabular-nums; }
+.mx-post__ic:hover .mx-post__icb { background: var(--ink); }
+.mx-post__ic:hover .mx-post__icb svg { filter: brightness(0) invert(1); }
+.mx-post__ic:focus-visible { outline: none; }
+.mx-post__ic:focus-visible .mx-post__icb { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+@media print { .mx-post__icb { width: 26px; height: 26px; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .mx-post__icb svg { width: 13px; height: 13px; } .mx-post__ic b { font-size: 9px; } }
+
+/* Coming next: the whole name and "Post 3 of 3" on one line each, the date beside them. */
+.mx-next ul { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important; }
+.mx-next li { grid-template-columns: 36px minmax(0, 1fr) auto !important; }
+.mx-next li b { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: anywhere; line-height: 1.25; }
+.mx-next li small { white-space: nowrap; }
+@media (max-width: 700px) { .mx-next ul { grid-template-columns: 1fr !important; } .mx-next li { grid-template-columns: 36px minmax(0, 1fr) !important; } }
+
+/* Donuts: what people did, what people say, the mood. */
+.mx-dn { display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 22px; align-items: center; }
+.mx-dn .mx-key { margin-top: 0; }
+.mx-donut { position: relative; width: 148px; height: 148px; }
+.mx-donut svg { width: 100%; height: 100%; display: block; }
+.mx-donut__c { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.mx-donut__c b { font: 400 30px/1 var(--heading); letter-spacing: .02em; color: var(--ink); }
+.mx-donut__c span { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--gray); margin-top: 2px; }
+.mx-sw { flex: none; width: 12px; height: 12px; border-radius: 50%; }
+.mx-key b small { font-weight: 500; color: var(--gray); margin-left: 6px; font-size: .9em; }
+.mx-key__x { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 2px; }
+@media (max-width: 420px) { .mx-dn { grid-template-columns: 1fr; justify-items: center; } .mx-dn .mx-key { width: 100%; } }
+@media print { .mx-dn { grid-template-columns: 30mm 1fr; gap: 5mm; } .mx-donut { width: 30mm; height: 30mm; } .mx-donut__c b { font-size: 20px; } .mx-donut__c span { font-size: 8px; }
+  .mx-donut svg { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+
+/* What they talk about: bigger type, English then Arabic on their own lines, thicker bars. */
+#mx-say .mx-topic { grid-template-columns: minmax(0, 1.4fr) minmax(80px, 1fr) auto; gap: 18px; margin-bottom: 0; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 17px; }
+#mx-say .mx-topic:last-child { border-bottom: 0; }
+#mx-say .mx-topic .mx-bar__k { display: grid; gap: 3px; }
+#mx-say .mx-topic .mx-bar__k > span { font-weight: 600; color: var(--ink); line-height: 1.25; }
+#mx-say .mx-topic .mx-bar__k small { font-size: 15px; color: var(--gray); text-align: left; line-height: 1.4; }
+#mx-say .mx-topic i { height: 14px; }
+#mx-say .mx-topic b { font: 400 26px/1 var(--heading); letter-spacing: .02em; min-width: 2.6em; }
+@media (max-width: 700px) {
+  #mx-say .mx-topic { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; font-size: 16px; }
+  #mx-say .mx-topic i { grid-column: 1 / -1; grid-row: 2; }
+  #mx-say .mx-topic b { grid-column: 2; grid-row: 1; }
+}
+@media print { #mx-say .mx-topic { font-size: 11px !important; padding: 4px 0 !important; } #mx-say .mx-topic b { font-size: 16px; } #mx-say .mx-topic .mx-bar__k small { font-size: 10px; } }
