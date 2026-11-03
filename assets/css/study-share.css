@@ -235,6 +235,7 @@ html.ss-on #ev-market { display: none; }
   .ss-nums { grid-template-columns: 1fr 1fr; }
   .ss-nums div:nth-child(3) { display: none; }
   .ss-nums b { font-size: 20px; }
+  .ss-nums span { font-size: 9.5px; letter-spacing: .04em; overflow-wrap: anywhere; }
   .ss-why { display: none; }
   .ss-logos > :nth-child(n+2):not(.ss-more) { display: none; }
   .ss-tier__n { margin-left: 0; }
