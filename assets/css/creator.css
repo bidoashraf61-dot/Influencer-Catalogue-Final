@@ -613,3 +613,17 @@ body.pp-modal-on { overflow: hidden; }
 html.hv-shared .pp-top { display: none; }
 /* Audit 2026-11-03: content and audience switches are 44px tall on phones. */
 @media (max-width: 640px) { body[data-page="creator"] main button:not(.pp-tip) { min-height: 44px; } }
+
+/* Bido 2026-11-03: a card without a stored picture waits for the platform's own player (a few seconds, one card
+   after another). While it waits it shimmers instead of reading "Instagram post", so it looks loading, not broken.
+   If the player fails (data-live-state="off": deleted or unavailable post) the label comes back. */
+.pp-post__media[data-live]:not(.is-live):not([data-live-state="off"]):has(> .pp-post__none) {
+  background-image: linear-gradient(100deg, rgba(255,255,255,0) 30%, rgba(255,255,255,.65) 50%, rgba(255,255,255,0) 70%);
+  background-color: #ece9e3; background-size: 220% 100%; background-repeat: no-repeat;
+  animation: pp-shimmer 1.3s linear infinite;
+}
+.pp-post__media[data-live]:not(.is-live):not([data-live-state="off"]) > .pp-post__none { visibility: hidden; }
+@keyframes pp-shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+@media (prefers-reduced-motion: reduce) { .pp-post__media[data-live] { animation: none !important; } }
+html.pp-printing .pp-post__media[data-live] { animation: none !important; background-image: none !important; }
+html.pp-printing .pp-post__media[data-live] > .pp-post__none { visibility: visible !important; }
