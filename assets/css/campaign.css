@@ -1106,24 +1106,55 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
 .hv-shared .mx-tabs { top: var(--rs-bar-h, 64px); }
 .hv-shared [id^="sec-"] { scroll-margin-top: calc(var(--rs-bar-h, 64px) + 84px); }
 
-/* The cover (item 301, 2026-11-03): Helvi Track's character and machines beside the title, on the art's own beige,
-   on the shared page, the staff report and page 1 of the PDF. */
-.mx-bug { background: #e0cdbc; }
-.mx-bug__in { display: grid; grid-template-columns: minmax(0, 1fr); }
-.mx-cover { margin: -8px 0 18px; order: -1; }
-.mx-cover img { display: block; width: 100%; height: auto; }
-.mx-bug .mx-score-line { background: #fff; }
-.mx-bug__sub, .mx-bug__sels { color: #4a3f36; }
+/* The cover (items 301/302, 2026-11-03): a full-bleed black banner with Helvi Track's character at his machines,
+   then the title block on white in black type. No beige; the art is cropped tight so nothing sits empty. */
+.mx-bug { background: var(--white); padding-top: 0; }
+.mx-cover { margin: 0 0 26px; background: #0b0b0b; line-height: 0; }
+.mx-cover img { display: block; width: 100%; height: auto; max-height: 560px; object-fit: cover; object-position: 50% 62%; }
 @media (min-width: 1000px) {
-  .mx-bug__in { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); column-gap: 28px; align-items: start; }
-  .mx-bug__in > * { grid-column: 1; }
-  .mx-cover { grid-column: 2; grid-row: 1 / span 6; align-self: center; margin: 0 -2% 0 0; order: 0; }
-  .mx-bug__in > .mx-score-line, .mx-bug__in > .mx-delivery { grid-column: 1 / -1; }
-  .mx-bug__title { font-size: clamp(3rem, 1rem + 5vw, 7rem) !important; }
+  .mx-bug__title { font-size: clamp(3.5rem, 1rem + 6vw, 8rem) !important; }
 }
 @media print {
-  .mx-bug { -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 10mm 0 8mm !important; min-height: 262mm; box-sizing: border-box; }
-  .mx-bug__in { display: block; }
-  .mx-cover { margin: 6mm 0 6mm; }
-  .mx-cover img { width: 100%; }
+  .mx-bug { -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 0 0 4mm !important; break-after: auto !important; }
+  .mx-cover { margin: 0 0 6mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .mx-cover img { max-height: none; }
+  .mx-bug__title { font-size: 58px !important; }
+  /* page 1: cover, numbers and the contents cards together; the chapters start on page 2 */
+  .mx-toc { padding-top: 2mm !important; }
+}
+/* PDF without empty space (item 302): page 1 holds the cover, the numbers and the contents; chapters then flow one after
+   another (a heading always stays with its first block, no block is split) instead of each forcing a new page. */
+@media print {
+  .mx-toc { break-after: auto !important; break-inside: avoid; padding-bottom: 4mm !important; }
+  .mx-toc__t { font-size: 26px !important; margin-bottom: 3mm !important; }
+  .mx-tcds { grid-template-columns: repeat(3, 1fr) !important; gap: 3mm !important; }
+  .mx-tcd { padding: 3mm 3.5mm !important; grid-template-rows: auto 30px auto auto 1fr !important; gap: 1mm !important; }
+  .mx-tcd__ch { font-size: 15px !important; }
+  .mx-tcd__fig { font-size: 32px !important; }
+  .mx-tcd__term { font-size: 8.5px !important; margin-top: 1mm !important; }
+  .mx-tcd__line { font-size: 9.5px !important; }
+  .mx-mv { height: 30px !important; }
+  .mx-mv--face, .mx-mv--face img { width: 30px !important; height: 30px !important; }
+  .mx-mv--thumbs img, .mx-mv--thumbs i { width: 22px !important; height: 30px !important; }
+  #mx-report .mx-sec:not([hidden]) { break-before: auto !important; padding-top: 8mm !important; }
+  .mx-sec__head, .mx-h2, .mx-story, .mx-table-title { break-after: avoid !important; }
+}
+@media print {
+  .mx-cover img { max-height: 72mm !important; object-fit: cover; object-position: 50% 60%; }
+  .mx-bug__brands { margin-bottom: 3mm !important; }
+  .mx-bug__row { margin-top: 4mm !important; }
+  .mx-podium, .mx-bullets, .mx-gantt, .mx-say__top, .mx-mix, .mx-charts { break-inside: avoid !important; }
+}
+@media print {
+  .mx-bug { min-height: 0 !important; }
+  .mx-podium { padding-top: 9mm !important; }
+}
+@media print {
+  .mx-cover img { max-height: 64mm !important; object-position: 50% 0% !important; }   /* trim the floor reflection, never the heads */
+  .mx-toc { padding-top: 0 !important; }
+  .mx-tcd { grid-template-rows: auto 22px auto auto !important; padding: 2.5mm 3mm !important; }
+  .mx-mv { height: 22px !important; }
+  .mx-mv--face, .mx-mv--face img { width: 22px !important; height: 22px !important; }
+  .mx-mv--thumbs img, .mx-mv--thumbs i { width: 16px !important; height: 22px !important; }
+  .mx-tcd__fig { font-size: 28px !important; }
 }
