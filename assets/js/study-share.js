@@ -322,7 +322,7 @@
     nm.appendChild(el("b", null, c.name || "@" + c.handle)); nm.appendChild(el("span", null, "@" + c.handle + (c.followers ? " · " + num(c.followers) + " followers" : "")));
     body.appendChild(nm);
     var ns = el("div", "ss-nums");
-    [[num(v.best), "Best views"], [pct(v.er), "Avg engagement"], [String(v.posts.length), v.posts.length === 1 ? "Competitor post" : "Competitor posts"]]
+    [[num(v.best), "Best views"], [pct(v.er), "Engagement"], [String(v.posts.length), v.posts.length === 1 ? "Competitor post" : "Competitor posts"]]
       .forEach(function (x) { var d = el("div"); d.appendChild(el("b", null, x[0])); d.appendChild(el("span", null, x[1])); ns.appendChild(d); });
     body.appendChild(ns); body.appendChild(el("p", "ss-why", why(v)));
     var lg = el("div", "ss-logos"), names = Object.keys(v.comps);
