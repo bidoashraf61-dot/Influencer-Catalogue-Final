@@ -182,7 +182,7 @@
   // to that selection and to every campaign holding it.
   function fromStudy(st) {
     var sel = st.selection;
-    var map = sel ? ROOT + "market/#s=" + encodeURIComponent(sel.token) : "";
+    var map = sel ? ROOT + "market/#s=" + encodeURIComponent(sel.token) : (st.opens || "");
     return {
       key: String(st.id), name: st.title, stage: st.stage, moves: st.moves || [], client: st.client || "",
       logos: st.logos || [], href: map, open: map ? "Open study" : "",

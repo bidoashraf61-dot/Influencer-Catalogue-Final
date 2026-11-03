@@ -81,7 +81,8 @@ def _visible(h, role, who, rows):
     import portal
     team = set(portal.team_codes(int(who)))
     granted = set(db.granted_selection_ids(int(who)))
-    return [r for r in rows if r["client_visible"] and r["sel_token"] and not r["sel_deleted"]
+    # A study filed under no selection is still the company's own (collected from the workspace); it opens there.
+    return [r for r in rows if r["client_visible"]
             and ((r["code_id"] is not None and int(r["code_id"]) in team) or r["selection_id"] in granted)]
 
 
@@ -101,7 +102,12 @@ def card(r, role, shared_refs, logo_dir):
             k = db.campaign(cid)
             if k is not None and (role != "client" or k["status"] != "draft"):
                 camps.append({"name": k["name"], "token": k["token"], "live": k["status"] == "live"})
-    return {"id": r["id"], "title": r["title"], "stage": stage, "auto_stage": auto, "manual": stage != auto,
+    sel_ok = bool(r["sel_token"]) and not r["sel_deleted"]
+    # Where the card opens: the study map for its selection, else the client's workspace results, or for staff
+    # the admin's own view of the pack.
+    opens = ("/market/#s=" + r["sel_token"]) if sel_ok else (
+        "/workspace/#helvi-intelligence" if role == "client" else "/admin/evidence/view?id=%d" % r["id"])
+    return {"id": r["id"], "title": r["title"], "stage": stage, "opens": opens, "auto_stage": auto, "manual": stage != auto,
             "moves": [s for s in STAGES if s != stage] if role == "admin" else [],
             "client": client, "logos": logos[:1], "kam": r["kam"] or "",
             "selection": {"token": r["sel_token"], "name": r["sel_name"]} if r["sel_token"] and not r["sel_deleted"] else None,
