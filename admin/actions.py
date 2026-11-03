@@ -27,6 +27,8 @@ The answer is read back out of the redirect the portal sends a browser: ``?ok=``
 is what it would show the admin in green, ``?e=`` what it would show in red.
 """
 import http.client
+import json
+import re
 import urllib.parse
 
 TIMEOUT = 120                      # a report or a sync can take a while
@@ -51,19 +53,20 @@ COUNTS = {"likes": "Likes.", "comments": "Comments.", "views": "Views.",
           "shares": "Shares.", "saves": "Saves."}
 
 
-def _a(path, about, line, fields, required=(), multi=(), risk="normal", lands=(), defaults=None):
+def _a(path, about, line, fields, required=(), multi=(), risk="normal", lands=(), defaults=None, as_json=False):
     return {"path": path, "about": about, "line": line, "fields": fields,
             "required": tuple(required), "multi": tuple(multi), "risk": risk,
-            "lands": tuple(lands), "defaults": dict(defaults or {})}
+            "lands": tuple(lands), "defaults": dict(defaults or {}), "json": as_json}
 
 
 REGISTRY = {
     # ---- the campaign itself
     "campaign.create": _a(
         "/campaigns/new",
-        "Start a new draft campaign, on its own or filled from a selection (its creators, client and prices come along).",
+        "Start a new draft campaign, on its own or filled from a selection (its creators, client and prices come along; "
+        "it then takes the selection's name). The new campaign's id comes back as id.",
         "Create the campaign “{name}”",
-        {"name": "What to call it.", "selection": "Selection id to build it from (optional).",
+        {"name": "What to call it.", "selection": "Selection id or exact name to build it from (optional).",
          "client": "Client name to show on the report (optional).",
          "code_id": "Access-code id of the client who may open it (optional)."},
         required=("name",), lands=("/campaigns/edit",)),
@@ -83,6 +86,28 @@ REGISTRY = {
         "Delete a campaign and everything on it. There is no undo for this one.",
         "DELETE campaign {id} and everything on it",
         {"id": "Campaign id."}, required=("id",), risk="high"),
+    "campaign.details": _a(
+        "/api/board/save",
+        "Set a campaign's details, brief and targets in one save, as the board card's Save does (only what you send changes): "
+        "name, client, first/last day, objective, targets and the brief. A live campaign needs both days.",
+        "Save details on campaign {id}",
+        {"id": "Campaign id.", "name": "New name (optional).", "client": "Client name on the report (optional).",
+         "starts": "First day, YYYY-MM-DD.", "ends": "Last day, YYYY-MM-DD.",
+         "objective": "awareness, engagement, traffic, a blend joined by + (awareness+engagement), or balanced. "
+                      "Leave it out when you send a brief: the brief's goal sets it.",
+         "targets": 'Goals as a JSON object, any of posts, views, engagement, er (percent), clicks, e.g. {"posts": 10, "views": 500000}.',
+         "brief": 'The brief as a JSON object of answers: goal (list of awareness/engagement/traffic), platforms (list), market '
+                  '(list of SA, AE, EG), category (list, e.g. skincare, health care), and optionally deliverable, timing, '
+                  'gender, age. e.g. {"goal": ["awareness"], "platforms": ["Instagram"], "market": ["SA"], "category": ["skincare"]}.'},
+        required=("id",), as_json=True),
+    "campaign.assign": _a(
+        "/campaigns/assign",
+        "Give a campaign to a client: the client access code that may open it (needed before it can go live).",
+        "Give campaign {id} to client access code {client}",
+        {"id": "Campaign id.", "client": "Client access-code id or the code's exact label.",
+         "with_selection": "1 to move its selection to the same client too (optional).",
+         "tell": "1 to ring the client's bell (optional)."},
+        required=("id", "client"), defaults={"confirmed": "1"}),
 
     # ---- filling in the posts
     "post.add": _a(
@@ -146,12 +171,13 @@ REGISTRY = {
         required=("id", "slug")),
     "link.add": _a(
         "/campaigns/link/custom",
-        "Add an extra tracking link to a campaign, for a creator or for the campaign as a whole.",
+        "Add an extra tracking link for one creator on the campaign (the creator must already be on it).",
         "Add a tracking link to campaign {id}",
         {"id": "Campaign id.", "destination": "Where it lands, a full https:// address.",
-         "code": "Creator code (optional).", "slug": "The slug to use (optional).",
+         "code": "Creator code, one already on this campaign.",
+         "slug": "The link's name in its address: 3-60 lowercase letters, digits and dashes, e.g. ivatherm-site.",
          "label": "What to call it (optional)."},
-        required=("id", "destination")),
+        required=("id", "destination", "code", "slug")),
     "link.toggle": _a(
         "/campaigns/link/toggle",
         "Switch one tracking link off or back on. Taps on a link that is off are told it is not active.",
@@ -257,7 +283,7 @@ REGISTRY = {
         required=("code",), multi=("ind_subs", "ind_also")),
 }
 
-AREAS = {"campaign": "The campaign itself: create, go live, delete, pull creators from its selection.",
+AREAS = {"campaign": "The campaign itself: create, details/brief/targets, give it to a client, go live, delete, pull creators from its selection.",
          "post": "The posts on a campaign: add one or many, edit, hide, delete, group, and what is still expected.",
          "link": "A campaign's tracking links.",
          "insight": "Screenshot numbers a creator sent in.",
@@ -318,6 +344,18 @@ def read_forms(page, cookie):
         return {"error": "page must be an admin page path such as /requests or /campaigns/content?id=2."}
     if not cookie:
         return {"error": "No admin session to read the page with. Open the admin once and sign in, then ask again."}
+    # id=<campaign name> -> the campaign id; anything else is percent-encoded so a space cannot break the request line
+    path, _, query = page.partition("?")
+    params = urllib.parse.parse_qsl(query, keep_blank_values=True)
+    for i, (k, v) in enumerate(params):
+        if k == "id" and not v.isdigit() and path.startswith("/campaigns"):
+            import db
+            with db.connect() as dbc:
+                rows = dbc.execute("SELECT id FROM campaigns WHERE lower(name) = lower(?)", (v.strip(),)).fetchall()
+            if len(rows) != 1:
+                return {"error": "id must be the campaign number, such as /campaigns/content?id=2; %r matched %d campaigns." % (v, len(rows))}
+            params[i] = (k, str(rows[0][0]))
+    page = urllib.parse.quote(path, safe="/%-_.~") + (("?" + urllib.parse.urlencode(params)) if params else "")
     conn = http.client.HTTPConnection(_WHERE["host"], _WHERE["port"], timeout=30)
     try:
         conn.request("GET", _WHERE["base"] + page, headers={"Cookie": cookie})
@@ -450,12 +488,38 @@ def check(action, fields):
             fields[k] = str(fields[k]).strip()
         elif k == "id" and a["fields"][k].startswith("Campaign id"):
             fields[k] = _campaign_by_name(str(fields[k]))       # the model gave a name: find the number
+        elif k == "selection":
+            fields[k] = _id_by_name("selections", "name", str(fields[k]), "selection")
         else:
             raise ValueError("%s: %s must be the number from the portal, not %r." % (action, k, fields[k]))
+    if action == "campaign.assign" and not str(fields["client"]).strip().isdigit():
+        fields["client"] = _id_by_name("codes", "label", str(fields["client"]), "client code")
+    for k in ("targets", "brief"):
+        if k in fields and a["json"] and not isinstance(fields[k], dict):
+            try:
+                fields[k] = json.loads(str(fields[k]))
+            except ValueError:
+                raise ValueError("%s: %s must be a JSON object." % (action, k))
+            if not isinstance(fields[k], dict):
+                raise ValueError("%s: %s must be a JSON object." % (action, k))
     return a, fields
 
 
 _ID_FIELDS = ("id", "content", "insight", "post", "code_id", "selection")
+
+
+def _id_by_name(table, col, name, what):
+    """The id of the one row whose name is exactly this (case and spacing aside). Only the id goes back to the model,
+    never another row's text, so resolving a client-written name does not open the taint door."""
+    import db
+    want = " ".join(name.lower().split())
+    with db.connect() as conn:
+        gone = {"selections": "deleted_at IS NULL", "codes": "revoked_at IS NULL"}.get(table, "1")
+        rows = [r["id"] for r in conn.execute("SELECT id, %s AS n FROM %s WHERE %s" % (col, table, gone)).fetchall()
+                if " ".join((r["n"] or "").lower().split()) == want]
+    if len(rows) == 1:
+        return str(rows[0])
+    raise ValueError("%s %r: %s. Use its number." % (what, name, "no exact match" if not rows else "%d match" % len(rows)))
 
 
 def _campaign_by_name(name):
@@ -536,6 +600,8 @@ def run(action, fields, cookie):
     a, fields = check(action, fields)
     if not cookie:
         return {"ok": False, "error": "No admin session to act with. Open the admin once and sign in (two-step code if asked), then ask again."}
+    if a["json"]:
+        return _run_json(a, action, dict(a["defaults"], **fields), cookie)
     pairs = []
     for k, v in dict(a["defaults"], **fields).items():
         if isinstance(v, (list, tuple)):
@@ -556,6 +622,35 @@ def run(action, fields, cookie):
     finally:
         conn.close()
     return _read_back(res.status, where, text, action, a["lands"])
+
+
+def _run_json(a, action, fields, cookie):
+    """A JSON route (the board card's Save): the portal answers {ok, message} itself."""
+    body = dict(fields)
+    if str(body.get("id") or "").isdigit():
+        body["id"] = int(body["id"])
+    if body.get("brief") is not None:
+        body["brief"] = {"answers": body["brief"]}
+    raw = json.dumps(body)
+    conn = http.client.HTTPConnection(_WHERE["host"], _WHERE["port"], timeout=TIMEOUT)
+    try:
+        conn.request("POST", _WHERE["base"] + a["path"], raw,
+                     {"Content-Type": "application/json", "Content-Length": str(len(raw)), "Cookie": cookie})
+        res = conn.getresponse()
+        text = res.read(8000).decode("utf-8", "replace")
+    except OSError as exc:
+        return {"ok": False, "error": "The portal did not answer: %s" % exc}
+    finally:
+        conn.close()
+    try:
+        got = json.loads(text)
+    except ValueError:
+        got = {}
+    if res.status == 200 and got.get("ok") is True:
+        return {"ok": True, "message": got.get("message") or "Saved.", "action": action, "id": str(fields.get("id") or "")}
+    if res.status == 401:
+        return {"ok": False, "error": "Not signed in: sign in again and ask once more."}
+    return {"ok": False, "error": got.get("message") or "The portal answered %d." % res.status}
 
 
 def _read_back(status, where, text, action, lands=()):
@@ -582,13 +677,129 @@ def _read_back(status, where, text, action, lands=()):
         return {"ok": False, "error": wrong}
     if status >= 400:
         return {"ok": False, "error": "The portal answered %d: %s" % (status, text[:200])}
+    new_id = (q.get("id") or [""])[0]
     if said:
-        return {"ok": True, "message": said, "action": action}
+        return _with_id({"ok": True, "message": said, "action": action}, new_id)
     if q.get("new") and path.endswith("/codes"):
         # A new access code is shown once, in the redirect: hand it to the admin.
         return {"ok": True, "message": "Issued. The new passcode is %s. Share it with the client." % q["new"][0], "action": action}
     if lands and any(path.endswith(p) or p in path for p in lands):
-        return {"ok": True, "message": "Done.", "action": action}
+        return _with_id({"ok": True, "message": "Done.", "action": action}, new_id)
     return {"ok": False, "error": "The portal did not confirm it - it answered with %s and no message. "
                                   "Nothing was reported as changed; check the page before trying again."
                                   % (path or "no page")}
+
+
+def _with_id(res, new_id):
+    """The id the portal landed on (campaign.create lands on /campaigns/edit?id=N), so a later step can use it."""
+    if new_id.isdigit():
+        res["id"] = new_id
+    return res
+
+
+# ------------------------------------------------------------------ plans --
+#
+# A task of several writes (set up a campaign: create it, give it to the client, set the brief and dates, add
+# posts) is one plan: the admin reads every step and presses Confirm once, then the steps run in order through
+# run(), each with the portal's own answer. The first step the portal does not confirm stops the plan; the
+# steps after it are reported as not run. A field may use the id an earlier step came back with: {{1.id}}.
+
+MAX_PLAN = 15
+_REF = re.compile(r"\{\{\s*(\d+)\.id\s*\}\}")
+
+
+def _refs(v):
+    return [int(n) for n in _REF.findall(v)] if isinstance(v, str) else []
+
+
+def plan_check(steps):
+    """[(action, fields, line)] or ValueError. Every step is checked before anything is queued."""
+    if isinstance(steps, str):
+        text = steps.strip()
+        if text.startswith("```"):
+            text = text.strip("`").split("\n", 1)[-1]
+        try:
+            steps = json.loads(text)
+        except ValueError:
+            raise ValueError('steps must be a JSON list such as [{"action": "campaign.create", "fields": {"name": "X"}}].')
+    if not isinstance(steps, list) or not steps:
+        raise ValueError("A plan needs at least one step.")
+    if len(steps) > MAX_PLAN:
+        raise ValueError("A plan holds at most %d steps; split it in two." % MAX_PLAN)
+    out = []
+    for i, st in enumerate(steps, 1):
+        if not isinstance(st, dict) or not st.get("action"):
+            raise ValueError("Step %d needs an action." % i)
+        action = str(st["action"]).strip()
+        if action == "form.submit":
+            raise ValueError("Step %d: form.submit is one at a time, outside a plan." % i)
+        fields = st.get("fields") or {}
+        if isinstance(fields, str):
+            try:
+                fields = json.loads(fields)
+            except ValueError:
+                raise ValueError("Step %d: fields must be a JSON object." % i)
+        if not isinstance(fields, dict):
+            raise ValueError("Step %d: fields must be a JSON object." % i)
+        probe = {}
+        for k, v in fields.items():
+            refs = _refs(v)
+            if any(n >= i for n in refs):
+                raise ValueError("Step %d: {{n.id}} can only point to an earlier step." % i)
+            probe[k] = "999999" if refs else v        # checked with a stand-in id; the real one is filled in when it runs
+        try:
+            line = describe(action, probe) if not any(_refs(v) for v in fields.values()) else _line(action, fields)
+        except ValueError as exc:
+            raise ValueError("Step %d: %s" % (i, exc))
+        if any(_refs(v) for v in fields.values()):
+            check(action, probe)
+        out.append((action, fields, line))
+    return out
+
+
+def _line(action, fields):
+    a = REGISTRY[action]
+    shown = {k: (("the one from step %d" % _refs(fields[k])[0]) if _refs(fields.get(k, "")) else fields.get(k, "")) for k in a["fields"]}
+    try:
+        return a["line"].format(**shown)
+    except (KeyError, IndexError):
+        return a["about"]
+
+
+def plan_describe(title, steps):
+    lines = plan_check(steps)
+    return (title or "Plan") + ": " + " · ".join("%d. %s" % (i, l) for i, (_a_, _f, l) in enumerate(lines, 1))
+
+
+def run_plan(steps, cookie, on_step=None):
+    """Run every step in order; stop at the first one the portal does not confirm. Returns the per-step results."""
+    lines = plan_check(steps)
+    got, out, stopped = {}, [], False
+    for i, (action, fields, line) in enumerate(lines, 1):
+        if stopped:
+            out.append({"n": i, "text": line, "state": "skipped", "message": "Not run: an earlier step did not go through."})
+            continue
+        if on_step:
+            on_step(i, "running", "")
+        real, res = {}, None
+        for k, v in fields.items():
+            if isinstance(v, str):
+                for n in _refs(v):
+                    if not got.get(n):
+                        res = {"ok": False, "error": "It needs the id from step %d, which the portal did not give back." % n}
+                v = _REF.sub(lambda m: got.get(int(m.group(1))) or "", v)
+            real[k] = v
+        if res is None:
+            try:
+                res = run(action, real, cookie)
+            except ValueError as exc:
+                res = {"ok": False, "error": str(exc)}
+        if res.get("ok"):
+            got[i] = res.get("id") or ""
+            out.append({"n": i, "text": line, "state": "done", "message": res.get("message") or "Done.", "id": got[i] or None})
+        else:
+            stopped = True
+            out.append({"n": i, "text": line, "state": "failed", "message": res.get("error") or "Not done."})
+        if on_step:
+            on_step(i, out[-1]["state"], out[-1]["message"])
+    return out
