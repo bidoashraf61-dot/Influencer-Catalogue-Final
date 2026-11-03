@@ -60,6 +60,7 @@
 .cat-cover .rs-btn--line:hover, .cat-cover .rs-btn--line[aria-expanded="true"], .cat-selhead .rs-btn--line:hover, .cat-selhead .rs-btn--line[aria-expanded="true"] {
   background: transparent; color: var(--rs-lime); border-color: var(--rs-lime); }
 .cat-selhead .rs-slot { margin: 16px 0 0; }
+.cx-selact .rs-share i { margin-left: -2px; }
 /* Creator analysis: the bar carries Download PDF. */
 .hv-shared #pp-print { display: none !important; }
 .hv-shared--ended body > *:not(.rs-ended) { display: none !important; }
@@ -69,7 +70,11 @@
 .rs-ended p { font: 400 17px/1.6 var(--rs-body); color: var(--rs-graphite); max-width: 46ch; margin: 0; }
 
 /* ------------------------------------------------- HelloVoice: Share with client */
-.rs-pop { position: fixed; z-index: 1000; width: min(440px, calc(100vw - 24px)); max-height: calc(100vh - 96px); overflow: auto;
+.rs-scrim { position: fixed; inset: 0; z-index: 999; background: rgba(18,18,18,.55); }
+.rs-scrim[hidden] { display: none; }
+html.rs-modal-open { overflow: hidden; }
+.rs-pop { position: fixed; z-index: 1000; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(480px, calc(100vw - 32px)); max-height: calc(100vh - 48px); max-height: calc(100dvh - 48px); overflow: auto; overscroll-behavior: contain;
   background: var(--rs-white); color: var(--rs-ink); border-radius: 20px; border: 1px solid var(--rs-rule);
   box-shadow: 0 24px 60px rgba(18,18,18,.22), 0 2px 8px rgba(18,18,18,.08); padding: 20px 22px 22px; font: 400 15px/1.5 var(--rs-body); text-align: left; }
 .rs-pop[hidden] { display: none; }
@@ -125,7 +130,7 @@
 /* --------------------------------------------------------------------- print */
 .rs-printhead { display: none; }
 @media print {
-  .rs-bar, .rs-pop, .rs-share { display: none !important; }
+  .rs-bar, .rs-pop, .rs-scrim, .rs-share { display: none !important; }
   .rs-printhead { display: flex !important; align-items: center; gap: 16px; padding: 0 0 12px; margin: 0 0 16px; border-bottom: 2px solid var(--rs-ink);
     -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .rs-printhead img { height: 54px; width: auto; }
@@ -198,6 +203,6 @@
   .rs-bar__meta b { font-size: 20px; flex-basis: 100%; }
   .rs-bar__meta span + span::before { margin-right: 8px; }
   .rs-bar .rs-btn { margin-left: auto; min-height: 40px; padding: 0 16px; font-size: 17px; }
-  .rs-pop { left: 12px !important; right: 12px !important; width: auto; top: auto !important; bottom: 12px; max-height: 80vh; }
+  .rs-pop { left: 12px; right: 12px; width: auto; top: auto; bottom: 12px; transform: none; max-height: 85vh; max-height: 85dvh; }
 }
 @media (prefers-reduced-motion: reduce) { .rs-btn, .rs-chip, .rs-seg__o span { transition: none; } }

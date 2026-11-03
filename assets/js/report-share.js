@@ -154,9 +154,11 @@
       bar.innerHTML = '<div class="rs-bar__in">'
         + '<img class="rs-bar__mark" src="' + ROOT + "assets/brand/modules/" + here[2] + '" alt="' + esc(here[3]) + '">'
         + '<div class="rs-bar__meta"><b id="rs-for">Shared report</b><span id="rs-asof">' + esc(HV.asOf()) + '</span><span id="rs-until"></span></div>'
-        + '<button type="button" class="rs-btn rs-btn--lime" id="rs-pdf">' + I_DOWN + "<span>Download PDF</span></button></div>";
+        // A shared selection is for deciding, not downloading (Bido 2026-11-03): no PDF in its bar.
+        + (here[0] === "selection" ? "" : '<button type="button" class="rs-btn rs-btn--lime" id="rs-pdf">' + I_DOWN + "<span>Download PDF</span></button>") + "</div>";
       document.body.insertBefore(bar, document.body.firstChild);
-      document.getElementById("rs-pdf").addEventListener("click", function () { HV.download(this); });
+      var pdf = document.getElementById("rs-pdf");
+      if (pdf) pdf.addEventListener("click", function () { HV.download(this); });
       asked.then(function (res) {
         meta = res.b || {};
         if (res.st !== 200 || !meta.ok) return ended(meta.reason);
@@ -180,8 +182,9 @@
 
   /* ---------------------------------------------------- HelloVoice: Share with client -- */
   if (!ref || !window.fetch) return;
-  // The selection and the competitor study had no PDF of their own: theirs sits in the same slot.
-  if (here[0] === "selection" || here[0] === "study") ready(function () {
+  // The competitor study has no PDF of their own: its Download PDF sits in the same slot. The selection has
+  // none: it is shared, not downloaded (Bido 2026-11-03).
+  if (here[0] === "study") ready(function () {
     var put = function () {
       var s = slot();
       if (!s || s.querySelector(".rs-pdf")) return !!s;
@@ -193,7 +196,10 @@
     };
     if (!put()) { var mo2 = new MutationObserver(function () { if (put()) mo2.disconnect(); }); mo2.observe(document.body, { childList: true, subtree: true }); }
   });
-  var STATE = null, pop = null, btn = null;
+  var STATE = null, pop = null, scrim = null, btn = null, late = false;
+  // The selection's action row (AI, Merge, ROI) is drawn by connect.js a moment after load; if it never comes,
+  // the button falls back to the slot under the header.
+  setTimeout(function () { late = true; if (STATE && !btn) mount(); }, 6000);
 
   function api(method, body) {
     var url = API + "/api/report/shares" + (method === "GET" ? "?kind=" + encodeURIComponent(here[0]) + "&ref=" + encodeURIComponent(ref) : "");
@@ -207,7 +213,7 @@
   function slot() {
     if (here[0] === "campaign") return document.querySelector(".db-head__actions");
     if (here[0] === "creator") { var p = document.getElementById("pp-print"); return p ? p.parentNode : null; }
-    if (here[0] === "selection") return document.getElementById("rs-slot-selection");
+    if (here[0] === "selection") return document.getElementById("cx-selact") || (late ? document.getElementById("rs-slot-selection") : null);
     var hd = document.querySelector("#ev-market .ev-mi__hd");
     if (!hd) return null;
     var sl = document.getElementById("rs-slot-study");
@@ -260,8 +266,13 @@
     if (!pop) {
       pop = el("div", "rs-pop");
       pop.setAttribute("role", "dialog");
+      pop.setAttribute("aria-modal", "true");
       pop.setAttribute("aria-labelledby", "rs-pop-t");
       pop.hidden = true;
+      // A centred dialog over a scrim: it never hangs off the button or runs past the window's edge.
+      scrim = el("div", "rs-scrim");
+      scrim.hidden = true;
+      document.body.appendChild(scrim);
       document.body.appendChild(pop);
       pop.addEventListener("click", onPop);
       pop.addEventListener("submit", onMake);
@@ -273,14 +284,13 @@
       document.addEventListener("click", function (e) { if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) close(); });
     }
     draw();
-    var r = btn.getBoundingClientRect();
-    pop.style.top = Math.min(window.innerHeight - 40, r.bottom + 8) + "px";
-    pop.style.right = Math.max(12, window.innerWidth - r.right) + "px";
+    scrim.hidden = false;
     pop.hidden = false;
+    document.documentElement.classList.add("rs-modal-open");
     btn.setAttribute("aria-expanded", "true");
     var f = pop.querySelector("input[name=label]"); if (f) f.focus();
   }
-  function close() { pop.hidden = true; btn.setAttribute("aria-expanded", "false"); btn.focus(); }
+  function close() { pop.hidden = true; scrim.hidden = true; document.documentElement.classList.remove("rs-modal-open"); btn.setAttribute("aria-expanded", "false"); btn.focus(); }
 
   function copy(text, b) {
     var done = function () { var t = b.textContent; b.textContent = "Copied"; b.classList.add("is-done"); setTimeout(function () { b.textContent = t; b.classList.remove("is-done"); }, 1600); };
@@ -337,12 +347,16 @@
   function mount() {
     var s = slot();
     if (!s || btn) return !!btn;
-    btn = el("button", "rs-btn rs-btn--line rs-share", I_LINK + "<span>Share with client</span><i data-n>" + count() + "</i>");
+    // On the selection it is one of the header's actions, styled like Merge beside it.
+    var inRow = s.id === "cx-selact";
+    btn = el("button", (inRow ? "cx-btn cx-btn--line" : "rs-btn rs-btn--line") + " rs-share",
+             (inRow ? I_LINK.replace(/16/g, "20") : I_LINK) + "<span>Share with client</span><i data-n>" + count() + "</i>");
     btn.type = "button";
     btn.setAttribute("aria-haspopup", "dialog");
     btn.setAttribute("aria-expanded", "false");
     btn.addEventListener("click", function () { if (pop && !pop.hidden) close(); else open(); });
-    s.appendChild(btn);
+    var roi = inRow ? s.querySelector(".cx-btn--roi") : null;
+    if (roi) s.insertBefore(btn, roi); else s.appendChild(btn);
     return true;
   }
 
