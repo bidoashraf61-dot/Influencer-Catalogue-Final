@@ -1294,3 +1294,10 @@ body:has(#mx-report:not([hidden])) .mx-top .mx-link:hover { color: var(--lime); 
 .mx-post__ic { min-width: 44px; }
 .mx-post__icb { width: 40px; height: 40px; }
 .mx-post__icb svg { width: 18px; height: 18px; }
+/* "What they talk about" wins over the 12px floor rule (item 304), which was meant for small labels. */
+@media screen {
+  #mx-say .mx-topic { font-size: 17px !important; }
+  #mx-say .mx-topic .mx-bar__k > span { font-size: 17px !important; }
+  #mx-say .mx-topic .mx-bar__k small { font-size: 15px !important; }
+}
+@media screen and (max-width: 700px) { #mx-say .mx-topic, #mx-say .mx-topic .mx-bar__k > span { font-size: 16px !important; } #mx-say .mx-topic .mx-bar__k small { font-size: 14px !important; } }
