@@ -563,7 +563,7 @@
     else {
       ft.appendChild(askButton(c, c.locked ? "unavailable" : "book", c.locked ? "Ask HelloVoice to check again" : "Ask HelloVoice for " + first,
                                "Sent. Your HelloVoice contact will reply within one working day.", false));
-      ft.appendChild(el("small", null, c.locked ? "Marked unavailable; we will check again." : "Goes to your account manager. Nothing changes in your selection."));
+      if (c.locked) ft.appendChild(el("small", null, "Marked unavailable; we will check again."));   // no note beside Ask (Bido 2026-11-03)
     }
     dos.appendChild(ft);
     scrim.hidden = false; dos.hidden = false;
