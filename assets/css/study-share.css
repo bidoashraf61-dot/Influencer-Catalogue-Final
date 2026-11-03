@@ -370,3 +370,5 @@ html.ss-on #ev-market { display: none; }
 .ss-dstats dd { margin: 3px 0 0; font: 400 20px/1 Bebasneue, "Bebas Neue", Arial, sans-serif; letter-spacing: .02em; color: #121212; }
 .ss-dstats__er { background: #e8ff76; }
 .ss-dpost__meta { margin: 0; font: 500 12px/1.35 "DM Sans", Arial, sans-serif; color: #5a5a5a; }
+/* When the note is the footer's only line (a creator not chosen), it spans the footer on one or two lines. */
+.ss-dos__ft small:only-child { max-width: none; flex: 1; font-size: 14px; display: block; }
