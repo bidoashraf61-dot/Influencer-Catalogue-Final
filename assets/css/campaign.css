@@ -1110,7 +1110,7 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
    then the title block on white in black type. No beige; the art is cropped tight so nothing sits empty. */
 .mx-bug { background: var(--white); padding-top: 0; }
 .mx-cover { margin: 0 0 26px; background: #0b0b0b; line-height: 0; }
-.mx-cover img { display: block; width: 100%; height: auto; max-height: 560px; object-fit: cover; object-position: 50% 62%; }
+.mx-cover img { display: block; width: 100%; height: auto; max-height: 600px; object-fit: contain; margin: 0 auto; }   /* the whole scene, centred on black */
 @media (min-width: 1000px) {
   .mx-bug__title { font-size: clamp(3.5rem, 1rem + 6vw, 8rem) !important; }
 }
@@ -1157,4 +1157,9 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
   .mx-mv--face, .mx-mv--face img { width: 22px !important; height: 22px !important; }
   .mx-mv--thumbs img, .mx-mv--thumbs i { width: 16px !important; height: 22px !important; }
   .mx-tcd__fig { font-size: 28px !important; }
+}
+/* Item 303: the matte cover has no reflection to trim, so it prints whole, a little narrower, centred on the black band. */
+@media print {
+  .mx-cover { background: #0b0b0b !important; text-align: center; }
+  .mx-cover img { width: 66% !important; max-height: none !important; margin: 0 auto; object-fit: contain !important; }
 }
