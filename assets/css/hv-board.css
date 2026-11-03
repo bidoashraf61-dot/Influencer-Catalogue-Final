@@ -755,10 +755,11 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
   .mb-cover__main { padding-right: 0; }
   .mb-cover__main { display: contents; }
   .mb-cover__title, .mb-cover__lede, .mb-cover__stats, .mb-pipe { grid-area: auto; }
-  .mb-cover__title { grid-column: 1; grid-row: 1; align-self: center; margin: 0; font-size: clamp(2.6rem, 2rem + 4vw, 3.4rem); }
-  .mb-cover__char { position: static; grid-column: 2; grid-row: 1; width: 96px; height: auto; max-width: none; margin: 0; align-self: end; }
-  .mb-cover__lede, .mb-cover__stats, .mb-pipe { grid-column: 1 / -1; }
-  .mb-cover__lede { margin: 12px 0 14px; font-size: 15px; }
+  .mb-cover__title { grid-column: 1; grid-row: 1; align-self: end; margin: 0; font-size: clamp(2.6rem, 2rem + 4vw, 3.4rem); }
+  .mb-cover__char { position: static; grid-column: 2; grid-row: 1 / span 2; width: 96px; height: auto; max-width: none; margin: 0; align-self: end; }
+  .mb-cover__stats, .mb-pipe { grid-column: 1 / -1; }
+  /* the intro runs beside the character, so a one-line title leaves no hole under it */
+  .mb-cover__lede { grid-column: 1; grid-row: 2; margin: 8px 0 14px; font-size: 14px; line-height: 1.5; }
   .mb-cover__stats { gap: 8px 22px; margin-bottom: 16px; }
   .mb-pipe { overflow-x: auto; grid-auto-columns: minmax(78px, 1fr); padding-bottom: 18px; margin-bottom: 0; }
   .mb-pipe__st { grid-template-rows: auto 40px auto; }
