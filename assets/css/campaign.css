@@ -1382,3 +1382,4 @@ body[data-only] #mx-report .mx-sec:not(.is-only) { display: none !important; }
 @media print { .mx-note { -webkit-print-color-adjust: exact; print-color-adjust: exact; break-inside: avoid; padding: 4mm 5mm; } .mx-upd__face { width: 18mm; } .mx-upd__txt { font-size: 12px; } .mx-upd__tag i { animation: none; } }
 /* Eight buttons: on wide screens they wrap rather than scroll, so Whole report is never cut off. */
 @media (min-width: 900px) { .mx-tabs__in { flex-wrap: wrap !important; overflow: visible !important; gap: 8px !important; } .mx-tab { padding-left: 16px !important; padding-right: 16px !important; } }
+@media (min-width: 900px) { .mx-tab { font-size: 18px !important; padding-left: 14px !important; padding-right: 14px !important; min-height: 42px !important; } .mx-tab .mx-ico { width: 16px; height: 16px; } }
