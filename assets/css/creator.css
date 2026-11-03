@@ -490,3 +490,19 @@ body.pp-modal-on { overflow: hidden; }
 /* Release r20 (2026-10-20): "Ask your account manager about this creator" is longer than the old
    label; on a phone it wraps to two balanced lines inside the pill instead of being cut off. */
 #pp-ask-full { white-space: normal; text-align: center; text-wrap: balance; line-height: 1.05; padding-top: 10px; padding-bottom: 10px; }
+
+/* The PDF is the report printed (Bido 2026-11-03): the desktop layout on a large sheet in A4 proportions (the page size is
+   set by creator.js while printing), every tab open, nothing cut through, no controls. */
+@media print {
+  html.pp-printing, html.pp-printing body { background: #fff !important; }
+  html.pp-printing .rs-bar, html.pp-printing .pp-actions, html.pp-printing .pp-tabs, html.pp-printing .pp-post__play,
+  html.pp-printing .cx-dock, html.pp-printing .hv-voice, html.pp-printing .hca-nav, html.pp-printing .pp-request-sec,
+  html.pp-printing .cat-footer, html.pp-printing .mx-top { display: none !important; }
+  html.pp-printing .pp .cat-container { max-width: none !important; width: auto !important; }
+  html.pp-printing .pp-page, html.pp-printing .pp-card, html.pp-printing .pp-tiles > div, html.pp-printing .pp-er, html.pp-printing .pp-post,
+  html.pp-printing .pp-brand, html.pp-printing .pp-stamp, html.pp-printing .pp-id, html.pp-printing .pp-trust-key, html.pp-printing section > div,
+  html.pp-printing figure, html.pp-printing table, html.pp-printing tr { break-inside: avoid; page-break-inside: avoid; }
+  html.pp-printing h2, html.pp-printing h3, html.pp-printing .pp-head, html.pp-printing .pp-pane::before { break-after: avoid; page-break-after: avoid; }
+  html.pp-printing .pp-tip, html.pp-printing .pp-trust:hover::after { display: none !important; }
+  html.pp-printing * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

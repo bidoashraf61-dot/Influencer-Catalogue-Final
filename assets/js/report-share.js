@@ -121,8 +121,8 @@
     var wait = function () {
       var drawn = here[0] === "selection" ? document.querySelectorAll(".cat-card").length
         : here[0] === "study" ? (HV.shared && typeof HV.studyReady === "function" ? HV.studyReady() : document.querySelectorAll("#ev-market .ev-mi__bd *").length > 20)
-        : document.getElementById("pp-print");
-      if ((drawn && Date.now() - last > 1500) || ++tries > 80) { mo.disconnect(); HV.download(document.getElementById("pp-print")); }
+        : document.getElementById("pp-id");
+      if ((drawn && Date.now() - last > 1500) || ++tries > 80) { mo.disconnect(); HV.download(document.getElementById("rs-pdf")); }
       else setTimeout(wait, 400);
     };
     wait();
@@ -202,18 +202,7 @@
   if (!ref || !window.fetch) return;
   // The competitor study has no PDF of their own: its Download PDF sits in the same slot. The selection has
   // none: it is shared, not downloaded (Bido 2026-11-03).
-  if (here[0] === "study") ready(function () {
-    var put = function () {
-      var s = slot();
-      if (!s || s.querySelector(".rs-pdf")) return !!s;
-      var b = el("button", "rs-btn rs-btn--lime rs-pdf", I_DOWN + "<span>Download PDF</span>");
-      b.type = "button";
-      b.addEventListener("click", function () { HV.download(b); });
-      s.insertBefore(b, s.firstChild);
-      return true;
-    };
-    if (!put()) { var mo2 = new MutationObserver(function () { if (put()) mo2.disconnect(); }); mo2.observe(document.body, { childList: true, subtree: true }); }
-  });
+  // No Download PDF on HelloVoice's own pages (Bido 2026-11-03): the PDF is on the client report link only.
   var STATE = null, pop = null, scrim = null, btn = null, late = false;
   // The selection's action row (AI, Merge, ROI) is drawn by connect.js a moment after load; if it never comes,
   // the button falls back to the slot under the header.
@@ -230,7 +219,7 @@
   // Where the button goes on each page: beside the page's own Download PDF.
   function slot() {
     if (here[0] === "campaign") return document.querySelector(".db-head__actions") || document.querySelector(".mx-top__links");
-    if (here[0] === "creator") { var p = document.getElementById("pp-print"); return p ? p.parentNode : null; }
+    if (here[0] === "creator") return document.getElementById("pp-actions");
     if (here[0] === "selection") return document.getElementById("cx-selact") || (late ? document.getElementById("rs-slot-selection") : null);
     var hd = document.querySelector("#ev-market .ev-mi__hd");
     if (!hd) return null;

@@ -583,119 +583,36 @@
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
 
-  /* ---------- PDF: its own A4 pages, links stay live in the saved file ---------- */
-  function buildPdf() {
-    var pr = document.querySelector(".ss-print");
-    if (!pr) { pr = el("div", "ss-print"); pr.setAttribute("aria-hidden", "true"); document.body.appendChild(pr); }
-    pr.textContent = "";
-    var keep = { comp: state.comp, plat: state.plat, kind: state.kind, ctype: state.ctype };
-    state.comp = state.plat = state.kind = state.ctype = "all";
-    var all = tiered((D.creators || []).map(view).filter(Boolean)).sort(function (a, b) { return a.tier - b.tier || b.typical - a.typical; }), n = 0;
-    var asOf = typeof HV.asOf === "function" ? HV.asOf() : "";
-    function page(cls) { var p = el("section", "ss-page" + (cls ? " " + cls : "")); pr.appendChild(p); return p; }
-    function foot(pg) {
-      var f = el("div", "ss-page__ft"), l = el("span");
-      l.appendChild(document.createTextNode("HELVi Intelligence · Prepared by HelloVoice for")); if (D.brand) l.appendChild(logo(D.brand)); l.appendChild(document.createTextNode(asOf ? "· " + asOf : ""));
-      f.appendChild(l); f.appendChild(el("span", null, "Page " + (++n))); pg.appendChild(f);
-    }
-    var cv = page("ss-pcover"), ct = el("div", "ss-pcover__top"), mk = el("img", "ss-pcover__mark");
-    mk.src = ROOT + "assets/brand/modules/helvi-intelligence-logo-v5.png"; mk.alt = "HELVi Intelligence"; ct.appendChild(mk);
-    if (D.brand) ct.appendChild(logo(D.brand, true));
-    cv.appendChild(ct);
-    var h = el("h1"); h.appendChild(document.createTextNode("Who to book, ")); h.appendChild(el("em", null, "already proven")); h.appendChild(document.createTextNode(" on your competitors")); cv.appendChild(h);
-    cv.appendChild(el("p", null, "Competitor study · " + (D.objective || "Awareness") + ". The creators in your selection who already posted for your competitors, ranked by the "
-      + (BY_ENG ? "likes and comments" : "views") + " those posts got. Tap any view count or post to open it."));
-    var crow = el("div", "ss-pcover__row"), art = el("img", "ss-pcover__char");
-    art.src = ROOT + "assets/brand/modules/helvi-intel-character-960.webp"; art.alt = "";
-    crow.appendChild(comps()); crow.appendChild(art); cv.appendChild(crow);
-    var pf = el("div", "ss-pfacts"), posts = 0, views = 0;
-    all.forEach(function (v) { posts += v.posts.length; v.organic.forEach(function (q) { views += q.views || 0; }); });
-    [[(D.competitors || []).length, "Competitors studied"], [all.length, "Creators in your selection"], [posts, "Competitor posts found"], [num(views), "Views on those posts"]]
-      .forEach(function (x) { var d = el("div"); d.appendChild(el("b", null, String(x[0]))); d.appendChild(el("span", null, x[1])); pf.appendChild(d); });
-    cv.appendChild(pf); foot(cv);
-    // shortlist, 20 rows a page
-    var T = TIERS();
-    var ROWS = 18;
-    for (var i = 0; i < all.length; i += ROWS) {
-      var p2 = page(); p2.appendChild(el("h2", null, i ? "Your shortlist, continued" : "Your shortlist, ranked"));
-      if (!i) p2.appendChild(el("p", "lede", T[1][0] + ": " + T[1][1] + " " + T[2][0] + ": " + T[2][1] + " " + T[3][0] + ": the rest. Boosted posts are left out of the numbers."));
-      p2.appendChild(ptable(all.slice(i, i + ROWS), true, i)); foot(p2);
-    }
-    // competitors + content + timeline
-    var p3 = page(); p3.appendChild(el("h2", null, "Your competitors on creators"));
-    p3.appendChild(el("p", "lede", "Creators used, posts and views per competitor, with the content type that worked best for each brand."));
-    p3.appendChild(scoreTable(compStats()));
-    var kt = kindTiles(); if (kt) { kt.className = "ss-pkinds"; p3.appendChild(kt); }
-    foot(p3);
-    var tl = timeline();
-    if (tl) {
-      var p3b = page(); p3b.appendChild(el("h2", null, "When they post"));
-      p3b.appendChild(el("p", "lede", "Creator posts per month for each competitor. The bigger the dot, the more posts; orange marks each brand\u2019s busiest month."));
-      p3b.appendChild(tl); foot(p3b);
-    }
-    // best posts
-    var tp = topPosts(12);
-    if (tp.length) {
-      var p4 = page(); p4.appendChild(el("h2", null, "Their " + tp.length + " best posts")); p4.appendChild(el("p", "lede", "Tap any post to watch it on the platform."));
-      var pw = el("div", "ss-pwall"); tp.forEach(function (x) { pw.appendChild(thumb(x.q, x.c.name || "@" + x.c.handle)); }); p4.appendChild(pw); foot(p4);
-    }
-    // one page per competitor
-    (D.competitors || []).forEach(function (c) {
-      state.comp = c.name;
-      var list = tiered((D.creators || []).map(view).filter(Boolean)).sort(function (a, b) { return b.typical - a.typical; });
-      if (!list.length) return;
-      var pg = page(), hh = el("h2"); hh.appendChild(logo(c.name, true)); hh.appendChild(document.createTextNode("Creators who posted for them")); hh.style.fontSize = "28px"; pg.appendChild(hh);
-      var cp = el("div", "ss-pcomp");
-      [[c.creators, "Creators"], [c.posts, "Posts"], [num(c.views), "Views"]].forEach(function (x) { var d = el("div"); d.appendChild(el("b", null, String(x[0]))); d.appendChild(el("span", null, x[1])); cp.appendChild(d); });
-      pg.appendChild(cp);
-      var cw = topPosts(4, c.name);
-      if (cw.length) { var tw = el("div", "ss-pwall"); cw.forEach(function (x) { tw.appendChild(thumb(x.q, x.c.name || "@" + x.c.handle)); }); pg.appendChild(tw); }
-      pg.appendChild(ptable(list.slice(0, 10), false, 0));
-      if (list.length > 10) pg.appendChild(el("p", "lede", "+ " + (list.length - 10) + " more creators who posted for them: see the shortlist."));
-      foot(pg);
-    });
-    // roster gaps
-    if ((D.outside || []).length) {
-      var p6 = page(); p6.appendChild(el("h2", null, "Not on our roster yet"));
-      p6.appendChild(el("p", "lede", "Strong creators your competitors use who are not with HelloVoice yet. Ask your HelloVoice contact and we will try to sign them."));
-      var gg = el("div", "ss-pgaps"); gapCards(gg, true, 10); p6.appendChild(gg); foot(p6);
-    }
-    state.comp = keep.comp; state.plat = keep.plat; state.kind = keep.kind; state.ctype = keep.ctype;
-    return pr;
-  }
-  function ptable(list, withTier, start) {
-    var T = TIERS(), t = el("table", "ss-ptable"), hr = el("tr");
-    var cols = ["#", "Creator", withTier ? "Tier" : "On", "Competitors", "Best views", BY_ENG ? "Typical eng." : "Typical", "Engagement", "Posts"];
-    var w = ["7mm", "44mm", withTier ? "22mm" : "16mm", "auto", "18mm", "16mm", "18mm", "11mm"];
-    cols.forEach(function (x, i) { var th = el("th", i > 3 ? "n" : "", x); th.style.width = w[i]; hr.appendChild(th); });
-    t.appendChild(hr);
-    list.forEach(function (v, i) {
-      var tr = el("tr"); tr.appendChild(el("td", null, String(start + i + 1)));
-      var nm = el("td"); nm.appendChild(el("b", null, v.c.name || "@" + v.c.handle)); nm.appendChild(el("div", null, "@" + v.c.handle)); tr.appendChild(nm);
-      var t3 = el("td"); if (withTier) t3.appendChild(el("span", "ss-ptier ss-ptier--" + v.tier, T[v.tier][0])); else t3.appendChild(platIcons(v.c.platforms)); tr.appendChild(t3);
-      var t4 = el("td"), lg = el("span", "ss-logos"); Object.keys(v.comps).slice(0, 3).forEach(function (nn) { lg.appendChild(logo(nn)); }); t4.appendChild(lg); tr.appendChild(t4);
-      var bp = v.organic.filter(function (q) { return typeof q.views === "number"; }).sort(function (a, b) { return b.views - a.views; })[0], bv = el("td", "n");
-      if (bp && safeUrl(bp.url)) { var a = el("a", null, num(v.best)); a.href = bp.url; a.target = "_blank"; a.rel = "noopener noreferrer"; bv.appendChild(a); } else bv.textContent = num(v.best);
-      tr.appendChild(bv); tr.appendChild(el("td", "n", num(v.typical))); tr.appendChild(el("td", "n", pct(v.er))); tr.appendChild(el("td", "n", String(v.posts.length)));
-      t.appendChild(tr);
-    });
-    return t;
-  }
+  /* ---------- PDF: the study itself, printed (Bido 2026-11-03: same structure and data as the report) ----------
+     Printed on a large sheet in A4 proportions so the desktop layout holds; every tier opened out; filters, sorting and
+     buttons left off; every picture loaded first; each page says who, when and page n of N. Links stay live in the file. */
   HV.pdf = function (btn) {
     if (!D) return;
+    var html = document.documentElement, keepOpen = state.open, title = document.title;
+    state.open = { 1: true, 2: true, 3: true }; drawBoard(false);
+    var st = document.getElementById("ss-pagesize") || document.head.appendChild(Object.assign(document.createElement("style"), { id: "ss-pagesize" }));
+    var asof = (typeof HV.asOf === "function" ? HV.asOf() : "").replace(/"/g, ""), brand = String(D.brand || "").replace(/"/g, "");
+    st.textContent = '@page { size: 380mm 537mm; margin: 14mm 14mm 20mm; @bottom-left { content: "Competitor study' + (brand ? " · " + brand : "") + " · " + asof
+      + ' · HELVi Intelligence by HelloVoice"; font: 13px "DM Sans", Arial, sans-serif; color: #383838; } @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 13px "DM Sans", Arial, sans-serif; color: #383838; } }';
+    html.classList.add("rs-printing", "ss-pageprint");
     if (btn) btn.disabled = true;
-    var pr = buildPdf(), html = document.documentElement;
-    // rs-printing lifts catalogue.css's "cannot be printed" block, as for every report's own Download PDF.
-    html.classList.add("ss-printing", "rs-printing");
-    var imgs = Array.prototype.slice.call(pr.querySelectorAll("img"));
+    var imgs = Array.prototype.slice.call(document.querySelectorAll("#ss img"));
     imgs.forEach(function (i) { i.loading = "eager"; });
-    var waitAll = Promise.all(imgs.map(function (i) { return i.complete ? 0 : new Promise(function (ok) { i.addEventListener("load", ok); i.addEventListener("error", ok); }); }));
-    var done = function () { html.classList.remove("ss-printing", "rs-printing"); if (btn) btn.disabled = false; window.removeEventListener("afterprint", done); };
-    window.addEventListener("afterprint", done);
-    Promise.race([waitAll, new Promise(function (ok) { setTimeout(ok, 6000); })]).then(function () {
+    var waits = imgs.filter(function (i) { return !i.complete; }).map(function (i) { return new Promise(function (ok) { i.addEventListener("load", ok); i.addEventListener("error", ok); }); });
+    if (document.fonts && document.fonts.ready) waits.push(document.fonts.ready);
+    var done = false, finish = function () {
+      html.classList.remove("rs-printing", "ss-pageprint"); st.textContent = ""; document.title = title;
+      state.open = keepOpen; drawBoard(false);
+      if (btn) btn.disabled = false; window.removeEventListener("afterprint", finish);
+    };
+    window.addEventListener("afterprint", finish);
+    var go = function () {
+      if (done) return; done = true;
       api("POST", "/api/report/ping", { what: "pdf" });          // the KAM hears once a day that the PDF was saved
-      setTimeout(function () { window.print(); }, 80);
-    });
+      document.title = "Competitor study" + (brand ? " - " + brand : "");
+      window.print();
+    };
+    Promise.all(waits).then(function () { setTimeout(go, 300); }, go); setTimeout(go, 12000);
   };
   HV.studyReady = function () { return !!(D && refs.board && refs.board.querySelector(".ss-card")); };
 })();

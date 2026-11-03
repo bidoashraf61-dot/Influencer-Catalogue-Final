@@ -368,9 +368,9 @@
       + '<div class="pp-handles">' + handles + "</div>"
       + '<dl class="pp-key">' + key.map(function (k) { return "<div><dt>" + k[0] + "</dt><dd>" + esc(k[1]) + (k[2] ? " " + k[2] : "") + "</dd></div>"; }).join("") + "</dl>"
       + bio
-      + (a && !a.basic && !D.sample ? '<div class="pp-actions"><button type="button" class="pp-btn pp-btn--ink" id="pp-print">' + I_DOWN + "Download PDF</button></div>" : "")
+      // The PDF is on the client report link only (Bido 2026-11-03); this row keeps the Share with client button.
+      + (a && !a.basic && !D.sample ? '<div class="pp-actions" id="pp-actions"></div>' : "")
       + "</div>";
-    var pb = $("pp-print"); if (pb) pb.addEventListener("click", function () { downloadPdf(pb); });
   }
   function day(iso) { var d = new Date(String(iso).slice(0, 10) + "T00:00:00Z"); return isNaN(d) ? iso : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }); }
 
@@ -1016,75 +1016,36 @@
   }
 
   /* ------------------------------------------------------------ the PDF */
-  // A real file, not the print dialog: each section is drawn on its own and
-  // laid onto A4 pages, so a page never cuts through the middle of a chart.
-  function script(src) {
-    return new Promise(function (ok, bad) { var s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = bad; document.head.appendChild(s); });
-  }
-  var LIBS = null;
-  function libs() {
-    return LIBS || (LIBS = Promise.all([
-      window.html2canvas ? 0 : script("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"),
-      window.jspdf ? 0 : script("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js")
-    ]));
-  }
   // Client report links (item 291, report-share.js): the shared bar's Download PDF is this PDF.
   function reportHooks() {
     if (!window.HVReport) return;
     window.HVReport.markLoaded();
-    window.HVReport.pdf = function (btn) { var b = btn || $("pp-print"); if (b) downloadPdf(b); };
+    window.HVReport.pdf = function (btn) { printPdf(btn); };
   }
 
-  function downloadPdf(btn) {
-    var label = btn.innerHTML;
-    btn.disabled = true; btn.innerHTML = I_DOWN + "Preparing PDF…";
-    var root = document.documentElement;
-    libs().then(function () {
-      root.classList.add("pp-pdf");
-      return document.fonts ? document.fonts.ready : 0;
-    }).then(function () {
-      var JsPDF = window.jspdf.jsPDF, doc = new JsPDF({ unit: "pt", format: "a4", compress: true });
-      var PW = doc.internal.pageSize.getWidth(), PH = doc.internal.pageSize.getHeight(), M = 28, CW = PW - 2 * M;
-      // The trust key goes right after the creator's identity: on paper there
-      // is no hover, so the key is what explains the bars beside each number.
-      addTrust();
-      var blocks = [$("pp-id"), $("pp-trust-key")].filter(Boolean)
-        .concat([].slice.call(document.querySelectorAll("#pp-pages > .pp-page:not([hidden]), #pp-source")));
-      var y = M, first = true;
-      return blocks.reduce(function (p, el) {
-        return p.then(function () {
-          return window.html2canvas(el, { scale: 2, useCORS: true, backgroundColor: "#ffffff", logging: false });
-        }).then(function (cv) {
-          var h = cv.height * CW / cv.width;
-          if (!first && y + Math.min(h, PH - 2 * M) > PH - M) { doc.addPage(); y = M; }
-          first = false;
-          if (h <= PH - 2 * M) { doc.addImage(cv.toDataURL("image/jpeg", 0.92), "JPEG", M, y, CW, h); y += h + 16; return; }
-          // taller than a page: slice it
-          var sliceH = Math.floor((PH - 2 * M) * cv.width / CW), off = 0;
-          while (off < cv.height) {
-            var part = document.createElement("canvas"); part.width = cv.width; part.height = Math.min(sliceH, cv.height - off);
-            part.getContext("2d").drawImage(cv, 0, off, cv.width, part.height, 0, 0, cv.width, part.height);
-            if (off > 0) { doc.addPage(); y = M; }
-            var ph = part.height * CW / cv.width;
-            doc.addImage(part.toDataURL("image/jpeg", 0.92), "JPEG", M, y, CW, ph); y += ph + 16; off += sliceH;
-          }
-        });
-      }, Promise.resolve()).then(function () {
-        // Every page says when these numbers were read (item 291), and which page it is.
-        var asof = window.HVReport && window.HVReport.asOf ? window.HVReport.asOf() : "", n = doc.getNumberOfPages();
-        for (var i = 1; i <= n; i++) {
-          doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(56, 56, 56);
-          doc.text("HELVi Connect by HelloVoice" + (asof ? " · " + asof : ""), M, PH - 12);
-          doc.text("Page " + i + " of " + n, PW - M, PH - 12, { align: "right" });
-        }
-        var c = D.creator;
-        doc.save((c.name || c.code).replace(/[^\w؀-ۿ -]+/g, "").trim().replace(/\s+/g, "-") + "-" + c.code + "-" + (PLAT || "").toLowerCase() + "-analysis.pdf");
-      });
-    }).catch(function () {
-      alert("The PDF could not be made. Please try again.");
-    }).then(function () {
-      root.classList.remove("pp-pdf"); btn.disabled = false; btn.innerHTML = label;
-    });
+  // The PDF is the report itself, printed (Bido 2026-11-03: same structure and data as the report). The page is
+  // printed on a large sheet in A4 proportions so the desktop layout holds; every picture is loaded first; every page
+  // carries who, when the numbers were read, and page n of N.
+  function printPdf(btn) {
+    var root = document.documentElement, c = D.creator, title = document.title;
+    var st = $("pp-pagesize") || document.head.appendChild(Object.assign(document.createElement("style"), { id: "pp-pagesize" }));
+    var asof = (window.HVReport && window.HVReport.asOf ? window.HVReport.asOf() : "").replace(/"/g, "");
+    var who = ((c.name || c.code) + " · " + (PLAT || "") + " analysis").replace(/"/g, "");
+    st.textContent = '@page { size: 380mm 537mm; margin: 14mm 14mm 20mm; @bottom-left { content: "' + who + " · " + asof + ' · HELVi Intelligence by HelloVoice"; font: 13px "DM Sans", Arial, sans-serif; color: #383838; }'
+      + ' @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 13px "DM Sans", Arial, sans-serif; color: #383838; } }';
+    root.classList.add("rs-printing", "pp-printing");
+    if (btn) btn.disabled = true;
+    var imgs = [].slice.call(document.querySelectorAll(".pp img"));
+    imgs.forEach(function (i) { i.loading = "eager"; });
+    var waits = imgs.filter(function (i) { return !i.complete; }).map(function (i) { return new Promise(function (ok) { i.addEventListener("load", ok); i.addEventListener("error", ok); }); });
+    if (document.fonts && document.fonts.ready) waits.push(document.fonts.ready);
+    var done = false, finish = function () {
+      root.classList.remove("rs-printing", "pp-printing"); st.textContent = ""; document.title = title;
+      if (btn) btn.disabled = false; window.removeEventListener("afterprint", finish);
+    };
+    window.addEventListener("afterprint", finish);
+    var go = function () { if (done) return; done = true; document.title = (c.name || c.code) + " - " + c.code + " - " + (PLAT || "") + " analysis"; window.print(); };
+    Promise.all(waits).then(function () { setTimeout(go, 300); }, go); setTimeout(go, 10000);
   }
 
   load();

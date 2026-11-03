@@ -372,3 +372,17 @@ html.ss-on #ev-market { display: none; }
 .ss-dpost__meta { margin: 0; font: 500 12px/1.35 "DM Sans", Arial, sans-serif; color: #5a5a5a; }
 /* When the note is the footer's only line (a creator not chosen), it spans the footer on one or two lines. */
 .ss-dos__ft small:only-child { max-width: none; flex: 1; font-size: 14px; display: block; }
+
+/* The PDF is the study printed (Bido 2026-11-03): the desktop layout on a large sheet in A4 proportions (size set by
+   study-share.js while printing), every tier open, no filters, sorting or buttons, nothing cut through. */
+@media print {
+  html.ss-pageprint, html.ss-pageprint body { background: #fff !important; }
+  html.ss-pageprint .rs-bar, html.ss-pageprint .ss-tabs-wrap, html.ss-pageprint .ss-tools, html.ss-pageprint .ss-moreall,
+  html.ss-pageprint .ss-dos, html.ss-pageprint .ss-scrim, html.ss-pageprint .cx-dock, html.ss-pageprint .hv-voice, html.ss-pageprint .hca-nav,
+  html.ss-pageprint .cat-footer, html.ss-pageprint .ss-thumb__play { display: none !important; }
+  html.ss-pageprint .ss-hero, html.ss-pageprint .ss-card, html.ss-pageprint .ss-thumb, html.ss-pageprint table, html.ss-pageprint tr,
+  html.ss-pageprint .ss-facts, html.ss-pageprint .ss-tier__hd, html.ss-pageprint section > div:not(.ss-grid) { break-inside: avoid; page-break-inside: avoid; }
+  html.ss-pageprint h2, html.ss-pageprint h3, html.ss-pageprint .ss-tier__hd { break-after: avoid; page-break-after: avoid; }
+  html.ss-pageprint .ss-stamp, html.ss-pageprint .ss-card { animation: none !important; transform: none !important; opacity: 1 !important; }
+  html.ss-pageprint * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
