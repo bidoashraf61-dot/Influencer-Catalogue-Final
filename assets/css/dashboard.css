@@ -540,6 +540,12 @@
 .db-plr i::after { content: ""; display: block; height: 100%; width: var(--w); background: var(--c); border-radius: 999px; }
 .db-plr b { font-family: var(--heading); font-size: 17px; font-weight: 400; text-align: right; }
 .db-plr span:last-child { color: var(--gray); text-align: right; }
+/* Desktop is one fixed-height screen, so the Platforms card can be shorter than its rows: 5+ platforms cut the
+   last one off (Snapchat on Jamjoom, owner 2026-11-03). Tighter rows fit 5 on most screens; any rest scrolls. */
+@media (min-width: 1100px) {
+  .db-plat .db-card__body { overflow-y: auto; scrollbar-width: thin; padding-right: 2px; }
+  .db-plat .db-plr { padding: 2px 0; }
+}
 /* Last update and a live countdown to the next one */
 .db-fresh--live { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; color: var(--gray); }
 .db-fresh__txt { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.35; }
