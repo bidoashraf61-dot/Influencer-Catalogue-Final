@@ -266,11 +266,12 @@
     var shut = !on || (STATE.openId !== x.id && !editing && x.id !== STATE.fresh);
     if (shut) return '<li class="rs-ln rs-ln--shut' + (on ? "" : " is-gone") + '" data-id="' + x.id + '">'
       + (on ? '<button type="button" class="rs-ln__row" data-open="' + x.id + '" aria-expanded="false">' : '<div class="rs-ln__row">')
-      + '<b>' + esc(x.label || "No name") + "</b><small>" + esc(meta.slice(0, 2).join(" · ")) + "</small>"
+      // Name on its own line, details under it (Bido 2026-11-03: names were cut to "ALPHA PLUS …").
+      + '<span class="rs-ln__txt"><b>' + esc(x.label || "No name") + "</b><small>" + esc(meta.slice(0, 2).join(" · ")) + "</small></span>"
       + (on ? '<span class="rs-ln__chev" aria-hidden="true"></span></button>' : "</div>") + "</li>";
     return '<li class="rs-ln' + (x.id === STATE.fresh ? " is-new" : "") + '" data-id="' + x.id + '">'
-      + '<button type="button" class="rs-ln__row" data-open="' + x.id + '" aria-expanded="true"><b>' + esc(x.label || "No name") + "</b><small>"
-      + esc(meta.join(" · ")) + '</small><span class="rs-ln__chev" aria-hidden="true"></span></button>'
+      + '<button type="button" class="rs-ln__row" data-open="' + x.id + '" aria-expanded="true"><span class="rs-ln__txt"><b>' + esc(x.label || "No name") + "</b><small>"
+      + esc(meta.join(" · ")) + '</small></span><span class="rs-ln__chev" aria-hidden="true"></span></button>'
       + (on ? fb(x) : "")
       + (on && !editing ? '<div class="rs-ln__acts">'
           + '<button type="button" class="rs-chip" data-copy="' + esc(x.url) + '">Copy link</button>'
