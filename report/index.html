@@ -36,7 +36,7 @@
   fetch("/admin/api/report?r=" + m[1], { credentials: "include", cache: "no-store" })
     .then(function (r) { return r.json().then(function (b) { return { st: r.status, b: b }; }); })
     .then(function (res) {
-      if (res.st !== 200 || !res.b.ok || !/^\/(campaign\/dashboard|selection|creator|market)\/#/.test(res.b.page || "")) return ended(res.b && res.b.reason);
+      if (res.st !== 200 || !res.b.ok || !/^\/(campaign(\/dashboard)?|selection|creator|market)\/#/.test(res.b.page || "")) return ended(res.b && res.b.reason);
       location.replace(".." + res.b.page);
     })
     .catch(function () { ended(""); });

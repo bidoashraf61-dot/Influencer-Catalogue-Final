@@ -404,6 +404,8 @@
       unlocked();
       var same = R && R.campaign && R._t === t;
       R = b.report; R._t = t;
+      // Client report links (item 294): this page is what a client link opens, and its PDF is this page printed.
+      if (window.HVReport) { window.HVReport.markLoaded(); window.HVReport.pdf = function () { printWhenReady(); }; }
       // No tracking links = no clicks anywhere on the report: no tab, no
       // column, no share of the score (the server already scored without it).
       R._noLinks = !!(R.objective && R.objective.links === false && R.visibility.clicks);
@@ -603,12 +605,92 @@
     renderClicks();
     renderCarousel();
     renderSay();
+    renderStory();
     $("tab-clicks").hidden = !R.visibility.clicks && !R._noLinks;
     markTab("overview");
     $("mx-csv").href = API + "/api/campaign.csv?t=" + encodeURIComponent(t);
     $("mx-dash").href = $("mx-dash-end").href = "dashboard/#t=" + encodeURIComponent(t); $("mx-dash").hidden = false;
     // Arriving from the dashboard's "Download PDF": open the print dialog.
     try { if (sessionStorage.getItem("hv_print")) { sessionStorage.removeItem("hv_print"); printWhenReady(); } } catch (e) {}
+  }
+
+  /* ---------------------------------------------- the magazine: story lines and contents (item 294) */
+  // Each chapter opens with one sentence written from the live numbers, the same on screen and in the PDF.
+  // Rule-based, no AI: it can only say what the numbers say.
+  var CHAPTERS = [["overview", "Overview"], ["leaderboard", "Leaderboard"], ["content", "Content"], ["performance", "Performance"],
+                  ["say", "What people say"], ["clicks", "Affiliate clicks"], ["timeline", "Timeline"]];
+  function stories() {
+    var t = R.total || {}, c = R.campaign || {}, out = {}, g = {};
+    (R.progress && R.progress.items || []).forEach(function (i) { g[i.key] = i; });
+    var v = R.verdict || {}, obj = R.objective && R.objective.label;
+    var parts = [];
+    if (!unscored() && v.label) parts.push(v.label + (R.progress && R.progress.score != null ? "" : ""));
+    if (g.views) parts.push("views at " + Math.round(g.views.pct) + "% of the goal");
+    if (g.engagement) parts.push("engagement at " + Math.round(g.engagement.pct) + "%");
+    var posts = full(t.delivered) + (t.planned ? " of " + t.planned : "") + " posts live";
+    out.overview = parts.length ? (parts[0].charAt(0).toUpperCase() + parts.join(", ").slice(1)) + "; " + posts + (obj ? ", for " + obj + "." : ".")
+      : num(t.views) + " views and " + num(t.engagement) + " engagements from " + posts + ".";
+    var ranked = (R.creators || []).filter(function (x) { return x.rank; }).slice().sort(function (a, b) { return a.rank - b.rank; });
+    if (ranked.length) {
+      var a = ranked[0], b = ranked[1], n0 = splitName(a.name).en;
+      out.leaderboard = n0 + " led with " + num(a.views || 0) + " views"
+        + (b && b.views ? ", " + (a.views / b.views >= 1.95 ? Math.round(a.views / b.views * 10) / 10 + "× the next creator" : "ahead of " + splitName(b.name).en) : "") + ".";
+    }
+    var list = (R.posts || []).filter(function (p) { return p.section === "campaign"; }), plats = {};
+    list.forEach(function (p) { plats[p.platform] = (plats[p.platform] || 0) + (p.views || 0); });
+    var pieces = mergePieces(list).sort(function (x, y) { return (y.views || 0) - (x.views || 0); }), np = Object.keys(plats).length;
+    if (list.length) out.content = list.length + " posts across " + np + " platform" + (np === 1 ? "" : "s")
+      + (pieces[0] && pieces[0].views ? "; the strongest video reached " + num(pieces[0].views) + " views" : "") + ".";
+    var tot = 0; Object.keys(plats).forEach(function (k) { tot += plats[k]; });
+    var top = Object.keys(plats).sort(function (x, y) { return plats[y] - plats[x]; })[0];
+    out.performance = num(t.views) + " views and " + num(t.engagement) + " engagements so far"
+      + (top && tot ? "; " + top + " carried " + Math.round(plats[top] / tot * 100) + "% of the views." : ".");
+    var st = sayTotals();
+    if (st && st.n) {
+      var th = Object.keys(st.themes).sort(function (x, y) { return st.themes[y] - st.themes[x]; })[0];
+      out.say = "Helvi read " + full(st.n) + " comments: " + sayPct(st.pos, st.n) + " positive, " + sayPct(st.intent, st.n) + " ask how to buy"
+        + (th ? ", and most of the talk is about " + th.toLowerCase() : "") + ".";
+    }
+    var cl = R.clicks;
+    if (R.visibility.clicks && cl && cl.links && cl.has_destination) out.clicks = full(cl.clicks) + " clicks from " + full(cl.uniques) + " people" + (t.ctr != null ? ", " + pct(t.ctr) + " click-through." : ".");
+    var steps = c.steps || [], done = steps.filter(function (x) { return x.state === "done"; }).length;
+    if (steps.length) out.timeline = done + " of " + steps.length + " steps done" + (c.ends_at ? "; the campaign " + (Date.now() / 1000 > c.ends_at ? "ended " : "ends ") + day(c.ends_at, true) + "." : ".");
+    return out;
+  }
+  // The contents line of a chapter with nothing to report; the chapter itself already says it.
+  var TOC_EMPTY = { clicks: "No tracking links in this campaign.", say: "The comments have not been read yet." };
+  function renderStory() {
+    var S = stories();
+    CHAPTERS.forEach(function (ch) {
+      var sec = $("sec-" + ch[0]), head = sec && sec.querySelector(".mx-sec__head");
+      if (!head) return;
+      var p = head.querySelector(".mx-story");
+      if (!p) { p = document.createElement("p"); p.className = "mx-story"; head.querySelector(".mx-h2").insertAdjacentElement("afterend", p); }
+      p.textContent = S[ch[0]] || ""; p.hidden = !S[ch[0]];
+    });
+    // Contents: every chapter with its sentence. On screen it jumps; in the PDF it is page 2.
+    var toc = $("mx-toc");
+    if (!toc) { toc = document.createElement("nav"); toc.id = "mx-toc"; toc.className = "mx-toc cat-pad"; toc.setAttribute("aria-label", "In this report");
+      document.querySelector(".mx-tabs").insertAdjacentElement("beforebegin", toc); }
+    var rows = CHAPTERS.filter(function (ch) { var sec = $("sec-" + ch[0]); return sec && !sec.hidden; }).map(function (ch) {
+      var line = S[ch[0]] || TOC_EMPTY[ch[0]] || "";
+      return '<li><a href="#sec-' + ch[0] + '" data-toc="' + ch[0] + '"><b>' + esc(ch[1]) + "</b><span>" + esc(line) + "</span></a></li>";
+    }).join("");
+    toc.innerHTML = '<div class="cat-container"><h2 class="mx-toc__t">In this report</h2><ol class="mx-toc__list">' + rows + "</ol></div>";
+    pageFooter();          // the PDF footer is always set, however the print is started
+  }
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("[data-toc]"); if (!a) return;
+    e.preventDefault();
+    var sec = $("sec-" + a.getAttribute("data-toc")); if (sec) { LOCK = Date.now() + 900; markTab(a.getAttribute("data-toc")); sec.scrollIntoView({ behavior: "smooth", block: "start" }); }
+  });
+  // The PDF footer on every page: who, when the numbers were read, page n of N (Chrome's @page margin boxes).
+  function pageFooter() {
+    var st = $("mx-pagefoot") || document.head.appendChild(Object.assign(document.createElement("style"), { id: "mx-pagefoot" }));
+    var asof = window.HVReport && window.HVReport.asOf ? window.HVReport.asOf() : "Data as of " + new Date().toLocaleString("en-GB");
+    var name = (R && R.campaign ? R.campaign.name : "Campaign report").replace(/["\\]/g, "");
+    st.textContent = '@page { @bottom-left { content: "' + name + " · " + asof.replace(/"/g, "") + ' · HELVi Connect by HelloVoice"; font: 9px "DM Sans", Arial, sans-serif; color: #383838; margin-left: 12mm; }'
+      + ' @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 9px "DM Sans", Arial, sans-serif; color: #383838; margin-right: 12mm; } }';
   }
 
   // The PDF is this page printed: print once its pictures and fonts are in (lazy pictures are made eager first, or they
@@ -622,10 +704,11 @@
     if (document.fonts && document.fonts.ready) waits.push(document.fonts.ready);
     waits.push(new Promise(function (ok) { setTimeout(ok, Math.max(900, 1700 - performance.now())); }));
     var done = false;
+    pageFooter();
     function go() { if (!done) { done = true; window.print(); } }
     Promise.all(waits).then(go, go); setTimeout(go, 10000);
   }
-  window.addEventListener("beforeprint", function () { [].forEach.call(document.querySelectorAll("#mx-report img"), function (i) { i.loading = "eager"; }); });
+  window.addEventListener("beforeprint", function () { if (R) pageFooter(); [].forEach.call(document.querySelectorAll("#mx-report img"), function (i) { i.loading = "eager"; }); });
 
   function renderBug(c) {
     var logos = (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="Brand logo">'; }).join("");
@@ -1071,7 +1154,7 @@
     var ct = sayTotals();
     if (ct && ct.n) mix.push('<div class="mx-panel mx-saybox"><h3>What people say</h3>' + moodBar(ct)
       + '<div class="mx-key">' + [["Comments read", full(ct.n)], ["Positive", sayPct(ct.pos, ct.n)], ["Ask how to buy", sayPct(ct.intent, ct.n)]].map(function (x) {
-        return "<div>" + x[0] + "<b>" + x[1] + "</b></div>"; }).join("") + '</div><a class="mx-saybox__go" href="#sec-say">Read the highlights ›</a></div>');
+        return "<div>" + x[0] + "<b>" + x[1] + "</b></div>"; }).join("") + '</div><a class="mx-saybox__go" href="#sec-say">Read the analysis ›</a></div>');
     $("mx-mix").innerHTML = mix.join("");
     decorateH3("mx-mix");
   }
@@ -1095,7 +1178,6 @@
       + MOOD.map(function (m) { var w = t.n ? t[m[0]] / t.n * 100 : 0; return w ? '<i style="width:' + w.toFixed(1) + "%;background:" + m[2] + '">' + (w >= 9 ? Math.round(w) + "%" : "") + "</i>" : ""; }).join("")
       + "</div>";
   }
-  var SAY_ITEMS = null;
   function renderSay() {
     var t = sayTotals(), C = R.comments || {};
     $("sec-say").hidden = $("tab-say").hidden = false;
@@ -1115,29 +1197,9 @@
       + '<div class="mx-say__grid"><div class="mx-panel"><h3>' + IC.say + "The mood</h3>" + moodBar(t) + '<div class="mx-key">' + MOOD.map(function (m) {
           return '<div><span class="mx-cs" style="background:' + m[2] + '"></span>' + m[1] + "<b>" + full(t[m[0]]) + "</b></div>"; }).join("") + "</div></div>"
       + '<div class="mx-panel"><h3>What they talk about</h3>' + (topics || '<p class="mx-panel__note">Topics appear once the comments are read.</p>') + "</div></div>"
-      + '<h3 class="mx-table-title">Comment highlights</h3><div class="mx-quotes" id="mx-quotes"><p class="mx-panel__note">Loading the comments…</p></div>';
-    var draw = function () { $("mx-quotes") && ($("mx-quotes").innerHTML = quotes()); };
-    if (SAY_ITEMS) return draw();
-    get("/api/campaign/comments?t=" + encodeURIComponent(R._t)).then(function (b) { SAY_ITEMS = b.items || []; draw(); }).catch(function () { SAY_ITEMS = []; draw(); });
+      + "";
+    // Our reading of the comments only, never the comments themselves (owner, 2026-11-03, item 294).
   }
-  // The comments that stood out: the most-liked positive ones and buying questions, each with its English line.
-  function quotes() {
-    var items = (SAY_ITEMS || []).filter(function (it) { return it[7] && it[7].length >= 12 && it[7].length <= 280; });
-    if (!items.length) return '<p class="mx-panel__note">No comments to show yet.</p>';
-    var by = items.slice().sort(function (a, b) { return (b[9] || 0) - (a[9] || 0); }), pick = [], seen = {};
-    var per = {};      // at most two per creator, so the highlights speak for the whole campaign
-    function add(list, n) { list.forEach(function (it) { var k = it[0] + it[7]; if (n > 0 && !seen[k] && (per[it[1]] || 0) < 2) { seen[k] = 1; per[it[1]] = (per[it[1]] || 0) + 1; pick.push(it); n--; } }); }
-    add(by.filter(function (it) { return it[3] === "p"; }), 3); add(by.filter(function (it) { return it[4]; }), 2); add(by, 6 - pick.length); if (pick.length < 6) { per = {}; add(by, 6 - pick.length); }
-    var names = {}; (R.creators || []).forEach(function (c) { names[c.code] = splitName(c.name).en; });
-    var M = { p: MOOD[0], n: MOOD[1], x: MOOD[2] };
-    return pick.slice(0, 6).map(function (it) {
-      var m = M[it[3]] || MOOD[1];
-      return '<article class="mx-q" style="--c:' + m[2] + '"><q dir="auto">' + esc(it[7]) + "</q>" + (it[8] && it[8] !== it[7] ? '<p class="mx-q__en">' + esc(it[8]) + "</p>" : "")
-        + '<p class="mx-q__m">' + icon(it[2]) + "<span>" + esc(names[it[1]] || it[2]) + "</span>" + '<em style="color:' + m[2] + '">' + m[1] + "</em>" + (it[4] ? "<em>Asks to buy</em>" : "")
-        + (it[9] ? '<span class="mx-q__l">♥ ' + it[9] + "</span>" : "") + "</p></article>";
-    }).join("");
-  }
-
   /* ----------------------------------------------------------- clicks */
 
   function renderClicks() {
@@ -1171,7 +1233,8 @@
     });
   }
 
-  // The PDF is built on the dashboard from every one of its panels, so it holds all the data (2026-10-23).
-  $("mx-print").addEventListener("click", function () { if (R && R._t) location.href = "dashboard/#t=" + encodeURIComponent(R._t) + "&pdf=1"; else printWhenReady(); });
+  // The PDF is this report printed, the same magazine as the screen, from the numbers loaded now (item 294;
+  // it was the dashboard's printAll since 2026-10-23).
+  $("mx-print").addEventListener("click", function () { printWhenReady(); });
   route();
 })();

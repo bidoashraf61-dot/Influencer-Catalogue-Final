@@ -1013,10 +1013,11 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
 .mx-saybox__go { display: inline-block; margin-top: 12px; font-weight: 700; font-size: 13.5px; color: var(--ink); }
 @media (max-width: 760px) { .mx-say__top, .mx-say__grid { grid-template-columns: 1fr; } }
 
-/* the report printed with the browser's own Print (the PDF button builds the full PDF on the dashboard): no URL footer */
+/* the report printed: top and bottom margins hold the report's own footer (campaign.js pageFooter, item 294); empty
+   margin boxes keep the browser's URL and date off the page */
 @media print {
-  @page { size: A4; margin: 0; }
-  body { padding: 12mm 0; }
+  @page { size: A4; margin: 12mm 0 14mm; @top-left { content: ""; } @top-center { content: ""; } @top-right { content: ""; } @bottom-center { content: ""; } }
+  body { padding: 0; }
   .mx-carousel__track { grid-template-columns: repeat(3, 1fr) !important; gap: 10px !important; }
   .mx-cc__body { padding: 16px 12px 12px !important; }
   .mx-cc__name { font-size: 20px !important; }
@@ -1032,3 +1033,37 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
 .mx-notes { grid-column: 1 / -1; padding: 20px 22px; border-radius: var(--r-md); background: #f4f2ee; }
 .mx-notes h3 { margin: 0 0 8px; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--gray); font-weight: 500; }
 .mx-notes ul { margin: 0; padding-left: 18px; font-size: 14px; color: var(--ink); line-height: 1.6; }
+
+/* ------------------------------------------------------------ the magazine (item 294, 2026-11-03) */
+/* Each chapter opens with its sentence, written from the live numbers. */
+.mx-story { flex-basis: 100%; max-width: 62ch; margin: 10px 0 0; font: 400 clamp(1.05rem, .95rem + .4vw, 1.3rem)/1.5 var(--body); color: var(--ink); text-wrap: pretty; }
+.mx-story[hidden] { display: none; }
+/* In this report: the chapters and their sentences, a ruled list like a magazine's contents. */
+.mx-toc { padding-top: 40px; padding-bottom: 44px; border-top: 1px solid var(--line); }
+.mx-toc__t { margin: 0 0 18px; font-family: var(--heading); font-weight: 400; font-size: clamp(2rem, 1.4rem + 1.8vw, 3rem); line-height: 1; }
+.mx-toc__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 32px; counter-reset: toc; }
+.mx-toc__list li { counter-increment: toc; border-top: 1px solid var(--line); }
+.mx-toc__list a { display: grid; grid-template-columns: 34px 1fr; column-gap: 12px; padding: 16px 0; color: var(--ink); text-decoration: none; }
+.mx-toc__list a::before { content: counter(toc, decimal-leading-zero); grid-row: span 2; font-family: var(--heading); font-size: 24px; line-height: 1; color: var(--gray); }
+.mx-toc__list b { font-family: var(--heading); font-weight: 400; font-size: 26px; line-height: 1; letter-spacing: .02em; }
+.mx-toc__list span { margin-top: 6px; font-size: 14px; line-height: 1.5; color: var(--gray); }
+.mx-toc__list a:hover b { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.mx-toc__list a:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; border-radius: 8px; }
+
+@media print {
+  /* Page 1 the cover, page 2 the contents, then one chapter per page. */
+  .mx-bug { break-after: page; padding-top: 30mm !important; }
+  .mx-bug__title { font-size: 72px !important; }
+  .mx-bug__sels, .mx-saybox__go { display: none !important; }
+  .mx-toc { break-after: page; border-top: 0; padding-top: 6mm; }
+  .mx-toc__list { grid-template-columns: 1fr; }
+  .mx-toc__list span { font-size: 12px; }
+  #mx-report .mx-sec:not([hidden]) { break-before: page !important; }     /* over the older "auto !important" rule */
+  .mx-story { font-size: 14px; }
+  .mx-sec__head { break-after: avoid; }
+  .mx-panel, .mx-bullet, .mx-pod, .mx-chart, .mx-bar, tr { break-inside: avoid; }
+  .mx-wall { grid-template-columns: repeat(3, 1fr) !important; }
+}
+/* A shared report (report-share.js): no way back into the portal from the report itself. */
+.hv-shared .mx-top__links, .hv-shared .mx-end, .hv-shared .mx-bug__sels, .hv-shared .mx-cs, .hv-shared .mx-csbar, .hv-shared #mx-bd-bar { display: none !important; }
+.hv-shared .mx-top__logo { pointer-events: none; }

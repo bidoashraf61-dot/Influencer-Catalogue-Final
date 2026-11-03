@@ -152,7 +152,7 @@ def listing(limit=400):
 def page(r):
     """Where the report itself lives on the site (relative to the site root)."""
     t = r["token"]
-    return {"campaign": "/campaign/dashboard/#t=%s&r=%s",
+    return {"campaign": "/campaign/#t=%s&r=%s",          # the report, not the dashboard (item 294)
             "selection": "/selection/#s=%s&r=%s",
             "creator": "/creator/#c=%s&r=%s",
             "study": "/market/#s=%s&r=%s"}[r["kind"]] % (r["ref"], t)

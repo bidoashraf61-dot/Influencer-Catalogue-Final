@@ -15,6 +15,7 @@
   "use strict";
   var API = (window.CAMPAIGN_CONFIG || window.CREATOR_CONFIG || window.CATALOGUE_CONFIG || {}).api || "/admin";
   var PAGE = { "/campaign/dashboard/": ["campaign", "t", "helvi-track-logo-v4.png", "Helvi Track"],
+               "/campaign/": ["campaign", "t", "helvi-track-logo-v4.png", "Helvi Track"],
                "/selection/": ["selection", "s", "helvi-selection-logo-v4.png", "Helvi Selection"],
                "/creator/": ["creator", "c", "helvi-intelligence-logo-v5.png", "Helvi Intelligence"],
                "/market/": ["study", "s", "helvi-intelligence-logo-v5.png", "Helvi Intelligence"] };
@@ -211,7 +212,7 @@
 
   // Where the button goes on each page: beside the page's own Download PDF.
   function slot() {
-    if (here[0] === "campaign") return document.querySelector(".db-head__actions");
+    if (here[0] === "campaign") return document.querySelector(".db-head__actions") || document.querySelector(".mx-top__links");
     if (here[0] === "creator") { var p = document.getElementById("pp-print"); return p ? p.parentNode : null; }
     if (here[0] === "selection") return document.getElementById("cx-selact") || (late ? document.getElementById("rs-slot-selection") : null);
     var hd = document.querySelector("#ev-market .ev-mi__hd");
@@ -347,10 +348,13 @@
   function mount() {
     var s = slot();
     if (!s || btn) return !!btn;
+    // One Share button (item 294): it makes the client link; the dashboard's old invite-by-email Share goes.
+    HV.canShare = true;
+    ["db-share", "db-share-pop"].forEach(function (id) { var o = document.getElementById(id); if (o) o.remove(); });
     // On the selection it is one of the header's actions, styled like Merge beside it.
     var inRow = s.id === "cx-selact";
     btn = el("button", (inRow ? "cx-btn cx-btn--line" : "rs-btn rs-btn--line") + " rs-share",
-             (inRow ? I_LINK.replace(/16/g, "20") : I_LINK) + "<span>Share with client</span><i data-n>" + count() + "</i>");
+             (inRow ? I_LINK.replace(/16/g, "20") : I_LINK) + "<span>" + (inRow ? "Share with client" : "Share") + "</span><i data-n>" + count() + "</i>");
     btn.type = "button";
     btn.setAttribute("aria-haspopup", "dialog");
     btn.setAttribute("aria-expanded", "false");
