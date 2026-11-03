@@ -1280,33 +1280,7 @@
     var mine = R.posts.filter(function (p) { return p.code === code && p.section === "campaign"; });
     return mine.length && !mine.some(function (p) { return p.video; }) ? '<span class="db-na" title="' + NO_VIEWS_TIP + '">Not public</span>' : "—";
   }
-  // With planned videos the panel is every creator's videos; without, only videos posted on more than one platform,
-  // and the title says so (owner, 2026-10-29: "why only these creators").
-  var VIDS_PLANNED = "Videos by creator", VIDS_CROSS = "Videos posted on more than one platform";
-  function vidsTitle(rows) { return rows.some(function (c) { return c.planned; }) ? VIDS_PLANNED : VIDS_CROSS; }
-  function videosByCreator(list, rows) {
-    var pieces = mergePieces(list), by = {};
-    // Only for campaigns with planned videos or one video on several platforms; otherwise it repeats the table (owner, 2026-10-29).
-    if (!rows.some(function (c) { return c.planned; }) && !pieces.some(function (p) { return p.parts && p.parts.length > 1; })) return "";
-    pieces.forEach(function (p) { (by[p.code] = by[p.code] || []).push(p); });
-    var out = rows.map(function (c) {
-      var mine = (by[c.code] || []).slice().sort(function (a, b) { return (a.posted_at || 0) - (b.posted_at || 0); });
-      if (!mine.length && !c.planned) return "";
-      if (!c.planned && !mine.some(function (p) { return p.parts && p.parts.length > 1; })) return "";   // one video, one platform: the table says it all
-      var tot = mine.reduce(function (a, p) { return a + seen(p); }, 0);
-      var rowsHtml = mine.map(function (p, i) {
-        var parts = p.parts || [p];
-        return '<div class="db-vt"><div class="db-vt__t"><b>Video ' + (i + 1) + (c.planned ? " of " + c.planned : "") + "</b><small>" + esc(day(p.posted_at)) + "</small></div>"
-          + '<div class="db-vt__n">' + num(seen(p)) + "<small>views</small></div>"
-          + '<div class="db-vt__chips">' + parts.map(function (x) {
-            return '<a class="db-chip" href="' + esc(x.url) + '" target="_blank" rel="noopener">' + (ICONS[x.platform] || "") + esc(x.platform) + " · " + num(seen(x)) + "</a>";
-          }).join("") + "</div></div>";
-      }).join("");
-      var owed = []; for (var i = mine.length; i < (c.planned || 0); i++) owed.push('<div class="db-vt is-owed"><div class="db-vt__t"><b>Video ' + (i + 1) + " of " + c.planned + "</b><small>Not published yet</small></div></div>");
-      return '<div class="db-vts"><h4>' + ava(c.photo) + "<span>" + who(c) + "</span><b>" + mine.length + (c.planned ? "/" + c.planned : "") + (mine.length === 1 && !c.planned ? " video · " : " videos · ") + num(tot) + " views</b></h4>" + rowsHtml + owed.join("") + "</div>";
-    }).join("");
-    return out ? "<h3>" + vidsTitle(rows) + "</h3>" + out : "";
-  }
+  // The per-creator video list under the table was removed for every campaign (owner, 2026-11-03).
 
   /* ------------------------------------------- goals: targets, forecast, benchmarks */
   // The Goals & benchmarks tab, for the client. One list of targets (achieved, benchmark range, where it
@@ -1682,7 +1656,7 @@
           var n = filtered() ? i + 1 : c.rank;
           return '<tr' + (n && n <= 3 ? ' class="is-top"' : "") + "><td>" + (n && n <= 3 ? '<span class="db-medal">' + medal(n) + "</span>" : (n || "—")) + '</td><td><span class="db-who">' + ava(c.photo) + "<b>" + who(c) + "</b></span></td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + (x.views ? num(x.views) : noViews(c.code)) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng)
             + "</td><td>" + share(x.views, tot.v) + "</td><td>" + share(x.eng, tot.e) + "</td><td>" + pct(c.video_er != null ? c.video_er : c.er) + "</td>" + (R.visibility.clicks && R.objective.links ? "<td>" + full(c.clicks) + "</td>" : "") + (ns ? "" : "<td>" + (filtered() && viewScore[c.code] != null ? scoreTxt(viewScore[c.code]) : scoreTxt(c.score)) + "</td>") + "</tr>"; }).join("")
-        + '</tbody></table><p class="db-note" style="margin-top:10px">' + esc(ns ? "Ranked by video views, then engagement. " + NS_TIP : scoreTip()) + "</p>" + videosByCreator(list, rows);
+        + '</tbody></table><p class="db-note" style="margin-top:10px">' + esc(ns ? "Ranked by video views, then engagement. " + NS_TIP : scoreTip()) + "</p>";
       // The score breakdown table is gone from the drawer (owner, 2026-10-29): the score is already in the table above.
     },
     stage: function () {
@@ -2219,14 +2193,6 @@
     [].slice.call(wrap.querySelectorAll("h3")).forEach(function (h) {
       var t = h.textContent.trim();
       if (t === "Score breakdown") { var tb = h.nextElementSibling; if (tb && tb.tagName === "TABLE") drop(tb); drop(h); }
-      if (t === VIDS_PLANNED || t === VIDS_CROSS) {
-        var sec = h.closest(".pp-sec"), box = document.createElement("div");
-        box.innerHTML = t === VIDS_PLANNED ? ppSec("00", t, "Every video each creator published, and its views on each platform.", "")
-          : ppSec("00", t, "The same video on several platforms, and its views on each one.", "");
-        var ns = box.firstChild, body = ns.querySelector(".pp-b");
-        while (h.nextSibling) body.appendChild(h.nextSibling);
-        drop(h); sec.parentNode.insertBefore(ns, sec.nextSibling);
-      }
     });
     [].forEach.call(wrap.querySelectorAll(".pp-sec"), function (sec, i) {
       var n = i + 1; sec.querySelector(".pp-h__n").textContent = (n < 10 ? "0" : "") + n;
