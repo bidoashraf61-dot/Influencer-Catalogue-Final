@@ -71,6 +71,31 @@ sign out, resend invite, reset two-step) and **creator industry** (confirm / hid
 The code handlers now answer with `?ok=` / `?e=` like the rest, and the roster
 review and selection delete refuse an id that does not exist.
 
+## Plans: a whole task, one Confirm (item 292, 2026-11-03)
+
+A task that needs 2 or more changes ("set up a campaign: create it from selection 81, give it to the client, dates,
+targets, a tracking link, take it live") is one `run_plan` call. The card lists every step; the admin presses
+**Confirm all** once; the steps run in order in the background through `actions.run_plan` (the same loopback door,
+permissions, History and read-back as `do_action`). The card polls `/ai/plan` (admin copilot) or `/api/chat/plan`
+(website chat) and shows each step as Waiting / Working / Done / Not done / Not run with the portal's own sentence.
+
+- `{{n.id}}` in a field is the id step n came back with (`campaign.create` lands on `/campaigns/edit?id=N`).
+- The first step the portal does not confirm stops the plan; the rest are reported "Not run". Nothing is rolled
+  back: each done step is in History and can be undone there.
+- Every step is checked before anything is queued (unknown action/field, missing field, forward `{{n.id}}`, more
+  than 15 steps, `form.submit` inside a plan are refused).
+- Same rules as `do_action`: owners/admins only, taint rule, only the portal may declare success.
+- The website chat mints a 30-minute loopback session for a plan (5 minutes for one action) and deletes it when the
+  last step finishes.
+
+New actions for campaign setup: `campaign.details` (name, client, first/last day, objective, targets, brief, via the
+board card's `/api/board/save`; only what is sent changes) and `campaign.assign` (the client access code that may
+open it). `campaign.create` takes a selection id or exact name; `campaign.assign` a code id or exact label: resolved
+on the server, so no client-written text reaches the model. `link.add` needs a creator already on the campaign and a
+slug. Owner/admin turns get 12 tool steps (clients keep 7).
+
+Tests: `python3 admin/tests/test_plans.py` (16 checks).
+
 ## Anything else an admin does by hand: read_forms + form.submit
 
 The registry names the common actions. For the rest the assistant does it the way a
