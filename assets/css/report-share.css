@@ -61,9 +61,8 @@
   background: transparent; color: var(--rs-lime); border-color: var(--rs-lime); }
 .cat-selhead .rs-slot { margin: 16px 0 0; }
 .cx-selact .rs-share i { margin-left: -2px; }
-/* The row's buttons arrive from three scripts in any order: AI and Merge first, then Share, then the rest. */
-.cx-selact .rs-share { order: 1; }
-.cx-selact .cx-btn--roi, .cx-selact .ev-mi-btn { order: 2; }
+/* The row is ordered in CSS (AI 1, Market Intelligence 2, Merge 3, ROI 4): Share follows Merge. */
+.cx-selact .rs-share { order: 3; }
 /* Creator analysis: the bar carries Download PDF. */
 .hv-shared #pp-print { display: none !important; }
 .hv-shared--ended body > *:not(.rs-ended) { display: none !important; }
