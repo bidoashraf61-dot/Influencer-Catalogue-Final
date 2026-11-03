@@ -200,7 +200,7 @@
   var STATE = null, pop = null, scrim = null, btn = null, late = false;
   // The selection's action row (AI, Merge, ROI) is drawn by connect.js a moment after load; if it never comes,
   // the button falls back to the slot under the header.
-  setTimeout(function () { late = true; if (STATE && !btn) mount(); }, 6000);
+  setTimeout(function () { late = true; if (STATE && !btn) mount(); }, 8000);
 
   function api(method, body) {
     var url = API + "/api/report/shares" + (method === "GET" ? "?kind=" + encodeURIComponent(here[0]) + "&ref=" + encodeURIComponent(ref) : "");
@@ -312,6 +312,7 @@
       else if (was.own) [].forEach.call(f.querySelectorAll("input[name=rs-days]"), function (r) { r.checked = false; });
       if (f.prices && was.p !== null) f.prices.checked = was.p;
     } else f.label.value = forWhom();
+    if (was && !was.label && !STATE.typed) f.label.value = forWhom();
     until();
   }
   // The end date beside "Open for", following the chips and the typed number.
@@ -340,12 +341,13 @@
       pop.addEventListener("input", function (e) {
         if (e.target.name === "own_days" && e.target.value) [].forEach.call(pop.querySelectorAll("input[name=rs-days]"), function (r) { r.checked = false; });
         if (e.target.name === "rs-days") { var o = pop.querySelector("input[name=own_days]"); if (o) o.value = ""; }
+        if (e.target.name === "label") STATE.typed = true;
         until();
       });
       document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !pop.hidden) close(); });
       document.addEventListener("click", function (e) { if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) close(); });
     }
-    STATE.editing = null;
+    STATE.editing = null; STATE.typed = false;
     var old = pop.querySelector("form.rs-new"); if (old) old.remove();      // a fresh form each time it opens
     draw();
     refresh();                                                                 // opens and decisions as they are now
@@ -431,31 +433,44 @@
   function refresh() {
     return api("GET").then(function (res) {
       if (res.st !== 200) return;
-      var fresh = STATE && STATE.fresh, editing = STATE && STATE.editing;
-      STATE = res.b; STATE.fresh = fresh; STATE.editing = editing;
+      var keep = STATE || {};
+      STATE = res.b; STATE.fresh = keep.fresh; STATE.editing = keep.editing; STATE.typed = keep.typed;
       if (pop && !pop.hidden) draw();
       if (btn) btn.querySelector("[data-n]").textContent = count();
     });
   }
   function count() { var n = STATE.links.filter(function (x) { return x.state === "open"; }).length; return n ? String(n) : ""; }
 
+  // Returns true once the button is in its final place. On a slow selection the fallback slot can come first: the
+  // button then moves into the action row when connect.js draws it.
   function mount() {
     var s = slot();
-    if (!s || btn) return !!btn;
+    if (!s) return false;
+    var inRow = s.id === "cx-selact";
+    if (btn) {
+      if (btn.parentNode === s) return here[0] !== "selection" || inRow;
+      btn.className = "cx-btn cx-btn--line rs-share";
+      btn.querySelector("svg").outerHTML = I_LINK.replace(/16/g, "20");
+      btn.querySelector("span").textContent = "Share with client";
+      place(s);
+      return true;
+    }
     // One Share button (item 294): it makes the client link; the dashboard's old invite-by-email Share goes.
     HV.canShare = true;
     ["db-share", "db-share-pop"].forEach(function (id) { var o = document.getElementById(id); if (o) o.remove(); });
     // On the selection it is one of the header's actions, styled like Merge beside it.
-    var inRow = s.id === "cx-selact";
     btn = el("button", (inRow ? "cx-btn cx-btn--line" : "rs-btn rs-btn--line") + " rs-share",
              (inRow ? I_LINK.replace(/16/g, "20") : I_LINK) + "<span>" + (inRow ? "Share with client" : "Share") + "</span><i data-n>" + count() + "</i>");
     btn.type = "button";
     btn.setAttribute("aria-haspopup", "dialog");
     btn.setAttribute("aria-expanded", "false");
     btn.addEventListener("click", function () { if (pop && !pop.hidden) close(); else open(); });
-    var after = inRow ? document.getElementById("mg-btn") || document.getElementById("aa-btn") : null;
+    place(s);
+    return here[0] !== "selection" || inRow;
+  }
+  function place(s) {
+    var after = s.id === "cx-selact" ? document.getElementById("mg-btn") || document.getElementById("aa-btn") : null;
     if (after && after.parentNode === s) s.insertBefore(btn, after.nextSibling); else s.appendChild(btn);
-    return true;
   }
 
   ready(function () {
