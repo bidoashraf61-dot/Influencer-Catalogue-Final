@@ -1436,6 +1436,15 @@ a.hv-note:hover { background: #efede8; }
 .sel-dec:focus-visible, .sel-st__change:focus-visible, .sel-repl:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
 .sel-dec[disabled] { opacity: .6; cursor: progress; }
 .sel-st__change { border: 0; background: none; color: var(--ink); padding: 0 2px; min-height: 32px; font: 600 12.5px var(--body); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; margin-left: auto; }
+/* A note on a creator (item 291): a quiet text button under the decision, opening a field in its place. */
+.sel-note { border: 0; background: none; color: var(--ink); padding: 0 2px; min-height: 32px; font: 600 12.5px var(--body); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; align-self: flex-start; }
+.sel-note:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.sel-note-f { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.sel-note-f input { flex: 1 1 160px; min-height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--rule, rgba(18,18,18,.12)); font: 400 14px var(--body); background: #fff; color: var(--ink); }
+.sel-note-f input:focus { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.sel-note-f__go { min-height: 38px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--ink); background: var(--ink); color: var(--lime, #e8ff76); font: 600 13px var(--body); cursor: pointer; }
+.sel-note-f__go:disabled { opacity: .55; }
+.sel-note-f__x { min-height: 38px; padding: 0 8px; border: 0; background: none; font: 600 13px var(--body); color: var(--ink); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .sel-st__off { margin: 8px 0 0; color: var(--gray); }
 /* "Find a replacement": one compact line, Helvi's face, the cost inline */
 .sel-repl { margin-top: 12px; max-width: 100%; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 6px 4px 5px;

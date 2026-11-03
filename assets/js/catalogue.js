@@ -2438,6 +2438,9 @@
             if (b.currency && FX[b.currency]) CURRENCY = b.currency;
             CURATED = { token: token, name: b.name, codes: b.codes || [],
                         prices: b.prices || {}, total: b.total,
+                        // A read-only link without prices (public, or a client report link made without them):
+                        // no "Indicative range" of zero (item 291).
+                        noPrices: (document.documentElement.classList.toggle("sel-noprices", !!b.public && !Object.keys(b.prices || {}).length), !!b.public && !Object.keys(b.prices || {}).length),
                         tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {}, scores: b.scores || {}, brief: b.brief || null, clientPlatforms: b.client_platforms || {},
                         segments: b.segments || {}, groupBy: b.group_by || "", reach: b.reach || {},
                         // Item 3c (Bido, 25 Oct 2026): tags marked as sub-tags in the admin.
@@ -2950,7 +2953,7 @@
         var rest = (n["Possible fit"] || 0) + (n["Not recommended"] || 0);
         if (rest) html += cell("Lower fit", rest, "is-low");
       }
-      if (selected.length) html += cell("Indicative range", priceText([lo, hi]), "is-range");
+      if (selected.length && !(CURATED && CURATED.noPrices)) html += cell("Indicative range", priceText([lo, hi]), "is-range");
       st.innerHTML = html;
     }
     function renderCurrency() {
@@ -3576,7 +3579,7 @@
       if (optimistic) {
         var was = statusOf(code);
         CURATED.status[code] = { s: body.status, by: was.by && was.s === body.status ? was.by : "You", hv: ROLE === "admin", at: Math.floor(Date.now() / 1000),
-                                 reason: body.status === "rejected" ? was.reason || "" : "", note: "", replacements: was.replacements || [] };
+                                 reason: body.status === "rejected" ? was.reason || "" : "", note: body.note !== undefined ? body.note : "", replacements: was.replacements || [] };
         if (then) then({ ok: true, status: CURATED.status[code], pending: true });
         render();
       }
@@ -3609,7 +3612,7 @@
     // their own "?" (it also edits the reason).
     function whoLine(st) {
       if (!st.at) return st.s === "review" ? (ROLE === "owner" ? "Your call." : "Not decided yet.") : "";
-      var lead = st.s === "review" ? "Set back by " : st.s === "unavailable" ? "Marked by " : "by ";
+      var lead = st.s === "review" ? (st.note ? "Note from " : "Set back by ") : st.s === "unavailable" ? "Marked by " : "by ";
       return lead + "<b>" + esc(st.by || (st.hv ? "HelloVoice" : "Client")) + "</b> · " + esc(stDay(st.at)) + infoTip(st);
     }
     function infoTip(st) {
@@ -3755,6 +3758,11 @@
         html += '<div class="sel-st__acts"><button type="button" class="sel-dec sel-dec--yes" data-st-set="approved" data-st-code="' + esc(code) + '">' + hvIcon("check") + " Approve</button>" +
           '<button type="button" class="sel-dec sel-dec--no" data-st-set="rejected" data-st-code="' + esc(code) + '">' + hvIcon("x") + " Reject</button></div>";
         // "Unavailable" is now one of the reasons under Reject (no separate HelloVoice link).
+      }
+      // A note on any creator not turned down (item 291: "approve, reject and comment"), for whoever decides. It goes
+      // back with the status, so HelloVoice reads it behind the (i); a rejection keeps its own "?" reason.
+      if (canDecide && st.s !== "rejected" && st.s !== "unavailable") {
+        html += '<button type="button" class="sel-note" data-st-note="' + esc(code) + '">' + (st.note ? "Edit note" : "Add a note") + "</button>";
       }
       // Find a replacement opens Helvi's side panel (connect.js), like Creators like this.
       if (canDecide && (st.s === "rejected" || st.s === "unavailable")) html += replButton(code, st);
@@ -4621,10 +4629,28 @@
     }, true);
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeInfos(null); });
     $("cat-grid").addEventListener("click", function (e) {
-      var t = e.target.closest && e.target.closest("[data-st-set], [data-st-whyq], [data-st-repl], [data-st-add]");
+      var t = e.target.closest && e.target.closest("[data-st-set], [data-st-whyq], [data-st-repl], [data-st-add], [data-st-note]");
       if (!t || !STATUS_ON) return;
       e.preventDefault(); e.stopPropagation();
-      var code = t.getAttribute("data-st-code") || t.getAttribute("data-st-whyq") || t.getAttribute("data-st-repl");
+      var code = t.getAttribute("data-st-code") || t.getAttribute("data-st-whyq") || t.getAttribute("data-st-repl") || t.getAttribute("data-st-note");
+      if (t.hasAttribute("data-st-note")) {
+        // The note opens in the button's own place: a field, Save and Cancel.
+        var stn = statusOf(code), f = document.createElement("form");
+        f.className = "sel-note-f"; f.setAttribute("data-noselect", "");
+        f.innerHTML = '<input type="text" maxlength="200" aria-label="Your note on this creator" placeholder="e.g. Can she post in Arabic?">' +
+          '<button type="submit" class="sel-note-f__go">Save</button><button type="button" class="sel-note-f__x">Cancel</button>';
+        f.querySelector("input").value = stn.note || "";
+        t.replaceWith(f);
+        f.querySelector("input").focus();
+        f.addEventListener("click", function (ev) { ev.stopPropagation(); if (ev.target.closest(".sel-note-f__x")) render(); });
+        f.addEventListener("submit", function (ev) {
+          ev.preventDefault();
+          var txt = f.querySelector("input").value.replace(/\s+/g, " ").trim();
+          f.querySelector(".sel-note-f__go").disabled = true;
+          stSave(code, { status: statusOf(code).s, note: txt });
+        });
+        return;
+      }
       if (t.hasAttribute("data-st-set")) {
         var to = t.getAttribute("data-st-set");
         t.disabled = true;
@@ -4926,6 +4952,7 @@
           '<small class="cat-reach__note">' + (engM ? "likes + comments" : "views") + " total · one post each · up to " + compact(rHi) + " best case</small>" +
           '<small class="cat-reach__note">Avg ' + compact(Math.round(rLo / rN)) + " per creator · " + rN + " creators" + (rEst ? " · " + rEst + " estimated" : "") + "</small>"]);
       }
+      if (CURATED && CURATED.noPrices) rows = rows.filter(function (r) { return r[0] !== "Indicative range"; });
       if (CURATED && CURATED.platform) rows.splice(1, 0, ["Quoted for", CURATED.platform]);
       if (dropped) rows.push(["Not in this roster", String(dropped)]);
       $("sel-summary").innerHTML = rows.map(function (r) {

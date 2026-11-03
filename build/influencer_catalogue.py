@@ -902,6 +902,8 @@ def build():
 <meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
 <meta name="referrer" content="no-referrer"/>
 <title>Selection — HELVi Connect</title>
+<link rel="stylesheet" href="{stamp('/assets/css/report-share.css')}"/>
+<script src="{stamp('/assets/js/report-share.js')}"></script>
 <script src="/assets/js/hv-loader.js" data-tone="light" data-wait="all"></script>
 <link rel="icon" href="/assets/brand/helvy-connect/helvy-icon-32.png?v=c4" type="image/png"/>
 <link rel="apple-touch-icon" href="/assets/app/apple-touch-icon.png"/>
@@ -1001,6 +1003,7 @@ def build():
           </a>
           <div class="cat-selhead__brief" id="sel-brief" hidden></div>
         </div>
+        <div class="rs-slot" id="rs-slot-selection"></div>
       </div>
     </div></div></div>
   </header>

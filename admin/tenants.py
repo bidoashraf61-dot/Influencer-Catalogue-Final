@@ -230,6 +230,7 @@ def page_html(query=None):
     body = (
         "<div class='card'><div class='hd'><h2>Tenants</h2><div class='hd-acts'>"
         "<a class='btn small ghost' href='" + e(u("/tenants/trials")) + "'>Demo links</a>"
+        "<a class='btn small ghost' href='" + e(u("/tenants/reports")) + "'>Client report links</a>"
         "<a class='btn small ghost' href='" + e(u("/tenants/requests")) + "'>Access requests"
         + (" <span class='badge'>%d</span>" % pend if pend else "") + "</a>"
         "<button type='button' class='btn small ghost' id='tn-csv'>Export CSV</button></div></div>" + note +

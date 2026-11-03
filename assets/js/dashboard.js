@@ -106,6 +106,9 @@
     go.then(function (t) { TOKEN = t; return get("/api/campaign?t=" + encodeURIComponent(t) + (shareTok() ? "&share=" + encodeURIComponent(shareTok()) : "")); })
       .then(function (b) {
         R = b.report;
+        // Client report links (item 291, report-share.js): the bar's Download PDF is this page's PDF, stamped
+        // with when these numbers were read.
+        if (window.HVReport) { window.HVReport.markLoaded(); window.HVReport.pdf = function () { printAll(); }; }
         $("cat-gate").hidden = true; $("cat-app").hidden = false; document.body.classList.remove("cat-locked", "cat-checking");
         setupHeader(); setupFilters(); renderAll(); setupShare(); watch();
         // The report's "Download PDF" comes here with &pdf=1: the PDF is built from this page's panels.
@@ -2328,9 +2331,10 @@
     var H = Math.max(flow.getBoundingClientRect().height, PH), N = Math.max(1, Math.ceil((H - FT - 1) / PH));
     wrap.style.height = N * PH + "px";
     var c = R.campaign, today = esc(day(Date.now() / 1000, true)), run = "";
+    var asof = esc(window.HVReport && window.HVReport.asOf ? window.HVReport.asOf() : "Data as of " + day(Date.now() / 1000, true));
     for (var i = 0; i < N; i++) {
       if (i) run += '<div class="pp-run pp-run--h" style="top:' + (i * PH + 6 * MM).toFixed(2) + 'px"><img src="' + PP_LOGO + '" alt=""><span>' + esc(c.name) + " · Campaign report</span><span>" + today + "</span></div>";
-      run += '<div class="pp-run pp-run--f" style="top:' + ((i + 1) * PH - 12 * MM).toFixed(2) + 'px"><span>HELVi Connect by HelloVoice · hellovoice.co.uk</span><span>Confidential · Page ' + (i + 1) + " of " + N + "</span></div>";
+      run += '<div class="pp-run pp-run--f" style="top:' + ((i + 1) * PH - 12 * MM).toFixed(2) + 'px"><span>HELVi Connect by HelloVoice · ' + asof + '</span><span>Confidential · Page ' + (i + 1) + " of " + N + "</span></div>";
     }
     wrap.insertAdjacentHTML("beforeend", run);
     if (toc) [].forEach.call(toc.querySelectorAll("em"), function (em, k) { em.textContent = Math.floor((box(secs[k]).top + SLACK + 5) / PH) + 1; });

@@ -99,6 +99,7 @@ import access_rules
 import modules
 import reference_view
 import trial
+import report_shares
 import views  # noqa: E402
 import ui  # noqa: E402
 
@@ -633,7 +634,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                    "credits", "ai_free", "campaign_cost", "spend"))
 
     def public_link(self, kind, token):
-        return bool(token) and db.public_link_on(kind, token)
+        if not token:
+            return False
+        # A client report link (item 291) for exactly this campaign or selection opens it the same way
+        # (looked at first, so its own rules, prices and decisions, apply on a page that is also public).
+        return self.report_share(kind, token) is not None or db.public_link_on(kind, token)
 
     @classmethod
     def public_strip(cls, obj):
@@ -644,12 +649,177 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return [cls.public_strip(v) for v in obj]
         return obj
 
-    def public_selection(self, token):
-        """The selection behind a public link token, or None (not public, unknown or deleted)."""
-        if not token or not self.public_link("selection", token):
+    def public_selection(self, token, study=False):
+        """The selection behind a public link token, or None (not public, unknown or deleted). With ``study``
+        (the competitor study's own routes) a client link to the study opens it too; a study link never
+        opens the shortlist itself."""
+        if not token:
+            return None
+        if not (self.report_share(("selection", "study") if study else "selection", token) is not None
+                or db.public_link_on("selection", token)):
             return None
         sel = db.selection(token=token)
         return sel if sel is not None and not sel["deleted_at"] else None
+
+    # ------------------------------------------------- client report links (item 291) --
+    # A secret link opens one report (report_shares.py). The token comes in ?r= on the page's own requests
+    # and in the hv_report cookie (set by /api/report) for pictures. It is checked live on every request,
+    # so a revoked or ended link stops at once.
+    def report_tokens(self):
+        memo = getattr(self, "_rtok_memo", None)
+        if memo is not None and memo[0] == self.path:
+            return memo[1]
+        toks = []
+        q = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(self.path).query)).get("r")
+        if q:
+            toks.append(q.strip())
+        toks += [t for t in (self.cookies().get(report_shares.COOKIE, "") or "").split(".") if t]
+        toks = [t for t in dict.fromkeys(toks) if re.fullmatch(r"[A-Za-z0-9_-]{16,40}", t)][:12]
+        self._rtok_memo = (self.path, toks)
+        return toks
+
+    def share_prices(self):
+        """True when this request came through a selection link made with prices."""
+        r = getattr(self, "_report", None)
+        return bool(r is not None and r["kind"] == "selection" and r["prices"])
+
+    def share_strip(self, obj):
+        """public_strip, keeping the client's prices on a selection link made with them."""
+        if not self.share_prices():
+            return self.public_strip(obj)
+        keep = {"price", "prices", "total_from", "total_to", "price_from", "price_to"}
+        drop = self.PUBLIC_MONEY_KEYS - keep
+
+        def walk(o):
+            if isinstance(o, dict):
+                return {k: walk(v) for k, v in o.items() if k not in drop}
+            if isinstance(o, list):
+                return [walk(v) for v in o]
+            return o
+        return walk(obj)
+
+    def report_share(self, kind, ref):
+        """The open client link this request carries for ``kind`` (or a tuple of kinds) and ``ref``, or None."""
+        if not ref:
+            return None
+        for t in self.report_tokens():
+            r = report_shares.valid(t, kind, ref)
+            if r is not None:
+                self._report = r
+                return r
+        return None
+
+    def share_maker(self):
+        """(admin row, role) of a HelloVoice person who may make client links: signed in to the admin, or to the
+        portal with an admin email (never while previewing as a client). (None, None) for anyone else."""
+        if self.as_client() or self.preview_mode():
+            return None, None
+        who = self.admin()
+        if who is None:
+            cid = self.viewer_cookie_id()
+            u = portal.user_for_code(cid) if cid is not None else None
+            who = db.admin_by_email(u["email"]) if u is not None and u["email"] else None
+            if who is not None and "disabled_at" in who.keys() and who["disabled_at"]:
+                who = None
+        return (who, team.role_of(who)) if who is not None else (None, None)
+
+    def share_item(self, kind, ref):
+        """(title, code_id, sel_id, camp_id) of the thing a link would open, or None when it does not exist."""
+        if kind == "campaign":
+            k = db.campaign(token=ref)
+            if k is None:
+                return None
+            return k["name"], (k["code_id"] if k["code_id"] is not None else kam_scope.campaign_code(k["id"])[1]), k["selection_id"], k["id"]
+        if kind in ("selection", "study"):
+            sel = db.selection(token=ref)
+            if sel is None or sel["deleted_at"]:
+                return None
+            if kind == "study" and evidence.for_selection(sel["id"], client_only=False) is None:
+                return None
+            return sel["name"], sel["code_id"], sel["id"], None
+        if kind == "creator":
+            c = db.creator(ref)
+            return (c["name"], None, None, None) if c is not None and c["active"] else None
+        return None
+
+    def share_allowed(self, kind, ref):
+        """Owner and admin accounts share any report; a key account manager shares her own clients' (and any
+        creator's analysis, which belongs to no client). Returns (who, title) or (None, None)."""
+        who, role = self.share_maker()
+        if who is None or role not in ("owner", "admin", "kam"):
+            return None, None
+        it = self.share_item(kind, ref)
+        if it is None:
+            return None, None
+        if role == "kam" and kind != "creator":
+            sc = kam_scope.clients(who)
+            ok = sc is not None and ((it[2] is not None and int(it[2]) in getattr(sc, "sel_ids", ()))
+                                     or (it[3] is not None and int(it[3]) in getattr(sc, "camp_ids", ()))
+                                     or (it[1] is not None and int(it[1]) in sc))
+            if not ok:
+                return None, None
+        return who, it[0]
+
+    def api_report_open(self, token, peek=False):
+        """/report/#r=… asks here what its link opens. Sets the hv_report cookie (the links this browser holds,
+        for the report's pictures) and counts the open."""
+        r = report_shares.get(token=str(token or "").strip()) if token else None
+        st = report_shares.state(r)
+        if st != "open" or self.share_item(r["kind"], r["ref"]) is None:
+            return self.send_json(410 if r is not None else 404, {"ok": False, "reason": st if st != "open" else "gone"},
+                                  self.cors() + [("Cache-Control", "no-store")])
+        if not peek:                            # the report page itself asks again (peek): one open per visit
+            report_shares.touch(r)
+        db.log("view", None, self.client_ip(), self.headers.get("User-Agent"), "report link %d:%s" % (r["id"], r["kind"]))
+        held = [r["token"]] + [t for t in (self.cookies().get(report_shares.COOKIE, "") or "").split(".")
+                               if t and t != r["token"]][:9]
+        policy = "SameSite=None; Secure" if ALLOWED_ORIGINS else "SameSite=Lax"
+        cookie = ("Set-Cookie", "%s=%s; Path=%s/; HttpOnly; %s; Max-Age=%d" % (
+            report_shares.COOKIE, ".".join(held), BASE, policy, 365 * 86400))
+        return self.send_json(200, {"ok": True, "kind": r["kind"], "page": report_shares.page(r),
+                                    "title": r["title"] or "", "label": r["label"] or "",
+                                    "expires_at": r["expires_at"], "now": db.now()},
+                              self.cors() + [("Cache-Control", "no-store"), cookie])
+
+    def api_report_shares(self, kind, ref):
+        """GET: a report's client links, for the people who may make them (else 403, and the page shows nothing)."""
+        import mailer
+        who, title = self.share_allowed(kind, ref)
+        if who is None:
+            return self.send_json(403, {"ok": False}, self.cors() + [("Cache-Control", "no-store")])
+        return self.send_json(200, {"ok": True, "can": True, "title": title, "kind": kind,
+                                    "days": list(report_shares.DAYS), "default_days": report_shares.DEFAULT_DAYS,
+                                    "links": [report_shares.public(x, mailer.SITE) for x in report_shares.for_item(kind, ref)]},
+                              self.cors() + [("Cache-Control", "no-store")])
+
+    def api_report_shares_post(self):
+        """POST {kind, ref, label, days, prices} makes a link; {revoke: id} revokes one."""
+        import mailer
+        b = self.json_body()
+        if b.get("revoke"):
+            r = report_shares.get(rid=kam_scope._int(b.get("revoke")) or 0)
+            if r is None:
+                return self.send_json(404, {"ok": False}, self.cors())
+            who, _ = self.share_allowed(r["kind"], r["ref"])
+            if who is None:
+                return self.send_json(403, {"ok": False}, self.cors())
+            history.set_actor(who["email"])
+            r = report_shares.revoke(r["id"], who["email"])
+            return self.send_json(200, {"ok": True, "link": report_shares.public(r, mailer.SITE)}, self.cors())
+        kind, ref = str(b.get("kind") or ""), str(b.get("ref") or "").strip()
+        if kind == "creator":
+            ref = ref.upper()
+        who, title = self.share_allowed(kind, ref)
+        if who is None:
+            return self.send_json(403, {"ok": False, "message": "Only owner and admin accounts, and the account's KAM, make client links."}, self.cors())
+        if self._throttled("share:%s" % who["email"], 60, 3600):
+            return
+        history.set_actor(who["email"])
+        try:
+            r = report_shares.create(kind, ref, title, b.get("label"), b.get("days"), bool(b.get("prices")), who["email"])
+        except ValueError as e:
+            return self.send_json(400, {"ok": False, "message": str(e)}, self.cors())
+        return self.send_json(200, {"ok": True, "link": report_shares.public(r, mailer.SITE)}, self.cors())
 
     def selection_viewer(self, token):
         """Who acts on a selection page: the admin, else the code typed for that
@@ -744,6 +914,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             portal.unlock_begin(self.kam_unlocked(), scope=sc)
 
     def do_GET(self):
+        self._report = None                     # the client report link this request came through (item 291)
         if self.trial_route():
             return
         portal.memo_begin()
@@ -882,6 +1053,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/api/campaign":
             self._share_token = (query.get("share") or "").strip()
             return self.api_campaign(query.get("t") or "")
+        if path == "/api/report":
+            return self.api_report_open(query.get("r") or "", bool(query.get("peek")))
+        if path == "/api/report/shares":
+            ref = (query.get("ref") or "").strip()
+            return self.api_report_shares(query.get("kind") or "", ref.upper() if query.get("kind") == "creator" else ref)
         if path == "/api/creator":
             return self.api_creator((query.get("c") or "").strip().upper())
         if path == "/api/creator-media":
@@ -1176,8 +1352,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             # Who has which module. Owners configure the platform; admins run the business, so an admin
             # reads the list and a company's page and may Share access there (Bido 2026-10-28), nothing more.
             role_ = team.role_of(who)
-            if role_ != "owner" and not (role_ == "admin" and path in ("/tenants", "/tenants/co")):
+            if role_ != "owner" and not (role_ == "admin" and path in ("/tenants", "/tenants/co", "/tenants/reports")):
                 return self.send(403, team_views.forbidden_page(team.role_of(who)))
+            if path == "/tenants/reports":
+                import mailer
+                return self.send(200, report_shares.admin_html(query, mailer.SITE))
             import tenants
             if path == "/tenants/co":
                 return self.send(200, tenants.company_html((query.get("k") or "").strip(), query, owner=role_ == "owner"))
@@ -1459,6 +1638,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                          "text/plain; charset=utf-8", h)
 
     def do_POST(self):
+        self._report = None
         if self.trial_route():
             return
         if self.route(urllib.parse.urlparse(self.path).path) in self.MEMO_POSTS:
@@ -1554,6 +1734,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_selection_order()
         if path == "/api/selection/status":
             return self.api_selection_status()
+        if path == "/api/report/shares":
+            return self.api_report_shares_post()
         if path == "/api/selection/scores":
             return self.api_selection_scores_publish()
         if path == "/api/selection/request-access":
@@ -1648,6 +1830,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                                 b.get("roles") if isinstance(b.get("roles"), dict) else {}, until,
                                                 who["email"] if "email" in who.keys() else "")
                 return self.send_json(200 if ok else 400, {"ok": ok, "message": msg}, [("Cache-Control", "no-store")])
+            if path == "/tenants/reports/revoke" and team.role_of(who) in ("owner", "admin"):
+                f = self.form_body()
+                r = report_shares.get(rid=int(f.get("id") or 0) if str(f.get("id") or "").isdigit() else 0)
+                if r is None:
+                    return self.redirect("/tenants/reports?e=" + urllib.parse.quote("That link no longer exists."))
+                report_shares.revoke(r["id"], who["email"] if "email" in who.keys() else "")
+                return self.redirect("/tenants/reports?ok=" + urllib.parse.quote("Revoked: %s." % (r["title"] or r["ref"])))
             if team.role_of(who) != "owner":
                 return self.send(403, team_views.forbidden_page(team.role_of(who)))
             import tenants
@@ -5951,12 +6140,29 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         """One creator for the analysis page: the public card facts always,
         the full analysis when one is uploaded."""
         code_id = self.viewer_code_id()
-        if code_id is None:
+        shared = self.report_share("creator", code) if code_id is None else None
+        if code_id is None and shared is None:
             return self.send_json(401, {"ok": False}, self.cors())
         r = db.creator(code)
         if r is None or not r["active"]:
             return self.send_json(404, {"ok": False}, self.cors())
         every = db.analyses(code)
+        if shared is not None:
+            # A client report link to this analysis (item 291): the full analysis HelloVoice chose to share,
+            # read-only, no money fields, no request buttons.
+            plats = list(db.platforms_of(code))
+            plats += [p for p in every if p not in plats]
+            db.log("view", None, self.client_ip(), self.headers.get("User-Agent"), "report link analysis:" + code)
+            card = {"code": r["code"], "name": r["name"], "tier": r["tier"], "city": r["city"],
+                    "nationality": r["nationality"], "interest": r["interest"], "followers": r["followers"],
+                    "photo_url": links.photo(r["photo"]) if r["photo"] else None,
+                    "profiles": db.split_profiles(r["profiles"]), "band": metrics.band_of(r["followers"])}
+            gate = {"state": "unlocked", "headline": gating.headline(card, every), "sample_full": False, "shared": True}
+            out = {"ok": True, "creator": card, "platforms": plats, "requested": [], "gate": gate,
+                   "analyses": {p: analysis.with_media_urls(a["data"], r["code"], BASE) for p, a in every.items()},
+                   "benchmarks": metrics.benchmarks(), "public": True,
+                   "shared": {"label": shared["label"] or "", "expires_at": shared["expires_at"]}}
+            return self.send_json(200, self.public_strip(out), self.cors() + [("Cache-Control", "no-store")])
         # The platforms this creator is on, plus any that has an analysis on file.
         plats = list(db.platforms_of(code))
         plats += [p for p in every if p not in plats]
@@ -5997,10 +6203,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         """A picture from a creator's analysis — post cover, photo or brand
         logo — for a viewer who has unlocked the catalogue."""
         viewer = self.viewer_code_id()
-        if viewer is None:
+        shared = self.report_share("creator", str(code or "").strip().upper()) if viewer is None else None
+        if viewer is None and shared is None:
             return self.send(401, b"", "text/plain")
         # Post covers and brand logos are part of the locked analysis.
-        if not self.admin_like() and not gating.unlocked(viewer, str(code or "").strip().upper()):
+        if shared is None and not self.admin_like() and not gating.unlocked(viewer, str(code or "").strip().upper()):
             return self.send(403, b"", "text/plain")
         f = analysis.media_path(code, name)
         if f is None:
@@ -6184,10 +6391,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             cid = self.link_code("s:" + token) or self.signed_in_client()
             if cid is None or (not portal.opens(int(cid), sel)
                                and int(cid) != db.admin_code_id()):
-                if self.public_selection(token) is None:
+                if self.public_selection(token, study=True) is None:
                     return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
                 public = True                   # public read-only link: the client's view, no actions
-        pk = evidence.for_selection(sel["id"], client_only=not staff)
+        sh = getattr(self, "_report", None) if public else None
+        # A client link to the study (or its selection) is HelloVoice choosing to show it: it opens even before
+        # the pack is switched on for the client (item 291).
+        pk = evidence.for_selection(sel["id"], client_only=not (staff or sh is not None))
         if pk is None:
             if creator is not None or thumb_post is not None or as_map:
                 return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
@@ -6210,9 +6420,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             out["reasons"] = {c: st.get("reason") or "" for c, st in status.items() if st["s"] == "rejected"}
             out["preview"] = bool(staff and not pk["client_visible"])
             if public:
-                out = self.public_strip(out)
+                out = self.share_strip(out)
                 out["can_add"] = False
-                out["can_decide"] = False
+                sh = getattr(self, "_report", None)
+                # A client link to the selection decides on the panel too (item 291); a study link only reads.
+                out["can_decide"] = bool(sh is not None and sh["kind"] == "selection")
+                if out["can_decide"]:
+                    out["role"] = "owner"
                 out["role"] = "viewer"
             return self.send_json(200, {"ok": True, "map": out}, self.cors())
         if thumb_post is not None:
@@ -6452,12 +6666,17 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         out["can_rename"] = (not public) and bool(sel["token"]) and selrename.client_may(reader, sel, db.admin_code_id())
         if public:
             # Read-only for anyone: no prices, totals or costs, no owner name, no actions.
-            out = self.public_strip(out)
-            out.pop("total", None)
+            shared = getattr(self, "_report", None)
+            out = self.share_strip(out)
+            if not self.share_prices():
+                out.pop("total", None)
             out["owner"] = None
             if isinstance(out.get("lifecycle"), dict):
                 out["lifecycle"]["owner"] = ""
-            out["role"] = "viewer"
+            # A client report link (item 291) approves, rejects and comments; a public link only looks.
+            out["role"] = "owner" if shared is not None and shared["kind"] == "selection" else "viewer"
+            if shared is not None:
+                out["shared"] = {"label": shared["label"] or "", "expires_at": shared["expires_at"], "prices": bool(shared["prices"])}
             out["public"] = True
             db.log("view", None, self.client_ip(), self.headers.get("User-Agent"), "public selection:" + sel["name"][:60])
         return self.send_json(200, out, self.cors())
@@ -6661,14 +6880,19 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         one = lambda k: (q.get(k) or [""])[0]
         why = self.roster_refusal(one("link").strip()[:80])
         if why and job == "cards" and one("link").strip()[:2] == "s:":
-            psel = self.public_selection(one("link").strip()[2:80])
+            psel = self.public_selection(one("link").strip()[2:80], study=True)
             if psel is not None:
                 # A public read-only selection link: the cards of that selection's creators only, no prices.
                 allowed = set(json.loads(psel["codes"] or "[]"))
                 codes = [c.strip().upper() for c in ",".join(q.get("codes") or []).split(",") if c.strip()]
                 codes = [c for c in codes if c in allowed][:200]
                 tiers = [{"name": x["name"], "from": None, "to": None, "reach": x["reach"]} for x in self.tier_payload()]
-                return self.send_json(200, {"ok": True, "cards": self.public_strip(paging.cards(self.roster_index(), codes)),
+                cards = paging.cards(self.roster_index(), codes)
+                if self.share_prices():
+                    tiers = self.tier_payload()        # a client link made with prices (item 291)
+                else:
+                    cards = self.public_strip(cards)
+                return self.send_json(200, {"ok": True, "cards": cards,
                                             "tiers": tiers, "fx": fx.rates(), "exp": links.expires_at(), "public": True},
                                       self.cors() + [("Cache-Control", "private, no-cache"), ("Vary", "Cookie")])
         if why:
@@ -6936,8 +7160,17 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         token = str(b.get("token") or "")
         reader = self.selection_viewer(token)
         if not reader:
-            self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
-            return None
+            # A client report link to this selection (item 291) decides as the selection's client would.
+            sh = self.report_share("selection", token) if token else None
+            sel = db.selection(token=token) if sh is not None else None
+            if sel is None or sel["deleted_at"] or sel["code_id"] is None:
+                self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
+                return None
+            code = str(b.get("code") or "").strip().upper()
+            if code not in json.loads(sel["codes"] or "[]"):
+                self.send_json(404, {"ok": False, "reason": "not_in_selection"}, self.cors())
+                return None
+            return sel, int(sel["code_id"]), "owner", code
         sel = db.selection(token=token) if token else None
         staff = self.staff_viewer() and self.kam_clients() is None
         if sel is None or (sel["code_id"] is not None and int(reader) != db.admin_code_id()
@@ -6951,6 +7184,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         return sel, int(reader), self.selection_role(sel, reader), code
 
     def _status_who(self, role, reader):
+        sh = getattr(self, "_report", None)
+        if sh is not None and role == "owner" and not self.signed_in_client():
+            return "client", ((sh["label"] or "Client") + " (shared link)")[:80], None
         if role == "admin":
             a = self.admin()
             u = self.person_user(reader) if a is None else None
@@ -7349,6 +7585,7 @@ def main():
     push.start()
     db.purge_expired_sessions()
     trial.init()
+    report_shares.init()
     _start_trial_process(args)
     ALLOWED_ORIGINS.update(args.origin)
     global BASE
@@ -7434,6 +7671,7 @@ def trial_main(args):
         team.init()
         evidence.init()
         trial.init()
+        report_shares.init()
     schema()
     trial.ON_FIRST_USE = schema
     ALLOWED_ORIGINS.update(args.origin)

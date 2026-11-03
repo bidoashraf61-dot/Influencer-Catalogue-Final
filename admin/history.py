@@ -144,6 +144,10 @@ def snapshot(entity, key, conn=None):
         return {"creators": _rows(conn, "creators", "1", ())}
     if entity == "settings":
         return {"settings": _rows(conn, "settings", "1", ())}
+    if entity == "share":
+        # A client report link (report_shares.py, item 291): undoing a make removes it, undoing a revoke reopens it.
+        rows = _rows(conn, "report_shares", "id = ?", (int(key),))
+        return {"report_shares": rows} if rows else None
     raise ValueError("unknown entity " + entity)
 
 
@@ -170,6 +174,8 @@ def _clear(conn, entity, key):
     elif entity == "settings":
         conn.execute("DELETE FROM settings")
         db.clear_setting_cache()
+    elif entity == "share":
+        conn.execute("DELETE FROM report_shares WHERE id = ?", (int(key),))
 
 
 # Parents before children, so foreign keys are satisfied as rows go back.

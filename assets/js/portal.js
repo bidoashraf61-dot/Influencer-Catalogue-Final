@@ -517,6 +517,7 @@
   var PERSONAL = /@(gmail|googlemail|hotmail|outlook|live|msn|yahoo|ymail|icloud|me|mac|aol|proton|protonmail|gmx|yandex|mail|zoho)\.[a-z.]+$/i;
 
   function enhanceGate(info) {
+    if (window.HV_SHARED) return;            // a client report link (report-share.js): never the sign-in
     var gate = $("cat-gate");
     if (!gate || gate.getAttribute("data-pt")) return;
     gate.setAttribute("data-pt", "1");
@@ -5066,6 +5067,7 @@
   }
 
   function boot() {
+    if (window.HV_SHARED) return;            // a client report link: no dock, Helvy, edit mode or gate (item 291)
     me(6).then(function (r) {
       if (r.b && r.b.signed_in) {
         ME = r.b; HV.me = ME; mountEditMode(); mountDock(); mountVoice(); mountAiCard(); mountLicences(); mountPreviewBar(); mountAdminStillNote();

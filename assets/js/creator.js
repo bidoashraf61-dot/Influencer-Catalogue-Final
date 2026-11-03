@@ -84,7 +84,7 @@
           if (!r.ok) { unlocked(); $("pp-empty").textContent = "The sample analysis isn't available right now."; $("pp-empty").hidden = false; return null; }
           return r.json();
         })
-        .then(function (b) { if (b) { D = b; unlocked(); render(); } })
+        .then(function (b) { if (b) { D = b; reportHooks(); unlocked(); render(); } })
         .catch(function () { unlocked(); $("pp-empty").textContent = "Could not load the sample. Please try again."; $("pp-empty").hidden = false; });
       return;
     }
@@ -95,7 +95,7 @@
         if (!r.ok) { unlocked(); $("pp-empty").textContent = r.status === 404 ? "That creator is not in the catalogue." : "Could not load this creator. Please try again."; $("pp-empty").hidden = false; return null; }
         return r.json();
       })
-      .then(function (b) { if (b) { D = b; unlocked(); render(); } })
+      .then(function (b) { if (b) { D = b; reportHooks(); unlocked(); render(); } })
       .catch(function () { unlocked(); $("pp-empty").textContent = "Could not load this creator. Please try again."; $("pp-empty").hidden = false; });
   }
   window.addEventListener("hashchange", load);
@@ -1028,6 +1028,13 @@
       window.jspdf ? 0 : script("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js")
     ]));
   }
+  // Client report links (item 291, report-share.js): the shared bar's Download PDF is this PDF.
+  function reportHooks() {
+    if (!window.HVReport) return;
+    window.HVReport.markLoaded();
+    window.HVReport.pdf = function (btn) { var b = btn || $("pp-print"); if (b) downloadPdf(b); };
+  }
+
   function downloadPdf(btn) {
     var label = btn.innerHTML;
     btn.disabled = true; btn.innerHTML = I_DOWN + "Preparing PDF…";
@@ -1063,6 +1070,13 @@
           }
         });
       }, Promise.resolve()).then(function () {
+        // Every page says when these numbers were read (item 291), and which page it is.
+        var asof = window.HVReport && window.HVReport.asOf ? window.HVReport.asOf() : "", n = doc.getNumberOfPages();
+        for (var i = 1; i <= n; i++) {
+          doc.setPage(i); doc.setFontSize(7.5); doc.setTextColor(56, 56, 56);
+          doc.text("HELVi Connect by HelloVoice" + (asof ? " · " + asof : ""), M, PH - 12);
+          doc.text("Page " + i + " of " + n, PW - M, PH - 12, { align: "right" });
+        }
         var c = D.creator;
         doc.save((c.name || c.code).replace(/[^\w؀-ۿ -]+/g, "").trim().replace(/\s+/g, "-") + "-" + c.code + "-" + (PLAT || "").toLowerCase() + "-analysis.pdf");
       });

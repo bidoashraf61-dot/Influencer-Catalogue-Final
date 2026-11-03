@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
+<meta name="referrer" content="no-referrer"/>
+<title>Report — HELVi Connect</title>
+<link rel="icon" href="../assets/brand/helvy-connect/helvy-icon-32.png?v=c4" type="image/png"/>
+<link rel="stylesheet" href="../assets/css/catalogue.css"/>
+<link rel="stylesheet" href="../assets/css/report-share.css"/>
+<style>
+  body { margin: 0; background: #fff; }
+  .rs-opening { min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+  .rs-opening img { height: 72px; width: auto; animation: rs-breathe 1.6s ease-in-out infinite; }
+  @keyframes rs-breathe { 50% { opacity: .45; } }
+  @media (prefers-reduced-motion: reduce) { .rs-opening img { animation: none; } }
+</style>
+</head>
+<body>
+<!-- A client report link (item 291): /report/#r=<token>. Asks the portal what the link opens, then moves to
+     that report with the link attached (report-share.js takes it from there). Nothing else of the portal loads. -->
+<div class="rs-opening" id="rs-opening" role="status" aria-label="Opening the report">
+  <img src="../assets/brand/helvy-connect/helvy-connect-light-320.webp?v=c5" alt="HELVi Connect"/>
+</div>
+<script>
+(function () {
+  "use strict";
+  var m = /[#&]r=([A-Za-z0-9_-]{16,40})/.exec(location.hash || "");
+  function ended(reason) {
+    var msg = reason === "revoked" ? "HelloVoice closed this link." : reason === "ended" ? "This link has ended." : "This link does not open a report.";
+    document.body.innerHTML = '<section class="rs-ended" role="alert"><img src="../assets/brand/helvy-connect/helvy-connect-light-320.webp?v=c5" alt="HELVi Connect">'
+      + "<h1>This report is not available</h1><p>" + msg + " Ask your HelloVoice contact for a new link.</p></section>";
+  }
+  if (!m) return ended("");
+  fetch("/admin/api/report?r=" + m[1], { credentials: "include", cache: "no-store" })
+    .then(function (r) { return r.json().then(function (b) { return { st: r.status, b: b }; }); })
+    .then(function (res) {
+      if (res.st !== 200 || !res.b.ok || !/^\/(campaign\/dashboard|selection|creator|market)\/#/.test(res.b.page || "")) return ended(res.b && res.b.reason);
+      location.replace(".." + res.b.page);
+    })
+    .catch(function () { ended(""); });
+})();
+</script>
+</body>
+</html>
