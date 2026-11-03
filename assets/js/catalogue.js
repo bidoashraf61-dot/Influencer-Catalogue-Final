@@ -4914,7 +4914,7 @@
       paintPicks();
 
       $("sel-title").textContent = selectionName;
-      document.title = selectionName + " — HELVi Connect";
+      document.title = selectionName + " — HELVi Select";
       if (REFUSED && !selected.length) { if (!$("cat-empty").querySelector(".sel-reqaccess")) refusedPanel($("cat-empty")); }
       else $("cat-empty").textContent = selected.length
         ? "No creators in this selection match those filters. Clear a filter or two to see more."

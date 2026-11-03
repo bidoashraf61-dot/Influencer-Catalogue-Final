@@ -126,7 +126,7 @@
   /* ------------------------------------------------------------- header */
   function setupHeader() {
     var c = R.campaign;
-    document.title = c.name + " — Dashboard — HELVi Connect";
+    document.title = c.name + " — Dashboard — HELVi Track";
     $("db-title").textContent = c.name;
     // The company's own colour (set in /workspace/ -> Settings), as the title's underline. Hex only, checked server-side.
     if (c.brand_colour && /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(c.brand_colour)) $("db-title").style.boxShadow = "inset 0 -0.16em 0 " + c.brand_colour;

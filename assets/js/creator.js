@@ -242,7 +242,7 @@
     PLAT = choosePlat();
     var a = (D.analyses || {})[PLAT] || null;
     D.analysis = a;
-    document.title = D.sample ? "Sample full analysis — HELVi Connect" : c.name + " — Creator analysis — HELVi Connect";
+    document.title = D.sample ? "Sample full analysis — HELVi Select" : c.name + " — Creator analysis — HELVi Select";
     window.scrollTo(0, 0);
     var gate = D.gate || { state: "unlocked" };
     var oldGate = $("pp-gate"); if (oldGate) oldGate.remove();

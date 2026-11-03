@@ -1339,7 +1339,7 @@
     var counts = {}, max = 0;
     (o.items || []).forEach(function (it) { counts[it.stage] = (counts[it.stage] || 0) + 1; });
     (o.stages || []).forEach(function (st) { max = Math.max(max, counts[st.key] || 0); });
-    var pipe = h("ol", { class: "mb-pipe", "aria-label": "By stage: " + (o.stages || []).map(function (st) { return st.label + " " + (counts[st.key] || 0); }).join(", ") });
+    var pipe = h("ol", { class: "mb-pipe", role: "img", "aria-label": "By stage: " + (o.stages || []).map(function (st) { return st.label + " " + (counts[st.key] || 0); }).join(", ") });
     (o.stages || []).forEach(function (st) {
       var n = counts[st.key] || 0;
       var bar = h("span", { class: "mb-pipe__bar" + (HOT[st.key] ? " is-hot" : "") + (n ? "" : " is-zero") });

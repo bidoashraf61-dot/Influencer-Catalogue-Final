@@ -770,3 +770,5 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
   body[data-page="campaign"] .mx-top__links:has(.hv-mods) { flex: 1 1 100%; justify-content: flex-start; }
   body[data-page="campaign"] .mx-top:has(.hv-mods) #mx-catalogue { display: none; }
 }
+/* audit: the Completed stage mark is ink, invisible on the cover's ink */
+.mb-pipe .hvb-stico.hvb-lane--completed { background: rgba(255,255,255,.22); color: var(--white); }
