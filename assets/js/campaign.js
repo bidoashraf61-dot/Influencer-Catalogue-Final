@@ -562,7 +562,7 @@
     });
     var owed = (c.planned || 0) - mine.length;
     if (owed > 0) rows.push('<div class="mx-cc__owed"><span>' + (owed === 1 ? "Video " + (mine.length + 1) : "Videos " + (mine.length + 1) + "–" + c.planned)
-      + "</span><em>" + (c.pending_date ? "Expected " + esc(day(c.pending_date, false)) : "Coming soon") + "</em></div>");
+      + "</span><em" + (late(c.pending_date) ? ' class="mx-late"' : "") + ">" + (c.pending_date ? esc(whenText(c, false)) : "Coming soon") + "</em></div>");
     return rows.length ? '<div class="mx-cc__vids">' + rows.join("") + "</div>" : "";
   }
   function renderCarousel() {
@@ -919,7 +919,7 @@
     var list = mergePieces(R.posts.filter(function (p) {
       return (!FILTER.section || p.section === FILTER.section) && (!FILTER.platform || p.platform === FILTER.platform)
         && (!FILTER.kind || p.kind === FILTER.kind);
-    }));
+    })).sort(function (a, b) { return (b.views || b.reach || 0) - (a.views || a.reach || 0); });     // the strongest first (audit item 304)
     var owed = pendingCards();
     if (!list.length && !owed.length) { $("mx-wall").innerHTML = '<p class="mx-empty-note">No posts yet. They appear here within 24 hours of going live.</p>'; return; }
     $("mx-wall").innerHTML = owed.length && !list.length ? owed.map(pendingCard).join("") : list.map(function (p) {
@@ -972,15 +972,18 @@
   }
   // With posts already live, the ones still to come fold into one short
   // "Coming next" list instead of a full card each (mobile audit 2026-10-19).
+  // A planned post past its date reads as late, in amber (audit item 304), not as a calm "Expected".
+  function late(d) { var t = typeof d === "number" ? d : Date.parse(d) / 1000; return !!d && t < Date.now() / 1000 - 86400; }   // dates come as "YYYY-MM-DD"
+  function whenText(c, withYear) { return c.pending_date ? (late(c.pending_date) ? "Late · was due " : "Expected ") + day(c.pending_date, withYear) : "Date to be confirmed"; }
   function pendingStrip(owed) {
     return '<section class="mx-next" aria-label="Coming next"><h3 class="mx-next__h">Coming next · ' + owed.length + (owed.length === 1 ? " video" : " videos") + "</h3><ul>"
       + owed.map(function (x) {
-        var c = x.c, when = c.pending_date ? "Expected " + day(c.pending_date) : "Date to be confirmed";
-        return "<li>" + ava(c.photo) + "<span><b>" + esc(c.name) + "</b><small>Post " + x.n + " of " + c.planned + "</small></span><em>" + esc(when) + "</em></li>";
+        var c = x.c, when = whenText(c);
+        return "<li>" + ava(c.photo) + "<span><b>" + esc(c.name) + "</b><small>Post " + x.n + " of " + c.planned + "</small></span><em" + (late(c.pending_date) ? ' class="mx-late"' : "") + ">" + esc(when) + "</em></li>";
       }).join("") + "</ul></section>";
   }
   function pendingCard(x) {
-    var c = x.c, when = c.pending_date ? "Expected " + day(c.pending_date) : "Date to be confirmed";
+    var c = x.c, when = whenText(c);
     var pic = c.photo_large || c.photo;
     return '<article class="mx-post mx-post--pending"><div class="mx-post__media"><div class="mx-post__plate"></div>'
       + (pic ? '<img src="' + esc(pic) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : "")

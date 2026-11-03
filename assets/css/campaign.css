@@ -1163,3 +1163,15 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
   .mx-cover { background: #0b0b0b !important; text-align: center; }
   .mx-cover img { width: 66% !important; max-height: none !important; margin: 0 auto; object-fit: contain !important; }
 }
+
+/* Audit leftovers (item 304, 2026-11-03): nothing on screen under 12px; late posts in amber; 44px taps on phones. */
+@media screen {
+  .mx-gantt__today span, .mx-state, .mx-nums dt, .mx-est, .mx-bullet__mark span, .mx-table, .mx-obj__due span, .mx-cc__meta,
+  .mx-bar, .mx-key-line, .mx-cc__chips a, .mx-post__tag, .mx-post__lbl, .mx-say__helvi p, .mx-say__nums dt, .mx-tcd__term, .mx-bar__k small { font-size: 12px !important; }
+}
+.mx-late { color: #a85507 !important; font-weight: 600; }
+@media (max-width: 700px) {
+  .mx-post__lk, .mx-tab, .mx-chip, .mx-post__go, .mx-saybox__go { min-height: 44px; display: inline-flex; align-items: center; }
+  .mx-info { position: relative; }
+  .mx-info::after { content: ""; position: absolute; inset: -9px; }
+}
