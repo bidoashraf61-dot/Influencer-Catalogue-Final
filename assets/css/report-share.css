@@ -53,6 +53,8 @@
 .hv-shared #hv-rn-sel, .hv-shared .sel-brief__acts, .hv-shared .cx-selact, .hv-shared .sel-tool--pick, .hv-shared .sel-tool--more,
 .hv-shared .cat-footer__copy, .hv-shared .cat-footer__legal, .hv-shared .hv-rn-btn { display: none !important; }
 .hv-shared .cat-brand, .hv-shared .cat-brand a { pointer-events: none; }
+/* Competitor study: no way back to the selection or into the portal. */
+.hv-shared .ev-mi__hd a.ev-act, .hv-shared .ev-mi__hd a[href*="/selection/"] { display: none !important; }
 /* On the selection's dark cover the line button is a ghost on ink (DESIGN: Ghost on ink). */
 .cat-cover .rs-btn--line, .cat-selhead .rs-btn--line { color: #fff; border-color: rgba(255,255,255,.35); }
 .cat-cover .rs-btn--line:hover, .cat-cover .rs-btn--line[aria-expanded="true"], .cat-selhead .rs-btn--line:hover, .cat-selhead .rs-btn--line[aria-expanded="true"] {
