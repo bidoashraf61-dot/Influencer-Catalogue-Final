@@ -44,6 +44,17 @@
   }
 
 
+  // A module this person may not open: the locked page (access.js, through app.js's watcher) takes over. Should it not
+  // appear (scripts blocked, an old cached app.js), the page still says why instead of standing empty.
+  function refused(b) {
+    $("mb-loading").hidden = true;
+    setTimeout(function () {
+      if (document.querySelector(".hva")) return;
+      closed((b && b.name ? b.name : "This module") + " isn't open to you",
+        b && b.code === "no_role" ? "Ask your account admin for a role in it." : "Ask HelloVoice to switch it on for your company.");
+    }, 2000);
+  }
+
   /* ---------------------------------------------------------- selections */
   var SEL_STAGES = [
     { key: "draft", label: "Draft", hint: "Named, no creators yet" },
@@ -66,7 +77,7 @@
   function selections() {
     return api("GET", "/api/account").then(function (r) {
       if (r.s === 401) { closed("Please sign in", "Sign in on the catalogue to see your selections."); return; }
-      if (r.s === 403) { if (!(r.b && r.b.code)) closed("Selections are for signed-in clients", "Sign in with your work email to see every selection on one board."); else $("mb-loading").hidden = true; return; }
+      if (r.s === 403) { if (!(r.b && r.b.code)) closed("Selections are for signed-in clients", "Sign in with your work email to see every selection on one board."); else refused(r.b); return; }
       if (!r.b.ok) { closed("Something went wrong", "Your selections couldn't be loaded. Please try again shortly."); return; }
       var list = r.b.selections || [];
       var studies = list.filter(function (s) { return s.study; }).length;
@@ -106,7 +117,7 @@
   function intelligence() {
     return api("GET", "/api/evidence/board").then(function (r) {
       if (r.s === 401) { closed("Please sign in", "Sign in on the catalogue to see your competitor studies."); return; }
-      if (r.s === 403) { $("mb-loading").hidden = true; return; }      // the locked page (app.js) takes over
+      if (r.s === 403) { refused(r.b); return; }
       if (!r.b.ok) { closed("Something went wrong", "The studies couldn't be loaded. Please try again shortly."); return; }
       var B = r.b, list = B.studies || [];
       var posts = list.reduce(function (a, s) { return a + (s.posts || 0); }, 0);
@@ -146,5 +157,8 @@
   }
 
   if (!window.HVBoard) { closed("Something went wrong", "The board couldn't start. Please reload the page."); return; }
-  (KIND === "intelligence" ? intelligence : selections)();
+  // Start once the deferred scripts have run: app.js installs the fetch watcher that draws the locked page, and the
+  // first request must pass through it (item 313 client audit: the member's page stood blank).
+  function start() { (KIND === "intelligence" ? intelligence : selections)(); }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start();
 })();
