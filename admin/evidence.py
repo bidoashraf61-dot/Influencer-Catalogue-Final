@@ -63,6 +63,18 @@ CREATE TABLE IF NOT EXISTS brand_logos (
     approved_at INTEGER,
     updated_at INTEGER
 );
+-- Notes on a study's creators (item 303): written by the client's team through the study link and by
+-- HelloVoice; everyone who may open the study reads them, and the KAM is told of each new one.
+CREATE TABLE IF NOT EXISTS evidence_notes (
+    id INTEGER PRIMARY KEY,
+    selection_id INTEGER NOT NULL,
+    handle TEXT NOT NULL,
+    note TEXT NOT NULL,
+    by_name TEXT,
+    by_staff INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS evidence_notes_sel ON evidence_notes (selection_id, handle);
 -- Creators a pack put on the roster: the mark Apify jobs target ("evidence:<pack id>"), even while hidden.
 CREATE TABLE IF NOT EXISTS evidence_roster (
     code TEXT PRIMARY KEY,
@@ -901,6 +913,40 @@ def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locke
             "competitors": sorted([{"name": c["name"], "posts": c["posts"], "views": c["views"], "creators": len(c["creators"]),
                                     "logo": logo_url(c["name"], approved)} for c in comps.values()], key=lambda c: -c["views"]),
             "creators": out}
+
+
+NOTE_MAX = 280
+
+
+def notes_for(selection_id):
+    """{handle: [{t, by, staff, at}]} oldest first: the notes on a study's creators."""
+    out = {}
+    with _conn() as conn:
+        for r in conn.execute("SELECT handle, note, by_name, by_staff, created_at FROM evidence_notes WHERE selection_id = ? "
+                              "ORDER BY id LIMIT 2000", (int(selection_id),)):
+            out.setdefault(r["handle"], []).append({"t": r["note"], "by": r["by_name"] or "", "staff": bool(r["by_staff"]),
+                                                    "at": r["created_at"]})
+    return out
+
+
+def add_note(selection_id, handle, note, by_name, staff=False):
+    """A new note; returns it, or None when the note is empty."""
+    note = re.sub(r"\s+", " ", str(note or "")).strip()[:NOTE_MAX]
+    handle = str(handle or "").lower().lstrip("@")[:60]
+    if not note or not handle:
+        return None
+    at = db.now()
+    with _conn() as conn:
+        conn.execute("INSERT INTO evidence_notes (selection_id, handle, note, by_name, by_staff, created_at) VALUES (?,?,?,?,?,?)",
+                     (int(selection_id), handle, note, str(by_name or "")[:80], 1 if staff else 0, at))
+    return {"t": note, "by": str(by_name or "")[:80], "staff": bool(staff), "at": at}
+
+
+def has_handle(pk, handle):
+    """True when ``handle`` posted in the pack (a creator of the study, on the roster or not)."""
+    with _conn() as conn:
+        return conn.execute("SELECT 1 FROM evidence_posts WHERE pack_id = ? AND handle = ? LIMIT 1",
+                            (pk["id"], str(handle or "").lower().lstrip("@"))).fetchone() is not None
 
 
 def add_by_handle(pk, sel, handle):

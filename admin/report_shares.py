@@ -45,6 +45,13 @@ CREATE TABLE IF NOT EXISTS report_shares (
     last_open_at  INTEGER
 );
 CREATE INDEX IF NOT EXISTS report_shares_item ON report_shares (kind, ref);
+-- One alert per link, per kind of event, per day (item 303: the KAM hears when a study link is opened or its PDF saved).
+CREATE TABLE IF NOT EXISTS report_pings (
+    share_id INTEGER NOT NULL,
+    what     TEXT NOT NULL,
+    day      TEXT NOT NULL,
+    PRIMARY KEY (share_id, what, day)
+);
 """
 
 
@@ -121,6 +128,15 @@ def touch(r):
     with db.connect() as c:
         c.execute("UPDATE report_shares SET opens = opens + 1, first_open_at = COALESCE(first_open_at, ?), "
                   "last_open_at = ? WHERE id = ?", (now, now, r["id"]))
+
+
+def ping(r, what):
+    """True the first time today that link ``r`` did ``what`` ("open", "pdf"): the moment to tell its KAM."""
+    import time
+    day = time.strftime("%Y-%m-%d", time.gmtime(db.now() + 3 * 3600))      # Riyadh day
+    with db.connect() as c:
+        return c.execute("INSERT OR IGNORE INTO report_pings (share_id, what, day) VALUES (?,?,?)",
+                         (r["id"], str(what)[:12], day)).rowcount == 1
 
 
 def revoke(rid, by=""):

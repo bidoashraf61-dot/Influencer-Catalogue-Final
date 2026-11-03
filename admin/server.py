@@ -770,6 +770,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                   self.cors() + [("Cache-Control", "no-store")])
         if not peek:                            # the report page itself asks again (peek): one open per visit
             report_shares.touch(r)
+            if r["kind"] == "study" and report_shares.ping(r, "open"):
+                self.study_alert(r, "opened")
         db.log("view", None, self.client_ip(), self.headers.get("User-Agent"), "report link %d:%s" % (r["id"], r["kind"]))
         held = [r["token"]] + [t for t in (self.cookies().get(report_shares.COOKIE, "") or "").split(".")
                                if t and t != r["token"]][:9]
@@ -1129,6 +1131,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_evidence(query.get("s") or "", None, kam_scope._int(query.get("p")))
         if path == "/api/evidence/creator":
             return self.api_evidence(query.get("s") or "", (query.get("c") or "").strip().upper())
+        if path == "/api/evidence/notes":
+            return self.api_evidence_notes(query.get("s") or "")
         if path == "/api/selection/gate":
             gs = db.selection(token=query.get("s") or "")
             if gs is None:
@@ -1736,6 +1740,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_evidence_add()
         if path == "/api/evidence/request":
             return self.api_evidence_request()
+        if path == "/api/evidence/note":
+            return self.api_evidence_note()
+        if path == "/api/report/ping":
+            return self.api_report_ping()
         if path == "/api/selection/status/bulk":           # item 242
             import selfilters
             return selfilters.api_bulk(self)
@@ -6367,16 +6375,18 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         staff = self.admin_like_for(sel["code_id"], sel["id"]) or (self.staff_viewer() and self.kam_clients() is None)
         cid = None
-        if not staff:
+        link = self.study_link(sel, token) if not staff else None
+        if not staff and link is None:
             cid = self.link_code("s:" + token) or self.signed_in_client()
             if cid is None or (not portal.opens(int(cid), sel)
                                and int(cid) != db.admin_code_id()):
                 return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
-        pk = evidence.for_selection(sel["id"], client_only=not staff)
+        pk = evidence.for_selection(sel["id"], client_only=not (staff or link is not None))
         if pk is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         handle = str(b.get("handle") or "").lower().lstrip("@")[:60]
-        kind = "unavailable" if b.get("kind") == "unavailable" else "roster"
+        # "book": a creator in the selection the client wants (item 303, the study link's Ask HelloVoice button).
+        kind = {"unavailable": "unavailable", "book": "book"}.get(b.get("kind"), "roster")
         with evidence._conn() as conn:
             r = conn.execute("SELECT name, code FROM evidence_posts WHERE pack_id = ? AND handle = ? LIMIT 1", (pk["id"], handle)).fetchone()
         if r is None:
@@ -6385,13 +6395,95 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if not staff:
             u = self.person_user(int(cid)) if cid is not None else None
             who = ((u["name"] or u["email"]) + ", " + (u["company"] or "")) if u else "An access-code client"
+            if link is not None:
+                who = "%s (competitor study link)" % (link["label"] or "The client")
             what = ("is marked Unavailable on the selection; they ask you to check again" if kind == "unavailable"
+                    else "is in the selection; they would like to book them" if kind == "book"
                     else "is not on the roster yet; they ask you to sign them")
             import notify
             notify.send("creator_request", ["%s asked for %s (@%s) from Market Intelligence." % (who, r["name"] or handle, handle),
                                             "The creator %s." % what, "Selection: %s" % sel["name"]],
-                        kam=u["kam"] if u is not None else None)
+                        kam=(u["kam"] if u is not None else None) or db.effective_kam("selection", sel["id"], sel["code_id"]))
         return self.send_json(200, {"ok": True}, self.cors())
+
+    # ------------------------------------------------- competitor study link (item 303) --
+    def study_link(self, sel, token):
+        """The open client link to this selection's competitor study that the request carries, or None."""
+        if self.public_selection(token, study=True) is None:
+            return None
+        r = getattr(self, "_report", None)
+        return r if r is not None and r["kind"] == "study" and r["ref"] == sel["token"] else None
+
+    def study_alert(self, r, what):
+        """Tell the study's KAM (and the notify list) that its client link was opened or its PDF saved."""
+        sel = db.selection(token=r["ref"])
+        if sel is None:
+            return
+        import notify
+        notify.send("report_opened", ["%s %s the competitor study link." % (r["label"] or "The client", what),
+                                      "Selection: %s" % sel["name"],
+                                      "Opened %d time%s so far." % (r["opens"] or 0, "" if (r["opens"] or 0) == 1 else "s")],
+                    kam=db.effective_kam("selection", sel["id"], sel["code_id"]))
+
+    def api_report_ping(self):
+        """POST {what: "pdf"} from a study link page: its PDF was saved. One alert per link per day."""
+        b = self.json_body()
+        what = "pdf" if b.get("what") == "pdf" else None
+        for t in self.report_tokens():
+            r = report_shares.valid(t, "study")
+            if r is not None and what:
+                if report_shares.ping(r, what):
+                    self.study_alert(r, "saved the PDF of")
+                return self.send_json(200, {"ok": True}, self.cors())
+        return self.send_json(404, {"ok": False}, self.cors())
+
+    def study_reader(self, token):
+        """(selection, pack, who, staff) for someone who may read the study's notes, else None."""
+        sel = db.selection(token=token) if token else None
+        if sel is None or sel["deleted_at"]:
+            return None
+        staff = self.admin_like_for(sel["code_id"], sel["id"]) or (self.staff_viewer() and self.kam_clients() is None)
+        link = None if staff else self.study_link(sel, token)
+        who = None
+        if staff:
+            a = self.admin()
+            who = ((a["name"] if a is not None and "name" in a.keys() else "") or (a["email"] if a is not None else "") or "HelloVoice")
+        elif link is not None:
+            who = "%s (study link)" % (link["label"] or "Client")
+        else:
+            cid = self.link_code("s:" + token) or self.signed_in_client()
+            if cid is None or not portal.opens(int(cid), sel):
+                return None
+            u = self.person_user(int(cid))
+            who = (u["name"] or u["email"]) if u else "Client"
+        pk = evidence.for_selection(sel["id"], client_only=not (staff or link is not None))
+        return (sel, pk, who, bool(staff)) if pk is not None else None
+
+    def api_evidence_notes(self, token):
+        got = self.study_reader(token)
+        if got is None:
+            return self.send_json(401, {"ok": False}, self.cors() + [("Cache-Control", "no-store")])
+        return self.send_json(200, {"ok": True, "notes": evidence.notes_for(got[0]["id"])}, self.cors() + [("Cache-Control", "no-store")])
+
+    def api_evidence_note(self):
+        """POST {token, handle, note}: a note on one of the study's creators; the KAM is told."""
+        b = self.json_body()
+        got = self.study_reader(str(b.get("token") or ""))
+        if got is None:
+            return self.send_json(401, {"ok": False}, self.cors())
+        sel, pk, who, staff = got
+        handle = str(b.get("handle") or "").lower().lstrip("@")[:60]
+        if not evidence.has_handle(pk, handle):
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        n = evidence.add_note(sel["id"], handle, b.get("note"), who, staff)
+        if n is None:
+            return self.send_json(400, {"ok": False, "reason": "empty"}, self.cors())
+        if not staff:
+            import notify
+            notify.send("study_note", ["%s left a note on @%s in the competitor study." % (who, handle),
+                                       "\u201c%s\u201d" % n["t"], "Selection: %s" % sel["name"]],
+                        kam=db.effective_kam("selection", sel["id"], sel["code_id"]))
+        return self.send_json(200, {"ok": True, "note": n}, self.cors())
 
     def api_evidence(self, token, creator=None, thumb_post=None, as_map=False):
         """The competitor evidence filed under a selection, for its client page — only when an admin

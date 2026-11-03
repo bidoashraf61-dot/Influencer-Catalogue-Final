@@ -9,6 +9,8 @@
   var root = document.getElementById("ev-root");
   var marketPage = !!document.getElementById("ev-market");
   if (!marketPage && (!sec || !root)) return;
+  // A client link to the competitor study gets its own page, "Who to book" (study-share.js, item 303).
+  if (marketPage && window.HV_SHARED && window.HV_SHARED.kind === "study") return;
   var data = null, brandIx = 0, loadedFor = null;
 
   function token() {

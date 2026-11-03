@@ -106,7 +106,7 @@
     mo.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true });
     var wait = function () {
       var drawn = here[0] === "selection" ? document.querySelectorAll(".cat-card").length
-        : here[0] === "study" ? document.querySelectorAll("#ev-market .ev-mi__bd *").length > 20
+        : here[0] === "study" ? (HV.shared && typeof HV.studyReady === "function" ? HV.studyReady() : document.querySelectorAll("#ev-market .ev-mi__bd *").length > 20)
         : document.getElementById("pp-print");
       if ((drawn && Date.now() - last > 1500) || ++tries > 80) { mo.disconnect(); HV.download(document.getElementById("pp-print")); }
       else setTimeout(wait, 400);
