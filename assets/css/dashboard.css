@@ -2115,3 +2115,17 @@ details.db-vt > .db-wall { padding: 12px; }
 @media (max-width: 900px) { details.db-cw > summary.db-cw__h { grid-template-columns: 56px minmax(0, 1fr) 28px; } details.db-cw > summary .db-cw__st { grid-column: 1 / -1; } }
 @media (prefers-reduced-motion: reduce) { .db-cw__chev::after, details.db-vt > summary::after { transition: none; } }
 .pp .db-pf, .pp .db-cw__chev { display: none; }
+
+/* Header never squeezes its title (item 295, 2026-11-03): the title and its client / live / dates line keep at least
+   380px; when the buttons do not fit beside it they move to their own row instead of crushing it. Phones keep the
+   640px layout above. */
+@media (min-width: 641px) {
+  .db-head { flex-wrap: wrap; row-gap: 10px; }
+  .db-head__title { flex: 1 1 380px; min-width: min(380px, 100%); }
+  .db-head__actions { flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+}
+@media (max-width: 640px) {
+  /* the Share button (report-share.js) takes the full row when it is the odd one out, like the other buttons */
+  .db-head__actions > .rs-share:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .db-head__actions > .rs-share { min-height: 44px; font-size: 17px; }
+}
