@@ -248,6 +248,8 @@
     var oldGate = $("pp-gate"); if (oldGate) oldGate.remove();
     var oldBand = $("pp-gate-band"); if (oldBand) oldBand.remove();
     clearLocks();
+    var oldStory = $("pp-story"); if (oldStory) oldStory.remove();
+    [].forEach.call(document.querySelectorAll(".pp-head__story"), function (n) { n.remove(); });
     renderId(c, a);
     if (gate.state !== "unlocked") {
       // Analysis gating: the real headline, then the real sections drawn from sample data.
@@ -272,8 +274,60 @@
     renderNetwork(a);
     renderAudience(a);
     renderTags(a);
+    renderStory(a);
     $("pp-source").textContent = a.updated ? "Data as of " + day(a.updated) : "";
     addTips();
+  }
+
+  /* The report as a magazine (Bido 2026-11-03): contents cards up top, one figure and one plain line per chapter,
+     and the same line under each chapter's title. Lines are built from the data, never invented. */
+  function renderStory(a) {
+    var old = $("pp-story"); if (old) old.remove();
+    [].forEach.call(document.querySelectorAll(".pp-head__story"), function (n) { n.remove(); });
+    var c = D.creator, out = [], best = 0, bestKind = "views";
+    (a.top_posts || []).concat(a.sponsored_posts || []).forEach(function (p) {
+      if (p.views != null && p.views > best) { best = p.views; bestKind = "views"; }
+      else if (p.views == null && p.likes != null && bestKind !== "views" && p.likes > best) { best = p.likes; bestKind = "likes"; }
+      else if (!best && p.likes != null) { best = p.likes; bestKind = "likes"; }
+    });
+    if (best) out.push({ sec: "pp-posts-sec", fig: num(best), term: "Best post",
+      line: "The best post here reached " + num(best) + " " + bestKind + (a.avg_views ? ", against " + num(a.avg_views) + " on an average post." : ".") });
+    if (a.fake_followers_pct != null) {
+      var real = Math.max(0, 100 - a.fake_followers_pct);
+      out.push({ sec: "pp-real-sec", fig: Math.round(real) + "%", term: "Real followers",
+        line: Math.round(real) + "% of " + num(a.followers || c.followers) + " followers look like real people" + (a.fake_likers_pct != null ? "; " + pct(a.fake_likers_pct, 0) + " of likers look fake." : ".") });
+    }
+    if (a.er != null) out.push({ sec: "pp-h-perf", fig: pct2(a.er), term: "Engagement",
+      line: "Engagement is " + pct2(a.er) + (a.avg_likes && !a.likes_hidden ? ", with about " + num(a.avg_likes) + " likes" + (a.avg_comments ? " and " + num(a.avg_comments) + " comments" : "") + " a post." : ".") });
+    var brands = (a.brands || []).filter(function (b) { return b && b.logo; }), ci = a.creator_interests || [];
+    if (brands.length || ci.length) out.push({ sec: "pp-net-sec", fig: brands.length ? String(brands.length) : String(ci.length), term: brands.length ? "Brands" : "Interests",
+      line: (brands.length ? "Has worked with or talked about " + brands.length + (brands.length === 1 ? " brand" : " brands") : "") + (ci.length ? (brands.length ? "; " : "") + "talks most about " + ci.slice(0, 3).join(", ").toLowerCase() : "") + "." });
+    var au = a.audience || {}, cs = au.countries || [];
+    if (cs.length) out.push({ sec: "pp-aud-sec", fig: pct(cs[0].pct, 0), term: "Top audience",
+      line: pct(cs[0].pct, 0) + " of the audience is in " + countryName(cs[0].code) + (cs[1] ? ", then " + countryName(cs[1].code) + " at " + pct(cs[1].pct, 0) : "")
+        + (au.gender && au.gender.female != null ? "; " + pct(au.gender.female, 0) + " women." : ".") });
+    var tags = (a.hashtags || []).filter(function (h) { return String(h.tag).charAt(0) !== "@"; });
+    if (tags.length) out.push({ sec: "pp-tags-sec", fig: String(tags[0].tag), term: "Top hashtag",
+      line: "Most used: " + tags.slice(0, 3).map(function (h) { return h.tag; }).join(", ") + "." });
+    if (!out.length) return;
+    var box = document.createElement("nav"); box.id = "pp-story"; box.className = "pp-story"; box.setAttribute("aria-label", "In this report");
+    box.innerHTML = '<p class="pp-story__k">In this report</p><div class="pp-story__cards">' + out.map(function (o, i) {
+      return '<a class="pp-story__card" href="#' + o.sec + '" data-sec="' + o.sec + '"><span class="pp-story__n">' + String(i + 1).padStart(2, "0") + "</span>"
+        + '<b class="pp-story__fig"' + arDir(o.fig) + ">" + esc(o.fig) + '</b><span class="pp-story__term">' + esc(o.term) + "</span>"
+        + '<span class="pp-story__line">' + esc(o.line) + "</span></a>";
+    }).join("") + "</div>";
+    var at = $("pp-plat") && !$("pp-plat").hidden ? $("pp-plat") : $("pp-id");
+    var band = $("pp-gate-band"); if (band && band.previousElementSibling === $("pp-id")) at = band;
+    at.insertAdjacentElement("afterend", box);
+    box.addEventListener("click", function (e) {
+      var k = e.target.closest("[data-sec]"); if (!k) return; e.preventDefault();
+      var t = $(k.getAttribute("data-sec")); t = t && (t.closest(".pp-page") || t);
+      if (t) t.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    out.forEach(function (o) {
+      var t = $(o.sec); t = t && (t.closest(".pp-page") || t); var h = t && t.querySelector(".pp-head");
+      if (h) h.insertAdjacentHTML("beforeend", '<p class="pp-head__story">' + esc(o.line) + "</p>");
+    });
   }
 
   function renderBasicPerf(a) {
@@ -370,7 +424,9 @@
       + bio
       // The PDF is on the client report link only (Bido 2026-11-03); this row keeps the Share with client button.
       + (a && !a.basic && !D.sample ? '<div class="pp-actions" id="pp-actions"></div>' : "")
-      + "</div>";
+      + "</div>"
+      // Helvi Select stands on the cover's floor beside the creator (the report's character, Bido 2026-11-03)
+      + '<img class="pp-char" src="../assets/brand/modules/helvi-select-stand-420.webp" srcset="../assets/brand/modules/helvi-select-stand-420.webp 1x, ../assets/brand/modules/helvi-select-stand-full.webp 2x" width="182" height="420" alt="">';
   }
   function day(iso) { var d = new Date(String(iso).slice(0, 10) + "T00:00:00Z"); return isNaN(d) ? iso : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }); }
 
