@@ -974,9 +974,9 @@ def build():
     <div class="cat-cover__nav"><div class="cat-pad"><div class="cat-container">
       <div class="cat-topbar">
         <div class="cat-brand">
-          <a href="/catalogue/" aria-label="HELVi Connect: back to the full catalogue"><img class="cat-hero__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
-               srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
-               alt="HELVi Connect" width="320" height="160"/></a>
+          <a href="/catalogue/" aria-label="HELVi Select: back to the full catalogue"><img class="cat-hero__logo cat-hero__logo--select" src="/assets/brand/modules/helvi-select-dark-320.webp"
+               srcset="/assets/brand/modules/helvi-select-dark-320.webp 1x, /assets/brand/modules/helvi-select-dark-640.webp 2x"
+               alt="HELVi Select" width="320" height="161"/></a>
         </div>
         <div class="cat-topbar__links"><a class="cat-track cat-track--cat" href="/catalogue/">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
@@ -990,6 +990,10 @@ def build():
     </div></div></div>
 
     <div class="cat-cover__body"><div class="cat-pad"><div class="cat-container">
+      <!-- Helvi Select's factory brands the hero (item 305): the brief goes in, a shortlist of creator cards comes out -->
+      <figure class="sel-factory"><img src="/assets/brand/modules/helvi-select-cover-matte-1800.webp"
+        srcset="/assets/brand/modules/helvi-select-cover-matte-900.webp 900w, /assets/brand/modules/helvi-select-cover-matte-1800.webp 1800w"
+        sizes="(max-width: 1240px) 100vw, 1180px" width="1800" height="767" alt="Helvi Select at the machines that turn a brief into a shortlist of creators" fetchpriority="high"></figure>
       <div class="cat-selhead">
         <div class="cat-selhead__lock">
           <span class="cat-selhead__tag">Selection</span>

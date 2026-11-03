@@ -151,7 +151,7 @@ button.rs-fb__b:focus-visible { outline: 3px solid var(--rs-red); outline-offset
 .sel-noprices .cat-summary .cat-note { display: none; }
 
 /* --------------------------------------------------------------------- print */
-.rs-printhead { display: none; }
+.rs-printhead, .rs-printcover { display: none; }
 @media print {
   .rs-bar, .rs-pop, .rs-scrim, .rs-share { display: none !important; }
   .rs-printhead { display: flex !important; align-items: center; gap: 16px; padding: 0 0 12px; margin: 0 0 16px; border-bottom: 2px solid var(--rs-ink);
@@ -208,7 +208,7 @@ button.rs-fb__b:focus-visible { outline: 3px solid var(--rs-red); outline-offset
   html.rs-printing [data-page="selection"] .cat-card { break-inside: avoid; page-break-inside: avoid; box-shadow: none !important; transform: none !important;
     border: 1px solid rgba(18,18,18,.12) !important; height: auto !important; }
   /* Three rows of three on an A4 page: a shorter photo, tighter rows, no empty Tags line. */
-  html.rs-printing [data-page="selection"] .cat-card__media, html.rs-printing [data-page="selection"] .cat-card__photo { height: 21mm !important; min-height: 0 !important; aspect-ratio: auto !important; }
+  html.rs-printing [data-page="selection"] .cat-card__media, html.rs-printing [data-page="selection"] .cat-card__photo { height: 17mm !important; min-height: 0 !important; aspect-ratio: auto !important; }
   html.rs-printing [data-page="selection"] .cat-card__body { padding: 2.5mm 3mm !important; height: auto !important; }
   html.rs-printing [data-page="selection"] .cat-card__name { font-size: 20px !important; margin-bottom: 4px !important; }
   html.rs-printing [data-page="selection"] .cat-card__meta > * { padding-top: 2px !important; padding-bottom: 2px !important; min-height: 0 !important; font-size: 12px !important; }
@@ -252,3 +252,24 @@ div.rs-ln__row { cursor: default; }
 .rs-lns--many { max-height: 320px; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
 .rs-lns .rs-ln[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .rs-ln__chev { transition: none; } }
+
+/* Item 305: the selection's summary tiles sit four across on paper, the decisions tile beside the others. */
+@media print {
+  html.rs-printing [data-page="selection"] #sel-summary { display: grid !important; grid-template-columns: repeat(4, 1fr) !important; gap: 3mm !important; }
+  html.rs-printing [data-page="selection"] .sel-under-notes { display: none !important; }
+}
+@media print {
+  html.rs-printing .rs-printcover { display: block !important; background: #090909; text-align: center; line-height: 0; margin: 0 0 4mm;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html.rs-printing .rs-printcover img { width: 46%; height: auto; }
+  html.rs-printing [data-page="selection"] .cat-controls { display: none !important; }
+  html.rs-printing [data-page="selection"] .sel-glance__viz { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 3mm !important; }
+  html.rs-printing [data-page="selection"] .sel-glance__viz > #sel-tiers { grid-column: 1 / -1; }
+  html.rs-printing [data-page="selection"] .sel-glance__viz > * { break-inside: avoid; margin: 0 !important; }
+  html.rs-printing [data-page="selection"] .sel-glance__viz svg { max-height: 28mm; width: auto; }
+}
+@media print {
+  html.rs-printing [data-page="selection"] #sel-summary .cat-stat { min-height: 0 !important; height: auto !important; padding: 3mm 3.5mm !important; }
+  html.rs-printing [data-page="selection"] .sel-glance__title { font-size: 26px !important; margin: 0 0 2mm !important; }
+  html.rs-printing [data-page="selection"] .cat-summary .cat-container > * + * { margin-top: 3mm !important; }
+}

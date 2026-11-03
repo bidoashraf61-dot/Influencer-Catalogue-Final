@@ -4952,6 +4952,17 @@
           '<small class="cat-reach__note">' + (engM ? "likes + comments" : "views") + " total · one post each · up to " + compact(rHi) + " best case</small>" +
           '<small class="cat-reach__note">Avg ' + compact(Math.round(rLo / rN)) + " per creator · " + rN + " creators" + (rEst ? " · " + rEst + " estimated" : "") + "</small>"]);
       }
+      // Decisions so far (item 305): approved / rejected / still to decide, as a figure and a bar.
+      if (CURATED && CURATED.status && selected.length) {
+        var dA = 0, dR = 0, dW = 0;
+        selected.forEach(function (code) { var x = CURATED.status[code]; var st = x ? x.s : "review";
+          if (st === "approved") dA++; else if (st === "rejected" || st === "unavailable") dR++; else dW++; });
+        var dn = selected.length;
+        rows.push(["Decisions so far", '<span class="cat-reach">' + dA + '<small class="sel-dec3__of">/' + dn + '</small></span>'
+          + '<small class="cat-reach__note">approved · ' + dR + " rejected · " + dW + " to decide</small>"
+          + '<span class="sel-dec3" role="img" aria-label="' + dA + " approved, " + dR + " rejected, " + dW + ' to decide">'
+          + '<i class="is-a" style="width:' + (dA / dn * 100).toFixed(1) + '%"></i><i class="is-r" style="width:' + (dR / dn * 100).toFixed(1) + '%"></i></span>']);
+      }
       if (CURATED && CURATED.noPrices) rows = rows.filter(function (r) { return r[0] !== "Indicative range"; });
       if (CURATED && CURATED.platform) rows.splice(1, 0, ["Quoted for", CURATED.platform]);
       if (dropped) rows.push(["Not in this roster", String(dropped)]);

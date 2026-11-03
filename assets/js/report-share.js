@@ -81,6 +81,13 @@
       title = "Competitor study" + (sname ? " · " + sname : "");
     }
     HV.printHead(String(title).trim());
+    // The page's own footer on every PDF page (item 305): what it is, when the numbers were read, page n of N; empty top
+    // boxes keep the browser's date and address off the paper.
+    var pf = document.getElementById("rs-pagefoot") || document.head.appendChild(Object.assign(document.createElement("style"), { id: "rs-pagefoot" }));
+    var foot = (String(title).trim() + " · " + HV.asOf() + " · HELVi by HelloVoice").replace(/["\\]/g, "");
+    pf.textContent = "@media print { @page { margin: 12mm 11mm 14mm; @top-left { content: \"\"; } @top-center { content: \"\"; } @top-right { content: \"\"; } @bottom-center { content: \"\"; }"
+      + " @bottom-left { content: \"" + foot + "\"; font: 9px 'DM Sans', Arial, sans-serif; color: #383838; }"
+      + " @bottom-right { content: \"Page \" counter(page) \" of \" counter(pages); font: 9px 'DM Sans', Arial, sans-serif; color: #383838; } } }";
     var root = document.documentElement;
     root.classList.add("rs-printing");
     var done = function () { root.classList.remove("rs-printing"); window.removeEventListener("afterprint", done); };
@@ -93,6 +100,13 @@
   HV.printHead = function (title) {
     var h = document.getElementById("rs-printhead");
     if (!h) { h = el("div", "rs-printhead"); h.id = "rs-printhead"; h.setAttribute("aria-hidden", "true"); document.body.insertBefore(h, document.body.firstChild); }
+    // The hero does not print, so its factory scene (item 305) opens the PDF on its own black band above the head.
+    var fac = document.querySelector(".sel-factory img");
+    if (fac && !document.getElementById("rs-printcover")) {
+      var pc = el("div", "rs-printcover"); pc.id = "rs-printcover"; pc.setAttribute("aria-hidden", "true");
+      pc.innerHTML = '<img src="' + esc(fac.currentSrc || fac.src) + '" alt="">';
+      document.body.insertBefore(pc, h);
+    }
     h.innerHTML = '<img src="' + ROOT + "assets/brand/modules/" + here[2] + '" alt="">'
       + "<div><b>" + esc(title || document.title) + "</b><span>" + esc(HV.asOf()) + " · Prepared by HelloVoice</span></div>";
   };
