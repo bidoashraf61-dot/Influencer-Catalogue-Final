@@ -1105,3 +1105,25 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
 /* On a shared link the share bar is sticky too: the chapter bar sits under it, never behind it. */
 .hv-shared .mx-tabs { top: var(--rs-bar-h, 64px); }
 .hv-shared [id^="sec-"] { scroll-margin-top: calc(var(--rs-bar-h, 64px) + 84px); }
+
+/* The cover (item 301, 2026-11-03): Helvi Track's character and machines beside the title, on the art's own beige,
+   on the shared page, the staff report and page 1 of the PDF. */
+.mx-bug { background: #e0cdbc; }
+.mx-bug__in { display: grid; grid-template-columns: minmax(0, 1fr); }
+.mx-cover { margin: -8px 0 18px; order: -1; }
+.mx-cover img { display: block; width: 100%; height: auto; }
+.mx-bug .mx-score-line { background: #fff; }
+.mx-bug__sub, .mx-bug__sels { color: #4a3f36; }
+@media (min-width: 1000px) {
+  .mx-bug__in { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); column-gap: 28px; align-items: start; }
+  .mx-bug__in > * { grid-column: 1; }
+  .mx-cover { grid-column: 2; grid-row: 1 / span 6; align-self: center; margin: 0 -2% 0 0; order: 0; }
+  .mx-bug__in > .mx-score-line, .mx-bug__in > .mx-delivery { grid-column: 1 / -1; }
+  .mx-bug__title { font-size: clamp(3rem, 1rem + 5vw, 7rem) !important; }
+}
+@media print {
+  .mx-bug { -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 10mm 0 8mm !important; min-height: 262mm; box-sizing: border-box; }
+  .mx-bug__in { display: block; }
+  .mx-cover { margin: 6mm 0 6mm; }
+  .mx-cover img { width: 100%; }
+}
