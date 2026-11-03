@@ -1383,3 +1383,4 @@ body[data-only] #mx-report .mx-sec:not(.is-only) { display: none !important; }
 /* Eight buttons: on wide screens they wrap rather than scroll, so Whole report is never cut off. */
 @media (min-width: 900px) { .mx-tabs__in { flex-wrap: wrap !important; overflow: visible !important; gap: 8px !important; } .mx-tab { padding-left: 16px !important; padding-right: 16px !important; } }
 @media (min-width: 900px) { .mx-tab { font-size: 18px !important; padding-left: 14px !important; padding-right: 14px !important; min-height: 42px !important; } .mx-tab .mx-ico { width: 16px; height: 16px; } }
+@media print { #mx-report .mx-carousel { break-inside: avoid !important; page-break-inside: avoid !important; } #mx-report .mx-carousel__head { break-after: avoid !important; } }   /* the creators heading stays with its cards */
