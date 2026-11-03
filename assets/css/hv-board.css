@@ -705,3 +705,56 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
 .mb-say { min-height: 0; margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink); opacity: 0; transition: opacity .2s ease; }
 .mb-say.is-on { opacity: 1; min-height: 22px; margin: 0 0 14px; }
 .mb-say.is-bad { color: #c01010; }
+
+/* ------------------------------------------------ item 315: board page covers */
+.mb-cover {
+  position: relative; isolation: isolate; overflow: hidden; color: var(--white);
+  background-color: var(--ink);
+  background-image:
+    radial-gradient(60% 80% at 88% 30%, rgba(232,255,118,.20) 0%, rgba(232,255,118,0) 60%),
+    radial-gradient(70% 60% at 0% 100%, rgba(232,255,118,.06) 0%, rgba(232,255,118,0) 60%),
+    linear-gradient(rgba(255,255,255,.043) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.043) 1px, transparent 1px);
+  background-size: auto, auto, 56px 56px, 56px 56px;
+}
+.mb-cover__in { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 32px; padding-top: clamp(32px, 4vw, 52px); }
+.mb-cover__main { min-width: 0; padding-bottom: clamp(28px, 3.5vw, 44px); }
+.mb-cover__title { font-family: var(--heading); font-weight: 400; font-size: clamp(3rem, 1.6rem + 4.4vw, 6rem); line-height: .88; margin: 0 0 14px; color: var(--white); }
+.mb-cover__lede { margin: 0 0 26px; max-width: 58ch; font-size: 17px; line-height: 1.55; color: rgba(255,255,255,.78); }
+.mb-cover__stats { display: flex; flex-wrap: wrap; gap: 12px 40px; margin: 0 0 28px; }
+.mb-cover__stats div { display: flex; flex-direction: column-reverse; }
+.mb-cover__stats dd { margin: 0; font-family: var(--heading); font-size: clamp(2.6rem, 1.9rem + 1.8vw, 3.6rem); line-height: .95; color: var(--lime); }
+.mb-cover__stats dt { font-size: 13px; font-weight: 500; letter-spacing: .04em; color: rgba(255,255,255,.72); }
+.mb-cover__char { display: block; width: clamp(240px, 26vw, 365px); height: auto; align-self: end; margin-bottom: -4px;
+  filter: drop-shadow(0 18px 40px rgba(0,0,0,.5)); animation: mb-rise .7s cubic-bezier(.16,1,.3,1) both; }
+@keyframes mb-rise { from { transform: translateY(18px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* the pipeline: one station per stage, a bar sized by its share of the board */
+.mb-pipe { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; max-width: 720px; }
+.mb-pipe__st { display: grid; grid-template-rows: auto 64px auto; gap: 6px; min-width: 0; }
+.mb-pipe__n { font-family: var(--heading); font-weight: 400; font-size: 26px; line-height: 1; color: var(--white); }
+.mb-pipe__well { position: relative; border-radius: 8px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); overflow: hidden; }
+.mb-pipe__bar { position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--h, 0) * 100%); border-radius: 7px 7px 0 0;
+  background: rgba(255,255,255,.34); transform-origin: bottom; animation: mb-grow .8s cubic-bezier(.16,1,.3,1) .15s both; }
+.mb-pipe__bar.is-hot { background: var(--lime); }
+.mb-pipe__bar.is-zero { display: none; }
+@keyframes mb-grow { from { transform: scaleY(0); } to { transform: none; } }
+.mb-pipe__lab { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; line-height: 1.25; color: rgba(255,255,255,.78); min-width: 0; }
+.mb-pipe__lab .hvb-stico { flex: none; }
+@media (prefers-reduced-motion: reduce) { .mb-cover__char, .mb-pipe__bar { animation: none; } }
+@media (max-width: 760px) {
+  .mb-cover__in { grid-template-columns: minmax(0, 1fr); gap: 0; position: relative; }
+  .mb-cover__char { position: absolute; right: -6px; top: 18px; width: 120px; margin: 0; }
+  .mb-cover__title { padding-right: 112px; }
+  .mb-cover__lede { font-size: 15px; }
+  .mb-cover__stats { gap: 10px 26px; }
+  .mb-pipe { overflow-x: auto; grid-auto-columns: minmax(64px, 1fr); padding-bottom: 4px; }
+  .mb-pipe__st { grid-template-rows: auto 48px auto; }
+  .mb-pipe__lab { font-size: 12px; }
+}
+/* the page below the cover */
+.mb-main--covered { padding-top: 28px; }
+.mx-list--covered { padding-top: 0 !important; }
+.mx-list--covered .mx-list__title, .mx-list--covered .mx-list__lede { display: none; }
+.mx-list--covered > .cat-container { padding-top: 28px; }
+.mb-pipe .hvb-stico svg { width: 12px; height: 12px; stroke-width: 2.1; }

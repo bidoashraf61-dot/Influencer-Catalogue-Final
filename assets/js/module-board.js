@@ -43,7 +43,6 @@
     clearTimeout(say.t); say.t = setTimeout(function () { el.className = "mb-say"; }, 6000);
   }
 
-  function count(n, one, many) { return n + " " + (n === 1 ? one : many); }
 
   /* ---------------------------------------------------------- selections */
   var SEL_STAGES = [
@@ -71,10 +70,13 @@
       if (!r.b.ok) { closed("Something went wrong", "Your selections couldn't be loaded. Please try again shortly."); return; }
       var list = r.b.selections || [];
       var studies = list.filter(function (s) { return s.study; }).length;
-      var live = list.filter(function (s) { return (s.campaigns || []).some(function (c) { return c.live; }); }).length;
-      $("mb-sum").textContent = list.length
-        ? [count(list.length, "selection", "selections"), count(live, "with a live campaign", "with a live campaign"), count(studies, "with a competitor study", "with a competitor study")].join(" · ")
-        : "";
+      var creators = list.reduce(function (n, s) { return n + ((s.counts || {}).creators || 0); }, 0);
+      HVBoard.cover($("mb-cover"), {
+        mod: "select", title: "Selections", stages: SEL_STAGES,
+        lede: "Every creator selection, from the first draft to a live campaign. A card opens the selection; its campaigns and competitor study are one tap away.",
+        stats: [[list.length, list.length === 1 ? "selection" : "selections"], [creators, "creators shortlisted"], [studies, studies === 1 ? "with a competitor study" : "with competitor studies"]],
+        items: list
+      });
       $("mb-loading").hidden = true;
       $("mb-board").hidden = false;
       if (!list.length) { closed("No selections yet", "Shortlist creators on the catalogue and your selections will gather here."); return; }
@@ -107,16 +109,17 @@
       if (r.s === 403) { $("mb-loading").hidden = true; return; }      // the locked page (app.js) takes over
       if (!r.b.ok) { closed("Something went wrong", "The studies couldn't be loaded. Please try again shortly."); return; }
       var B = r.b, list = B.studies || [];
-      var shared = list.filter(function (s) { return s.stage === "shared"; }).length;
       var posts = list.reduce(function (a, s) { return a + (s.posts || 0); }, 0);
-      $("mb-sum").textContent = list.length
-        ? [count(list.length, "study", "studies"), count(posts, "competitor post read", "competitor posts read"), count(shared, "shared with the client", "shared with clients")].join(" · ")
-        : "";
-      $("mb-lede").textContent = B.role === "admin"
-        ? "Every competitor study, from the request to the client link. A card opens the study; its selection and campaigns are one tap away. Drag a card to correct its stage."
-        : B.role === "client"
-          ? "Who your competitors work with, study by study. Open one to see the creators behind their posts, then jump to your selection or campaign."
-          : "Your clients' competitor studies, by stage. A card opens the study; its selection and campaigns are one tap away.";
+      var found = list.reduce(function (a, s) { return a + (s.creators || 0); }, 0);
+      HVBoard.cover($("mb-cover"), {
+        mod: "intelligence", title: "Competitor studies", stages: B.stages, items: list,
+        lede: B.role === "admin"
+          ? "Every competitor study, from the request to the client link. A card opens the study; its selection and campaigns are one tap away. Drag a card to correct its stage."
+          : B.role === "client"
+            ? "Who your competitors work with, study by study. Open one to see the creators behind their posts, then jump to your selection or campaign."
+            : "Your clients' competitor studies, by stage. A card opens the study; its selection and campaigns are one tap away.",
+        stats: [[list.length, list.length === 1 ? "study" : "studies"], [posts, "competitor posts read"], [found, "creators found"]]
+      });
       $("mb-loading").hidden = true;
       $("mb-board").hidden = false;
       if (!list.length) { closed("No competitor studies yet", "When HelloVoice studies your competitors' creators, each study appears here, tied to its selection."); return; }

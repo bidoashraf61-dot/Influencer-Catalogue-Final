@@ -121,6 +121,7 @@
   var TRACK = { good: "On track", moderate: "Slightly behind", low: "Behind target" };
   function ours(client) { return /^\s*hello\s*voice\b/i.test(client || ""); }
   // Item 219: a stage's mark, a small disc in the stage's colour. Decorative: the stage name is always written beside it.
+  function plural(noun) { return noun === "study" ? "studies" : noun + "s"; }
   function stageIcon(key, cls) {
     if (!ICON["st_" + key]) return null;
     return h("span", { class: "hvb-stico hvb-lane--" + key + (cls ? " " + cls : ""), "aria-hidden": "true" }, svg("st_" + key));
@@ -938,8 +939,8 @@
       });
     }
     B.shown = shown;
-    var search = h("input", { type: "search", class: "hvb-search__in", value: F.q || "", placeholder: "Search " + noun + "s, clients, KAMs",
-                              "aria-label": "Search " + noun + "s" });
+    var search = h("input", { type: "search", class: "hvb-search__in", value: F.q || "", placeholder: "Search " + plural(noun) + ", clients, KAMs",
+                              "aria-label": "Search " + plural(noun) });
     var t0 = null;
     search.addEventListener("input", function () { clearTimeout(t0); t0 = setTimeout(function () { F.q = search.value; keepF(); redraw(); }, 160); });
     function picker(label, key, values) {
@@ -1019,7 +1020,7 @@
       opts.stages.forEach(function (s) {
         var L = lanes[s.key], list = by[s.key] || [];
         list.forEach(function (it) { L.cards.appendChild(card(it, B)); });
-        if (!list.length) L.cards.appendChild(h("p", { class: "hvb-empty" }, list0.length < items.length ? "None match" : "No " + noun + "s here"));
+        if (!list.length) L.cards.appendChild(h("p", { class: "hvb-empty" }, list0.length < items.length ? "None match" : "No " + plural(noun) + " here"));
         L.count.textContent = String(list.length);
         tabs[s.key].querySelector("b").textContent = String(list.length);
         var folded = !!FOLD[s.key];
@@ -1060,7 +1061,7 @@
         var head = h("button", { type: "button", class: "hvb-band__head", "aria-expanded": shut ? "false" : "true" },
           svg("chev"), brand({ client: c.name, name: c.name, logos: first.logos || [] }),
           h("b", { class: "hvb-band__name" }, c.name),
-          h("span", { class: "hvb-band__n" }, c.items.length + " " + noun + (c.items.length === 1 ? "" : "s")),
+          h("span", { class: "hvb-band__n" }, c.items.length + " " + (c.items.length === 1 ? noun : plural(noun))),
           // Item 221: each stage named, never colour alone: its mark, the count, a tooltip and screen-reader text.
           h("span", { class: "hvb-band__dots" }, opts.stages.map(function (s) {
             var n = c.items.filter(function (x) { return x.stage === s.key; }).length;
@@ -1154,7 +1155,7 @@
         if (label) {
           tb.appendChild(h("tr", { class: "hvb-t__group" }, h("th", { scope: "rowgroup", colspan: String(C.length) },
             h("span", { class: "hvb-t__client" }, brand({ client: label, name: label, logos: list[0].logos || [] }), h("b", null, label)),
-            h("small", null, list.length + " " + noun + (list.length === 1 ? "" : "s")))));
+            h("small", null, list.length + " " + (list.length === 1 ? noun : plural(noun))))));
         }
         list.forEach(function (it) {
           var r = h("tr", { class: it.track ? "is-track-" + it.track.grade : null });
@@ -1319,5 +1320,49 @@
     return v && (!only || only.indexOf(v) >= 0) && VIEWS.some(function (x) { return x[0] === v; }) ? v : "board";
   }
 
-  window.HVBoard = { mount: mount, fromCampaign: fromCampaign, fromSelection: fromSelection, fromStudy: fromStudy, viewSwitch: viewSwitch, viewOf: viewOf };
+  /* ------------------------------------------------- item 315: a board page's cover
+   * The selection page's ink desk (hairline grid, lime glow) with the module's character standing on the right,
+   * the page title, three figures, and the pipeline drawn as one bar per stage (count over a bar whose height is its
+   * share of the board). Busy lanes read at a glance before the kanban itself.
+   *   HVBoard.cover(host, {mod: "select"|"track"|"intelligence", title, lede, stats: [[value, label]], stages, items})
+   */
+  var CHAR = { select: "helvi-select-char", track: "helvi-track-char", intelligence: "helvi-intelligence-char" };
+  var HOT = { live: 1, shared: 1, ready: 1, approved: 1 };
+  function short(n) {
+    n = Number(n) || 0;
+    if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace(/\.0$/, "") + "M";
+    if (n >= 1e4) return Math.round(n / 1e3) + "K";
+    return n.toLocaleString("en");
+  }
+  function cover(host, o) {
+    host.textContent = "";
+    var counts = {}, max = 0;
+    (o.items || []).forEach(function (it) { counts[it.stage] = (counts[it.stage] || 0) + 1; });
+    (o.stages || []).forEach(function (st) { max = Math.max(max, counts[st.key] || 0); });
+    var pipe = h("ol", { class: "mb-pipe", "aria-label": "By stage: " + (o.stages || []).map(function (st) { return st.label + " " + (counts[st.key] || 0); }).join(", ") });
+    (o.stages || []).forEach(function (st) {
+      var n = counts[st.key] || 0;
+      var bar = h("span", { class: "mb-pipe__bar" + (HOT[st.key] ? " is-hot" : "") + (n ? "" : " is-zero") });
+      bar.style.setProperty("--h", max ? Math.max(n / max, n ? .08 : 0).toFixed(3) : "0");
+      pipe.appendChild(h("li", { class: "mb-pipe__st", "aria-hidden": "true" },
+        h("b", { class: "mb-pipe__n" }, String(n)), h("span", { class: "mb-pipe__well" }, bar),
+        h("span", { class: "mb-pipe__lab" }, stageIcon(st.key, "hvb-stico--mini"), st.label)));
+    });
+    var stats = h("dl", { class: "mb-cover__stats" });
+    (o.stats || []).forEach(function (x) {
+      stats.appendChild(h("div", null, h("dd", null, typeof x[0] === "number" ? short(x[0]) : String(x[0])), h("dt", null, x[1])));
+    });
+    var c = CHAR[o.mod] || CHAR.select;
+    host.appendChild(h("section", { class: "mb-cover mb-cover--" + (o.mod || "select") },
+      h("div", { class: "cat-pad" }, h("div", { class: "cat-container mb-cover__in" },
+        h("div", { class: "mb-cover__main" },
+          h("h1", { class: "mb-cover__title" }, o.title || ""),
+          o.lede ? h("p", { class: "mb-cover__lede" }, o.lede) : null,
+          stats, pipe),
+        h("img", { class: "mb-cover__char", src: ROOT + "assets/brand/modules/" + c + "-440.webp",
+                   srcset: ROOT + "assets/brand/modules/" + c + "-440.webp 1x, " + ROOT + "assets/brand/modules/" + c + "-880.webp 2x",
+                   alt: "", width: "365", height: "440", decoding: "async" })))));
+  }
+
+  window.HVBoard = { mount: mount, cover: cover, fromCampaign: fromCampaign, fromSelection: fromSelection, fromStudy: fromStudy, viewSwitch: viewSwitch, viewOf: viewOf };
 })();

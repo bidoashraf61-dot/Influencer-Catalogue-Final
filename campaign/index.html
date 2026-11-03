@@ -76,6 +76,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           Full catalogue
         </a>
         <a class="mx-link" href="#list" id="mx-all" hidden>All campaigns</a>
+        <nav class="hv-mods" aria-label="HELVi modules"><a class="hv-mod hv-mod--select" href="/selections/" aria-label="HELVi Select"><img src="/assets/brand/modules/helvi-selection-mark-v4.png" alt="" width="40" height="40" decoding="async"/><span>Select</span></a><a class="hv-mod hv-mod--track" href="/campaign/#list" aria-current="page" aria-label="HELVi Track"><img src="/assets/brand/modules/helvi-track-mark-v4.png" alt="" width="40" height="40" decoding="async"/><span>Track</span></a><a class="hv-mod hv-mod--intelligence" href="/intelligence/" aria-label="HELVi Intelligence"><img src="/assets/brand/modules/helvi-intelligence-mark-v5.png" alt="" width="40" height="40" decoding="async"/><span>Intelligence</span></a></nav>
         <a class="cat-btn cat-btn--lime mx-dash" href="dashboard/" id="mx-dash" hidden>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>
           Back to dashboard
@@ -85,13 +86,14 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   </nav>
 
   <!-- the passcode's campaigns -->
-  <section class="mx-list cat-pad" id="mx-list" hidden>
-    <div class="cat-container">
+  <section class="mx-list" id="mx-list" hidden>
+    <div id="mb-cover"></div>
+    <div class="cat-pad"><div class="cat-container">
       <h1 class="cat-hero__title mx-list__title">My campaigns</h1>
       <p class="mx-list__lede" id="mx-list-lede">Every campaign HelloVoice runs for you, with where each one is on its timeline. Open one for its dashboard.</p>
       <div class="mx-sum" id="mx-list-sum"></div>
       <div class="mx-list__items" id="mx-list-items"></div>
-    </div>
+    </div></div>
   </section>
 
   <div id="mx-report" hidden>

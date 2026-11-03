@@ -182,7 +182,7 @@
     return b;
   }
   function showBoard() {
-    document.title = "My campaigns — HELVi Connect";
+    document.title = "My campaigns — HELVi Track";
     var list = BOARD.campaigns || [];
     if (!list.length) { showNone(); return; }
     $("mx-list-lede").textContent = BOARD.role === "client"
@@ -195,6 +195,17 @@
       + '<p class="mx-bd-say" id="mx-bd-say" role="status" aria-live="polite"></p>';
     show("list");
     wireStart();
+    // Item 315: the board opens on Helvi Track's own cover: title, figures and the pipeline by stage.
+    if (window.HVBoard && HVBoard.cover && $("mb-cover")) {
+      var views = list.reduce(function (n, c) { return n + ((c.numbers || {}).views || 0); }, 0);
+      var live = list.filter(function (c) { return c.stage === "live"; }).length;
+      $("mx-list").classList.add("mx-list--covered");
+      HVBoard.cover($("mb-cover"), {
+        mod: "track", title: BOARD.role === "client" ? "My campaigns" : "Campaigns", stages: BOARD.stages, items: list,
+        lede: $("mx-list-lede").textContent,
+        stats: [[list.length, list.length === 1 ? "campaign" : "campaigns"], [live, "live now"], [views, "views so far"]]
+      });
+    }
     if (window.HVBoard) {
       // Item 199: Board or Table here too (List lives on the profile).
       var view = HVBoard.viewOf("tracking", ["board", "table"]);

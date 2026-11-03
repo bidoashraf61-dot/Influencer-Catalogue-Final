@@ -2659,9 +2659,13 @@ body:has(#cat-tray:not([hidden])) .sel-arr { bottom: 112px; }
 .cat-hero--cover .hv-mods { background: rgba(18,18,18,.62); border-color: rgba(255,255,255,.45); }
 .cat-hero--cover .hv-mod:focus-visible { outline-color: var(--lime); }
 @media (prefers-reduced-motion: reduce) { .hv-mod, .hv-mod img { transition: none; } .hv-mod:hover img { transform: none; } }
+/* Phones: the switcher gets its own row under the logo (bell and account stay at its end), and each
+   product stacks its character over its name so all three names fit. */
 @media (max-width: 640px) {
-  .hv-mods { gap: 2px; padding: 3px; }
-  .hv-mod { gap: 6px; padding: 2px 11px 2px 2px; font-size: 15px; }
-  .hv-mod img { width: 36px; height: 36px; }
+  html body .cat-topbar:has(.hv-mods) { flex-wrap: wrap; row-gap: 12px; }
+  html body .cat-topbar__links:has(.hv-mods) { flex: 1 1 100%; flex-wrap: nowrap; justify-content: space-between; gap: 8px; }
+  .cat-topbar__links:has(.hv-mods) .hc-link { display: none; }
+  .hv-mods { gap: 2px; padding: 3px; border-radius: 18px; }
+  .hv-mod { flex-direction: column; justify-content: center; gap: 3px; min-width: 62px; min-height: 56px; padding: 4px 6px 5px; border-radius: 15px; font-size: 13px; }
+  .hv-mod img { width: 30px; height: 30px; }
 }
-@media (max-width: 380px) { .hv-mod { padding-right: 8px; font-size: 14px; } .hv-mod img { width: 32px; height: 32px; } }
