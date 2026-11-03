@@ -695,7 +695,7 @@ def build():
 <meta name="referrer" content="no-referrer"/>
 <title>HELVi Connect — Influencer Catalogue</title>
 <script src="/assets/js/hv-loader.js" data-tone="dark"></script>
-<link rel="icon" href="/assets/brand/helvy-connect/helvy-icon-32.png?v=c4" type="image/png"/>
+<link rel="icon" href="/assets/brand/helvy-connect/helvy-icon-32.png?v=c6" type="image/png"/>
 <link rel="apple-touch-icon" href="/assets/app/apple-touch-icon.png"/>
 <link rel="stylesheet" href="{stamp('/assets/css/catalogue.css')}"/>
 <link rel="stylesheet" href="{stamp('/assets/css/portal.css')}"/>
@@ -725,8 +725,8 @@ def build():
 
 <div class="cat-gate" id="cat-gate">
   <div class="cat-gate__inner">
-    <img class="cat-gate__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
-         srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
+    <img class="cat-gate__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c6"
+         srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c6 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c6 2x"
          alt="HELVi Connect" width="320" height="160"/>
     <!-- No access-code form (item 181): portal.js puts the email sign-in here. Until it has, only
          the logo shows (cat-checking); cat-gate-note is for "could not load", never for a code. -->
@@ -748,11 +748,11 @@ def build():
     <div class="cat-cover__nav"><div class="cat-pad"><div class="cat-container">
       <div class="cat-topbar">
         <div class="cat-brand">
-          <img class="cat-hero__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
-               srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
+          <img class="cat-hero__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c6"
+               srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c6 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c6 2x"
                alt="HELVi Connect" width="320" height="160"/>
         </div>
-        <div class="cat-topbar__links"><nav class="hv-mods" aria-label="HELVi modules"><a class="hv-mod hv-mod--select" href="/selections/" aria-label="HELVi Select"><img src="/assets/brand/modules/helvi-selection-mark-v4.png" alt="" width="40" height="40" decoding="async"/><span>Select</span></a><a class="hv-mod hv-mod--track" href="/campaign/#list" aria-label="HELVi Track"><img src="/assets/brand/modules/helvi-track-mark-v4.png" alt="" width="40" height="40" decoding="async"/><span>Track</span></a><a class="hv-mod hv-mod--intelligence" href="/intelligence/" aria-label="HELVi Intelligence"><img src="/assets/brand/modules/helvi-intelligence-mark-v5.png" alt="" width="40" height="40" decoding="async"/><span>Intelligence</span></a></nav>
+        <div class="cat-topbar__links"><nav class="hv-mods" aria-label="HELVi modules"><a class="hv-mod hv-mod--select" href="/selections/" aria-label="HELVi Select"><img src="/assets/brand/modules/helvi-selection-mark-v4.png" alt="" width="40" height="40" decoding="async"/><span>Select</span></a><a class="hv-mod hv-mod--intelligence" href="/intelligence/" aria-label="HELVi Intelligence"><img src="/assets/brand/modules/helvi-intelligence-mark-v5.png" alt="" width="40" height="40" decoding="async"/><span>Intelligence</span></a><a class="hv-mod hv-mod--track" href="/campaign/#list" aria-label="HELVi Track"><img src="/assets/brand/modules/helvi-track-mark-v4.png" alt="" width="40" height="40" decoding="async"/><span>Track</span></a></nav>
       </div>
       </div>
     </div></div></div>
@@ -813,8 +813,8 @@ def build():
   <footer class="cat-footer">
     <div class="cat-pad"><div class="cat-container">
       <div class="cat-footer__top">
-        <img class="cat-footer__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
-             srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
+        <img class="cat-footer__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c6"
+             srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c6 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c6 2x"
              alt="HELVi Connect" width="320" height="160"/>
         <a class="cat-footer__portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
           See the portfolio at hellovoice.co.uk
@@ -902,7 +902,7 @@ def build():
 <link rel="stylesheet" href="{stamp('/assets/css/report-share.css')}"/>
 <script src="{stamp('/assets/js/report-share.js')}"></script>
 <script src="/assets/js/hv-loader.js" data-tone="light" data-wait="all"></script>
-<link rel="icon" href="/assets/brand/helvy-connect/helvy-icon-32.png?v=c4" type="image/png"/>
+<link rel="icon" href="/assets/brand/helvy-connect/helvy-icon-32.png?v=c6" type="image/png"/>
 <link rel="apple-touch-icon" href="/assets/app/apple-touch-icon.png"/>
 <link rel="stylesheet" href="{stamp('/assets/css/catalogue.css')}"/>
 <link rel="stylesheet" href="{stamp('/assets/css/portal.css')}"/>
@@ -933,8 +933,8 @@ def build():
 
 <div class="cat-gate" id="cat-gate">
   <div class="cat-gate__inner">
-    <img class="cat-gate__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
-         srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
+    <img class="cat-gate__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c6"
+         srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c6 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c6 2x"
          alt="HELVi Connect" width="320" height="160"/>
     <!-- No access-code form (item 181): portal.js puts the email sign-in here. Until it has, only
          the logo shows (cat-checking); cat-gate-note is for "could not load", never for a code. -->
@@ -978,7 +978,7 @@ def build():
         <div class="cat-topbar__links"><a class="cat-track cat-track--cat" href="/catalogue/">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
           Full catalogue
-        </a><nav class="hv-mods" aria-label="HELVi modules"><a class="hv-mod hv-mod--select" href="/selections/" aria-current="page" aria-label="HELVi Select"><img src="/assets/brand/modules/helvi-selection-mark-v4.png" alt="" width="40" height="40" decoding="async"/><span>Select</span></a><a class="hv-mod hv-mod--track" href="/campaign/#list" aria-label="HELVi Track"><img src="/assets/brand/modules/helvi-track-mark-v4.png" alt="" width="40" height="40" decoding="async"/><span>Track</span></a><a class="hv-mod hv-mod--intelligence" href="/intelligence/" aria-label="HELVi Intelligence"><img src="/assets/brand/modules/helvi-intelligence-mark-v5.png" alt="" width="40" height="40" decoding="async"/><span>Intelligence</span></a></nav>
+        </a><nav class="hv-mods" aria-label="HELVi modules"><a class="hv-mod hv-mod--select" href="/selections/" aria-current="page" aria-label="HELVi Select"><img src="/assets/brand/modules/helvi-selection-mark-v4.png" alt="" width="40" height="40" decoding="async"/><span>Select</span></a><a class="hv-mod hv-mod--intelligence" href="/intelligence/" aria-label="HELVi Intelligence"><img src="/assets/brand/modules/helvi-intelligence-mark-v5.png" alt="" width="40" height="40" decoding="async"/><span>Intelligence</span></a><a class="hv-mod hv-mod--track" href="/campaign/#list" aria-label="HELVi Track"><img src="/assets/brand/modules/helvi-track-mark-v4.png" alt="" width="40" height="40" decoding="async"/><span>Track</span></a></nav>
       </div>
       </div>
     </div></div></div>
@@ -1062,8 +1062,8 @@ def build():
   <footer class="cat-footer">
     <div class="cat-pad"><div class="cat-container">
       <div class="cat-footer__top">
-        <img class="cat-footer__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
-             srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
+        <img class="cat-footer__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c6"
+             srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c6 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c6 2x"
              alt="HELVi Connect" width="320" height="160"/>
         <a class="cat-footer__portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
           See the portfolio at hellovoice.co.uk

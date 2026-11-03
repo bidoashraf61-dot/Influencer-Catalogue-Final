@@ -533,7 +533,7 @@
     /* -- the name and one line -- */
     var pitch = h("section", { class: "cx-pitch", "aria-label": "About HELVi Connect" });
     pitch.appendChild(h("h1", { class: "cx-vh" }, "HELVi Connect"));
-    pitch.appendChild(h("img", { class: "cx-pitch__logo", src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5", alt: "HELVi Connect", width: "440", height: "220", fetchpriority: "high" }));
+    pitch.appendChild(h("img", { class: "cx-pitch__logo", src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c6", alt: "HELVi Connect", width: "440", height: "220", fetchpriority: "high" }));
     pitch.appendChild(h("p", { class: "cx-pitch__tag" }, "Connecting Brands with the Right Voices"));
 
     /* -- the card, Helvi standing on it -- */
