@@ -499,9 +499,11 @@ body.pp-modal-on { overflow: hidden; }
   html.pp-printing .cx-dock, html.pp-printing .hv-voice, html.pp-printing .hca-nav, html.pp-printing .pp-request-sec,
   html.pp-printing .cat-footer, html.pp-printing .mx-top { display: none !important; }
   html.pp-printing .pp .cat-container { max-width: none !important; width: auto !important; }
-  html.pp-printing .pp-page, html.pp-printing .pp-card, html.pp-printing .pp-tiles > div, html.pp-printing .pp-er, html.pp-printing .pp-post,
-  html.pp-printing .pp-brand, html.pp-printing .pp-stamp, html.pp-printing .pp-id, html.pp-printing .pp-trust-key, html.pp-printing section > div,
-  html.pp-printing figure, html.pp-printing table, html.pp-printing tr { break-inside: avoid; page-break-inside: avoid; }
+  /* cards stay whole; sections flow from page to page so no page is left half empty */
+  html.pp-printing .pp-card, html.pp-printing .pp-tiles > div, html.pp-printing .pp-er, html.pp-printing .pp-post,
+  html.pp-printing .pp-brand, html.pp-printing .pp-stamp, html.pp-printing .pp-id, html.pp-printing .pp-trust-key,
+  html.pp-printing figure, html.pp-printing tr { break-inside: avoid; page-break-inside: avoid; }
+  html.pp-printing .pp-page { break-inside: auto !important; page-break-inside: auto !important; }
   html.pp-printing h2, html.pp-printing h3, html.pp-printing .pp-head, html.pp-printing .pp-pane::before { break-after: avoid; page-break-after: avoid; }
   html.pp-printing .pp-tip, html.pp-printing .pp-trust:hover::after { display: none !important; }
   html.pp-printing * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -524,7 +526,7 @@ body.pp-modal-on { overflow: hidden; }
   html.pp-printing .pp-key dd { font-size: inherit; }
   html.pp-printing .pp-posts { grid-template-columns: repeat(6, 1fr) !important; }
   html.pp-printing .pp-brands { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important; }
-  html.pp-printing .pp-post__media:not([style*="background-image"]) { aspect-ratio: auto !important; height: 64px; background: #efece6 !important; }
+  html.pp-printing .pp-post__media.pp-nopic, html.pp-printing .pp-post__media:not([style*="background-image"]) { aspect-ratio: auto !important; height: 64px; background: #efece6 !important; }
   html.pp-printing .pp-post__media .lv-frame { display: none !important; }
   html.pp-printing .pp-page { margin-top: 34px !important; }
 }

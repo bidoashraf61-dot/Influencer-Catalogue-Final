@@ -1039,7 +1039,13 @@
     imgs.forEach(function (i) { i.loading = "eager"; });
     var waits = imgs.filter(function (i) { return !i.complete; }).map(function (i) { return new Promise(function (ok) { i.addEventListener("load", ok); i.addEventListener("error", ok); }); });
     if (document.fonts && document.fonts.ready) waits.push(document.fonts.ready);
+    // A post picture whose link has expired would print as a big grey box: it becomes a short strip instead.
+    [].forEach.call(document.querySelectorAll(".pp-post__media[style*='background-image']"), function (m) {
+      var u = /url\(['"]?([^'")]+)/.exec(m.style.backgroundImage || ""); if (!u) return;
+      waits.push(new Promise(function (ok) { var t = new Image(); t.onload = ok; t.onerror = function () { m.classList.add("pp-nopic"); ok(); }; t.referrerPolicy = "no-referrer"; t.src = u[1]; }));
+    });
     var done = false, finish = function () {
+      [].forEach.call(document.querySelectorAll(".pp-nopic"), function (m) { m.classList.remove("pp-nopic"); });
       root.classList.remove("rs-printing", "pp-printing"); st.textContent = ""; document.title = title;
       if (btn) btn.disabled = false; window.removeEventListener("afterprint", finish);
     };
