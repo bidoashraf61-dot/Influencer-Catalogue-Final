@@ -294,3 +294,13 @@ div.rs-ln__row { cursor: default; }
   .rs-date small { font-size: 8.5px; }
   .rs-date i { font-size: 11px; padding: 4px 7px; }
 }
+/* Phones: both dates on one row (the icons say which is which), so the sticky bar stays short. */
+@media (max-width: 700px) {
+  .rs-dates { flex-wrap: nowrap; gap: 5px; max-width: 100%; }
+  .rs-date { gap: 5px; padding: 2px 8px 2px 2px; min-width: 0; }
+  .rs-date small { display: none; }
+  .rs-date > svg { width: 22px; height: 22px; padding: 4px; }
+  .rs-date b { font-size: 11.5px !important; white-space: nowrap; }
+  .rs-date i { font-size: 10.5px; padding: 3px 6px; white-space: nowrap; }
+  .rs-bar__meta { gap: 4px 10px; }
+}
