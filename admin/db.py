@@ -329,6 +329,8 @@ CREATE TABLE IF NOT EXISTS creator_analysis (
   updated_at INTEGER NOT NULL,
   PRIMARY KEY (code, platform)
 );
+-- who has an analysis, and when: read from the index alone, never the large `data` rows (2026-11-03)
+CREATE INDEX IF NOT EXISTS creator_analysis_code_at ON creator_analysis(code, updated_at);
 
 -- What the admin typed in an upload, mapped to the creator they said it meant,
 -- so the same handle or name is recognised next time without asking.
@@ -3462,15 +3464,22 @@ def content_history(cid):
     for v in mine.values():
         v.sort()
 
-    def main_by(content_id, day):
-        end = calendar.timegm(time.strptime(day, "%Y-%m-%d")) + 86400
-        return sum(1 for t in mine[content_id] if t < end)
+    import bisect
 
+    def totals(day):
+        end = calendar.timegm(time.strptime(day, "%Y-%m-%d")) + 86400
+        out = {k: sum((v[k] or 0) for v in latest.values()) for k in ("likes", "views", "shares", "saves")}
+        out["comments"] = sum(bisect.bisect_left(mine[i], end) if i in mine else (v["comments"] or 0)
+                              for i, v in latest.items())
+        return out
+
+    # One total per day, taken after that day's last snapshot (rows come in time order). Summing after
+    # every snapshot made the report and the board take seconds on campaigns with many posts (2026-11-03).
     latest, days = {}, {}
-    for r in rows:
+    for n, r in enumerate(rows):
         latest[r["content_id"]] = r
-        days[r["d"]] = {k: sum((v[k] or 0) for v in latest.values()) for k in ("likes", "views", "shares", "saves")}
-        days[r["d"]]["comments"] = sum(main_by(i, r["d"]) if i in mine else (v["comments"] or 0) for i, v in latest.items())
+        if n + 1 == len(rows) or rows[n + 1]["d"] != r["d"]:
+            days[r["d"]] = totals(r["d"])
     return [dict(d=d, engagement=v["likes"] + v["comments"] + v["shares"] + v["saves"], **v)
             for d, v in sorted(days.items())]
 

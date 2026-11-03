@@ -33,9 +33,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M  # PDF imports parse large reports; 128M was OOM-killed on 2026-10-07
+          memory: 1G        # raised live with docker update on 2026-10-14
         reservations:
-          memory: 32M
+          # 512M, not 32M (2026-11-03): with a tiny reservation the kernel reclaimed this container first
+          # whenever the shared host ran short, swapping the server out and freezing /admin for minutes.
+          memory: 512M
 
 networks:
   proxy:
