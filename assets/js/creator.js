@@ -312,7 +312,7 @@
     if (!out.length) return;
     var box = document.createElement("nav"); box.id = "pp-story"; box.className = "pp-story"; box.setAttribute("aria-label", "In this report");
     box.innerHTML = '<p class="pp-story__k">In this report</p><div class="pp-story__cards">' + out.map(function (o, i) {
-      return '<a class="pp-story__card" href="#' + o.sec + '" data-sec="' + o.sec + '"><span class="pp-story__n">' + String(i + 1).padStart(2, "0") + "</span>"
+      return '<a class="pp-story__card" href="#' + o.sec + '" data-sec="' + o.sec + '">'
         + '<b class="pp-story__fig"' + arDir(o.fig) + ">" + esc(o.fig) + '</b><span class="pp-story__term">' + esc(o.term) + "</span>"
         + '<span class="pp-story__line">' + esc(o.line) + "</span></a>";
     }).join("") + "</div>";
@@ -410,7 +410,7 @@
     // The photo at its own size: never stretched past its pixels, never cropped.
     var src = (a && a.photo_url) || c.photo_url;
     var bio = a && a.bio ? '<div class="pp-bio">' + (a.bio_ai ? '<p class="pp-bio__tag">AI summary <small>written from the creator\'s content, not their own words</small></p>' : "") + String(a.bio).split("\n").map(function (l) { return "<p" + arDir(l) + ">" + esc(l) + "</p>"; }).join("") + "</div>" : "";
-    $("pp-id").innerHTML = '<div class="pp-photo">' + (src ? '<img src="' + esc(src) + '" alt="' + esc(c.name) + '">'
+    $("pp-id").innerHTML = '<div class="pp-photo">' + (src ? '<img src="' + esc(src) + '" alt="' + esc(c.name) + '" data-fallback="' + esc(c.code.split("-").pop()) + '">'
       : '<span class="pp-photo__none">' + esc(c.code.split("-").pop()) + "</span>") + "</div>"
       + '<div class="pp-fields">'
       + (a ? '<p class="pp-badge pp-badge--ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.4 1.8 3 .1.9 2.9 2.4 1.8-.9 2.9.9 2.9-2.4 1.8-.9 2.9-3 .1L12 21.5l-2.4-1.8-3-.1-.9-2.9-2.4-1.8.9-2.9-.9-2.9 2.4-1.8.9-2.9 3-.1z" fill="currentColor"/><path d="M8.2 12.3l2.6 2.6 5-5.2" fill="none" stroke="#e8ff76" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
@@ -427,6 +427,12 @@
       + "</div>"
       // Helvi Select stands on the cover's floor beside the creator (the report's character, Bido 2026-11-03)
       + '<img class="pp-char" src="../assets/brand/modules/helvi-select-stand-420.webp" srcset="../assets/brand/modules/helvi-select-stand-420.webp 1x, ../assets/brand/modules/helvi-select-stand-full.webp 2x" width="182" height="420" alt="">';
+    // a photo that fails to load becomes the creator's number tile, never an empty corner beside the character
+    var ph = $("pp-id").querySelector(".pp-photo img[data-fallback]");
+    if (ph) {
+      var swap = function () { var n = document.createElement("span"); n.className = "pp-photo__none"; n.textContent = ph.getAttribute("data-fallback"); ph.replaceWith(n); };
+      if (ph.complete && !ph.naturalWidth) swap(); else ph.addEventListener("error", swap, { once: true });
+    }
   }
   function day(iso) { var d = new Date(String(iso).slice(0, 10) + "T00:00:00Z"); return isNaN(d) ? iso : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }); }
 
