@@ -73,6 +73,10 @@ cp "$SRC/account/index.html"        "$DST/account/index.html"
 # The client workspace (modules, team and roles), hand-written.
 mkdir -p "$DST/workspace"
 cp "$SRC/workspace/index.html"      "$DST/workspace/index.html"
+# The Selections and Intelligence boards (items 311-315), hand-written.
+mkdir -p "$DST/selections" "$DST/intelligence"
+cp "$SRC/selections/index.html"     "$DST/selections/index.html"
+cp "$SRC/intelligence/index.html"   "$DST/intelligence/index.html"
 # HELVi Connect privacy notice and terms (drafts pending legal review), hand-written.
 cp "$SRC/privacy/index.html"        "$DST/privacy/index.html"
 cp "$SRC/terms/index.html"          "$DST/terms/index.html"

@@ -43,7 +43,7 @@
   var base = me && me.src ? me.src.replace(/assets\/js\/hv-loader\.js.*$/, "") : "/";
   // The loader is the HELVi Connect logo alone, breathing (client, 2026-10-10): coloured on light
   // pages, white on ink. "dark" is the file drawn for dark backgrounds.
-  var logo = base + "assets/brand/helvy-connect/helvy-connect-" + (tone === "light" ? "light" : "dark") + "-640.webp?v=c4";
+  var logo = base + "assets/brand/helvy-connect/helvy-connect-" + (tone === "light" ? "light" : "dark") + "-640.webp?v=c6";
   var reduce = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   var T0 = Date.now();
   var SHOW_AFTER = 600, GONE_BY = 1500;
