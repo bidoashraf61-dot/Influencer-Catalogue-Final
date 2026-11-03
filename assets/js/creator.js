@@ -426,7 +426,7 @@
       + (a && !a.basic && !D.sample ? '<div class="pp-actions" id="pp-actions"></div>' : "")
       + "</div>"
       // Helvi Select stands on the cover's floor beside the creator (the report's character, Bido 2026-11-03)
-      + '<img class="pp-char" src="../assets/brand/modules/helvi-select-stand-420.webp" srcset="../assets/brand/modules/helvi-select-stand-420.webp 1x, ../assets/brand/modules/helvi-select-stand-full.webp 2x" width="182" height="420" alt="">';
+      + '<img class="pp-char" src="../assets/brand/modules/helvi-select-lean-420.webp" srcset="../assets/brand/modules/helvi-select-lean-420.webp 1x, ../assets/brand/modules/helvi-select-lean-840.webp 2x" width="282" height="420" alt="">';
     // a photo that fails to load becomes the creator's number tile, never an empty corner beside the character
     var ph = $("pp-id").querySelector(".pp-photo img[data-fallback]");
     if (ph) {

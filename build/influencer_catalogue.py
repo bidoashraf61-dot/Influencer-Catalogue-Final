@@ -991,9 +991,9 @@ def build():
           <h1 class="cat-selhead__title" id="sel-title">Selection</h1>
         </div>
         <!-- Helvi Select himself, standing on the hero's floor right after the name (item 309: the character only) -->
-        <img class="sel-char" src="/assets/brand/modules/helvi-select-stand-420.webp"
-             srcset="/assets/brand/modules/helvi-select-stand-420.webp 1x, /assets/brand/modules/helvi-select-stand-full.webp 2x"
-             width="182" height="420" alt="" fetchpriority="high">
+        <img class="sel-char" src="/assets/brand/modules/helvi-select-lean-420.webp"
+             srcset="/assets/brand/modules/helvi-select-lean-420.webp 1x, /assets/brand/modules/helvi-select-lean-840.webp 2x"
+             width="282" height="420" alt="" fetchpriority="high">
         </div>
         <p class="cat-selhead__client" id="sel-client" hidden></p>
         <div class="cat-selhead__foot">
