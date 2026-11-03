@@ -36,7 +36,7 @@ html.ss-on #ev-market { display: none; }
 .ss-sent { display: flex; gap: 10px; align-items: center; padding: 10px 16px; border-radius: 999px; background: #e7f7ed; color: #14884a; font-weight: 600; font-size: 14px; }
 
 /* cover: the Intelligence detective at his machine line on ink, under a faint broadcast grid */
-.ss-hero { position: relative; background: var(--ink); color: #fff; padding-top: clamp(28px, 4vw, 52px); overflow: hidden; isolation: isolate; }
+.ss-hero { position: relative; background: var(--ink); color: #fff; padding-top: clamp(20px, 2.4vw, 32px); overflow: hidden; isolation: isolate; }
 .ss-hero::before { content: ""; position: absolute; inset: 0; z-index: -1; background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px); background-size: 48px 48px; -webkit-mask-image: linear-gradient(#000 40%, transparent 92%); mask-image: linear-gradient(#000 40%, transparent 92%); }
 .ss-hero::after { content: ""; position: absolute; left: 10%; right: 10%; bottom: 4%; height: 30%; z-index: -1; background: radial-gradient(closest-side, rgba(232,255,118,.10), transparent); }
 .ss-hero__txt { position: relative; z-index: 1; padding: 0 var(--pad); display: flex; flex-direction: column; gap: 18px; }
@@ -48,7 +48,7 @@ html.ss-on #ev-market { display: none; }
 /* Item 309: the detective alone beside the title and the competitor logos, standing on the hero's floor. */
 .ss-hero:has(.ss-hero__char) { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding-right: var(--pad); }
 .ss-hero:has(.ss-hero__char) .ss-hero__txt { flex: 1 1 auto; min-width: 0; padding-bottom: clamp(24px, 3vw, 44px); }
-.ss-hero__char.ss-hero__art { flex: none; width: auto; height: clamp(240px, 26vw, 400px); max-width: none; margin: 0; }
+.ss-hero__char.ss-hero__art { flex: none; width: auto; height: clamp(220px, 20vw, 300px); max-width: none; margin: 0; }   /* the copy sets the height, not the art (audit 2026-11-03) */
 @media (max-width: 640px) {
   .ss-hero:has(.ss-hero__char) { gap: 8px; }
   .ss-hero__char.ss-hero__art { height: 190px; margin-right: -16px; }
@@ -109,7 +109,7 @@ html.ss-on #ev-market { display: none; }
 .ss-card__ph > .ss-plat { position: absolute; right: 10px; top: 10px; }
 .ss-card__ph > .ss-plat span { background: rgba(255,255,255,.92); }
 .ss-badges { position: absolute; left: 10px; bottom: 10px; right: 10px; display: flex; flex-wrap: wrap-reverse; gap: 4px; }
-.ss-badge { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: 999px; background: #fff; color: #121212; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.ss-badge { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: 999px; background: #fff; color: #121212; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .ss-badge i { width: 8px; height: 8px; border-radius: 50%; background: #14884a; }
 .ss-badge .ss-ic { width: 14px; height: 14px; }
 .ss-badge--recent { background: #fff1e2; color: #a85507; }
@@ -126,11 +126,11 @@ html.ss-on #ev-market { display: none; }
 .ss-nums div + div { padding-left: 10px; border-left: 1px solid var(--rule-soft); }
 .ss-nums b { display: block; font: 400 24px/1 var(--disp); }
 .ss-nums div:first-child b { color: var(--green); }
-.ss-nums div:nth-child(2) b { color: var(--orange); }
-.ss-nums span { display: block; margin-top: 3px; font-size: 10px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--graphite); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ss-nums div:nth-child(2) b { color: #c2410c; }   /* orange text at 5.2:1 (the brand orange is 2.9:1 on white; audit 2026-11-03) */
+.ss-nums span { display: block; margin-top: 3px; font-size: 12px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--graphite); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ss-why { margin: 0; font-size: 13.5px; line-height: 1.45; }
 .ss-logos { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: auto; }
-.ss-logos .ss-more { height: 30px; padding: 0 9px; border-radius: 999px; border: 1px dashed var(--rule); display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 600; color: var(--graphite); }
+.ss-logos .ss-more { height: 30px; padding: 0 9px; border-radius: 999px; border: 1px dashed var(--rule); display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; color: var(--graphite); }
 .ss-card.is-dim .ss-card__ph > img { filter: grayscale(1); opacity: .7; }
 .ss-empty { padding: 48px 24px; text-align: center; border-radius: 28px; background: var(--stone); }
 .ss-empty b { display: block; font: 400 30px/1 var(--disp); margin-bottom: 6px; }
@@ -141,7 +141,7 @@ html.ss-on #ev-market { display: none; }
 .ss-sec h2 { margin: 0; font: 400 clamp(2rem, 1.4rem + 1.8vw, 3rem)/1 var(--disp); }
 .ss-sec__hd p { margin: 0; max-width: 60ch; color: var(--graphite); font-size: 15px; }
 .ss-score { width: 100%; border-collapse: collapse; }
-.ss-score th { text-align: left; font-size: 11px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--graphite); padding: 0 12px 10px 0; border-bottom: 2px solid var(--ink); }
+.ss-score th { text-align: left; font-size: 12px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--graphite); padding: 0 12px 10px 0; border-bottom: 2px solid var(--ink); }
 .ss-score td { padding: 12px 12px 12px 0; border-bottom: 1px solid var(--rule); vertical-align: middle; }
 .ss-score th.n { text-align: right; }
 .ss-score td.n { text-align: right; font: 400 24px/1 var(--disp); }
@@ -173,13 +173,13 @@ html.ss-on #ev-market { display: none; }
 .ss-thumb__bt b { display: block; font: 400 26px/1 Bebasneue, Arial, sans-serif; color: #e8ff76; }
 .ss-thumb__bt span { display: block; font-size: 12px; opacity: .92; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ss-thumb__who { font-weight: 600; opacity: 1 !important; }
-.ss-thumb .ss-badge--boost { position: absolute; left: 10px; top: 44px; height: 22px; font-size: 10.5px; }
+.ss-thumb .ss-badge--boost { position: absolute; left: 10px; top: 44px; height: 22px; font-size: 12px; }
 .ss-tl { display: grid; grid-template-columns: 130px repeat(var(--m), minmax(0, 1fr)); grid-auto-rows: 52px; align-items: stretch; border-top: 2px solid var(--ink); }
 .ss-tl > * { padding: 0 6px; border-bottom: 1px solid var(--rule-soft); display: flex; align-items: center; }
 .ss-tl > .mh { height: 36px; }
-.ss-tl .mh { justify-content: center; font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--graphite); }
+.ss-tl .mh { justify-content: center; font-size: 12px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--graphite); }
 .ss-tl .cell { justify-content: center; }
-.ss-dot { border-radius: 50%; background: #14884a; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 700; }
+.ss-dot { border-radius: 50%; background: #14884a; display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 700; }
 .ss-dot.hot { background: #ff691e; }
 .ss-gaps { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
 .ss-gap { padding: 16px; border-radius: 20px; border: 1px solid rgba(18,18,18,.12); display: flex; flex-direction: column; gap: 10px; background: #fff; }
@@ -196,7 +196,7 @@ html.ss-on #ev-market { display: none; }
 .ss-gap__hd span { font-size: 12.5px; color: #383838; }
 .ss-gap__n { display: flex; gap: 18px; }
 .ss-gap__n b { font: 400 24px/1 Bebasneue, Arial, sans-serif; color: #14884a; display: block; }
-.ss-gap__n span { font-size: 10.5px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: #383838; }
+.ss-gap__n span { font-size: 12px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: #383838; }
 .ss-gap .ss-btn { align-self: flex-start; }
 .ss-end { height: 72px; }
 
@@ -221,7 +221,7 @@ html.ss-on #ev-market { display: none; }
 .ss-dnums div { padding: 4px 0; }
 .ss-dnums div + div { padding-left: 12px; border-left: 1px solid rgba(18,18,18,.12); }
 .ss-dnums b { display: block; font: 400 34px/1 Bebasneue, Arial, sans-serif; }
-.ss-dnums span { font-size: 11px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: #383838; }
+.ss-dnums span { font-size: 12px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: #383838; }
 .ss-dos h3 { margin: 24px 0 10px; font: 400 22px/1 Bebasneue, Arial, sans-serif; letter-spacing: .04em; }
 .ss-dwall { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .ss-note-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
@@ -252,16 +252,16 @@ html.ss-on #ev-market { display: none; }
   .ss-nums { grid-template-columns: 1fr 1fr; }
   .ss-nums div:nth-child(3) { display: none; }
   .ss-nums b { font-size: 20px; }
-  .ss-nums span { font-size: 9.5px; letter-spacing: .04em; }
+  .ss-nums span { font-size: 12px; letter-spacing: .04em; }
   .ss-nums span[data-short] { font-size: 0; }
-  .ss-nums span[data-short]::after { content: attr(data-short); font-size: 9.5px; }
+  .ss-nums span[data-short]::after { content: attr(data-short); font-size: 12px; }
   .ss-why { display: none; }
   .ss-logos > :nth-child(n+2):not(.ss-more) { display: none; }
   .ss-tier__n { margin-left: 0; }
   .ss-kinds { grid-template-columns: 1fr; }
   .ss-score .hide-m { display: none; }
   .ss-tl { grid-template-columns: 84px repeat(var(--m), 44px); overflow-x: auto; margin-right: calc(var(--pad) * -1); padding-right: var(--pad); }
-  .ss-tl .mh { font-size: 9px; letter-spacing: 0; }
+  .ss-tl .mh { font-size: 12px; letter-spacing: 0; }
   .ss-tl .ss-logo img { max-width: 56px; }
   .ss-wall { grid-template-columns: 1fr 1fr; }
   .ss-dos { top: auto; left: 0; width: 100%; height: 88vh; border-radius: 28px 28px 0 0; transform: translateY(104%); }
@@ -335,7 +335,7 @@ html.ss-on #ev-market { display: none; }
 .ss-pwall .ss-thumb__bt { padding: 18px 8px 6px; }
 .ss-pwall .ss-thumb__bt b { font-size: 18px; }
 .ss-pwall .ss-thumb__bt span { font-size: 8.5px; }
-.ss-dwall .ss-thumb__bt span { font-size: 11.5px; }
+.ss-dwall .ss-thumb__bt span { font-size: 12px; }
 .ss-pwall .ss-plat span { width: 20px; height: 20px; }
 .ss-pwall .ss-plat .ss-ic { width: 11px; height: 11px; }
 .ss-pwall .ss-thumb__top .ss-logo { height: 20px; }
@@ -455,3 +455,5 @@ html.ss-on #ev-market { display: none; }
 .ss-slide__btn:hover { background: #2a2a2a; }
 .ss-slide__btn:focus-visible { outline: 3px solid #e8ff76; outline-offset: 2px; }
 @media (max-width: 640px) { .ss-tab .ss-logo { height: 40px; } .ss-tab .ss-logo img { height: 22px; } }
+/* Audit 2026-11-03: filter buttons are 44px tall on phones. */
+@media (max-width: 640px) { .ss-seg button { min-height: 44px; } }

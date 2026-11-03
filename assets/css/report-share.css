@@ -282,7 +282,7 @@ div.rs-ln__row { cursor: default; }
 .rs-date > span { display: grid; line-height: 1.15; }
 .rs-date small { font: 600 9.5px/1.2 var(--rs-body); letter-spacing: .1em; text-transform: uppercase; color: var(--rs-graphite); }
 .rs-date b { font: 700 13.5px/1.25 var(--rs-body) !important; letter-spacing: 0 !important; color: var(--rs-ink); margin: 0 !important; }
-.rs-date i { font: 700 12px/1 var(--rs-body); font-style: normal; padding: 5px 9px; border-radius: 999px; background: var(--rs-green-soft); color: var(--rs-green); margin-left: 2px; }
+.rs-date i { font: 700 12px/1 var(--rs-body); font-style: normal; padding: 5px 9px; border-radius: 999px; background: var(--rs-green-soft); color: #0e6b39; margin-left: 2px; }   /* 6:1 on the soft green */
 .rs-date--until > svg { background: var(--rs-ink); color: var(--rs-lime); }
 .rs-date.is-soon i { background: #fde8e8; color: var(--rs-red-text); }
 .rs-date[hidden] { display: none; }
@@ -291,8 +291,8 @@ div.rs-ln__row { cursor: default; }
   .rs-date { padding: 3px 9px 3px 3px; gap: 7px; }
   .rs-date > svg { width: 24px; height: 24px; padding: 5px; }
   .rs-date b { font-size: 12px !important; }
-  .rs-date small { font-size: 8.5px; }
-  .rs-date i { font-size: 11px; padding: 4px 7px; }
+  .rs-date small { font-size: 12px; }
+  .rs-date i { font-size: 12px; padding: 4px 7px; }
 }
 /* Phones: both dates on one row (the icons say which is which), so the sticky bar stays short. */
 @media (max-width: 700px) {
@@ -300,7 +300,7 @@ div.rs-ln__row { cursor: default; }
   .rs-date { gap: 5px; padding: 2px 8px 2px 2px; min-width: 0; }
   .rs-date small { display: none; }
   .rs-date > svg { width: 22px; height: 22px; padding: 4px; }
-  .rs-date b { font-size: 11.5px !important; white-space: nowrap; }
-  .rs-date i { font-size: 10.5px; padding: 3px 6px; white-space: nowrap; }
+  .rs-date b { font-size: 12px !important; white-space: nowrap; }
+  .rs-date i { font-size: 12px; padding: 3px 6px; white-space: nowrap; }
   .rs-bar__meta { gap: 4px 10px; }
 }

@@ -1233,7 +1233,12 @@
       tabBar.querySelectorAll(".hvb-tab").forEach(function (b) {
         var on = +b.getAttribute("data-i") === B.lane;
         b.setAttribute("aria-selected", on ? "true" : "false");
-        if (on && tabBar.scrollWidth > tabBar.clientWidth) tabBar.scrollLeft = b.offsetLeft - tabBar.offsetLeft - 16;
+        // Audit 2026-11-03: the strip starts exactly at a pill (the one before the open stage, so the way back shows),
+        // never mid-pill with its icon cut at the edge.
+        if (on && tabBar.scrollWidth > tabBar.clientWidth) {
+          var lead = b.previousElementSibling || b;
+          tabBar.scrollLeft = Math.max(0, lead.offsetLeft - tabBar.firstElementChild.offsetLeft);
+        }
       });
     }
     function edges() {

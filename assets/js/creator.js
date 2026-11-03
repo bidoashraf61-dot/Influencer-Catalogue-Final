@@ -815,6 +815,33 @@
   function igCode(u) { var m = /instagram\.com\/(?:[^\/]+\/)?(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/.exec(u || ""); return m && !/^\d+$/.test(m[1]) ? m[1] : null; }
   function liveAttr(u) { var t = ttId(u), g = !t && igCode(u); return t ? "tt:" + t : g ? "ig:" + g : ""; }
 
+  // Audit 2026-11-03: a post picture that will not load (Instagram's CDN refuses other sites, CORP same-origin) used to
+  // leave a blank grey card. Each card's picture is tried once; a refused one shows the same "<platform> post" label as a
+  // card that never had a picture, so the card still reads as a post and still opens it.
+  var PIC_SEEN = typeof WeakSet === "function" ? new WeakSet() : null;
+  function checkPics(root) {
+    [].forEach.call((root || document).querySelectorAll(".pp-post__media[style*='background-image']"), function (m) {
+      if (!PIC_SEEN || PIC_SEEN.has(m)) return;
+      PIC_SEEN.add(m);
+      var u = /url\(['"]?([^'")]+)/.exec(m.style.backgroundImage || ""); if (!u) return;
+      var t = new Image();
+      t.onerror = function () {
+        m.style.backgroundImage = "";
+        if (!m.querySelector(".pp-post__none")) {
+          var n = document.createElement("span"); n.className = "pp-post__none";
+          n.textContent = (/tiktok/.test((m.getAttribute("data-live") || "")) || /^tt:/.test(m.getAttribute("data-live") || "") ? "TikTok" : (PLAT || "Instagram")) + " post";
+          m.insertBefore(n, m.firstChild);
+        }
+      };
+      t.referrerPolicy = "no-referrer"; t.src = u[1];
+    });
+  }
+  if (typeof MutationObserver === "function") {
+    var picTimer = null;
+    new MutationObserver(function () { clearTimeout(picTimer); picTimer = setTimeout(function () { checkPics(document); }, 120); })
+      .observe(document.documentElement, { childList: true, subtree: true });
+  }
+
   function postGrid(list, sponsored, recent) {
     return '<div class="pp-posts">' + list.map(function (p, i) {
       return '<a class="pp-post" href="' + esc(p.url) + '" target="_blank" rel="noopener" aria-label="Play post ' + (i + 1) + '" data-post="' + i + '"' + (sponsored ? ' data-sp="1"' : "") + (recent ? ' data-rc="1"' : "") + ">"

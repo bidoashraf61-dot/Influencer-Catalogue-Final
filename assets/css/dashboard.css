@@ -1938,7 +1938,7 @@ body.pp-on { margin: 0 !important; padding: 0 !important; background: #fff; }
   .pp .pp-b .db-table { table-layout: auto; font-size: 9.5px; }
   .pp .pp-b .db-table th, .pp .pp-b .db-table td { padding: 5px 4px; white-space: normal; }
   .pp-h__n { color: var(--ink); }
-  .pp .pp-b h3.pp-sub, .pp .pp-b .db-sec__t.pp-sub { display: flex; align-items: center; gap: 3mm; margin: 8mm 0 4mm; padding: 2.5mm 4mm; border-radius: 10px; background: #f3f0e9; border-left: 6px solid var(--lime);
+  .pp .pp-b h3.pp-sub, .pp .pp-b .db-sec__t.pp-sub { display: flex; align-items: center; gap: 3mm; margin: 8mm 0 4mm; padding: 2.5mm 4mm; border-radius: 10px; background: #f3f0e9; box-shadow: inset 0 -2px 0 var(--lime);
     font-family: var(--heading); font-weight: 400; font-size: 22px; line-height: 1; letter-spacing: .02em; text-transform: uppercase; color: var(--ink); }
   .pp .pp-b h3.pp-sub:first-child { margin-top: 0; }
   .pp .db-sec__h:has(.pp-sub) { margin: 8mm 0 4mm; }
@@ -2065,7 +2065,7 @@ body.pp-on { margin: 0 !important; padding: 0 !important; background: #fff; }
 
   /* comment highlights */
   .pp-quotes { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; }
-  .pp-q { display: flex; gap: 8px; padding: 4mm; border-radius: 14px; background: #faf8f4; border-left: 4px solid var(--c); }
+  .pp-q { display: flex; gap: 8px; padding: 4mm; border-radius: 14px; background: color-mix(in srgb, var(--c) 8%, #faf8f4); border: 1px solid color-mix(in srgb, var(--c) 30%, transparent); }
   .pp-q .cm-face { flex: none; width: 20px; height: 20px; color: var(--c); }
   .pp-q q { display: block; font-size: 12px; line-height: 1.5; quotes: "“" "”"; }
   .pp-q__en { margin: 3px 0 0; font-size: 10.5px; color: #6a665f; font-style: italic; }

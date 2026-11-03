@@ -2953,7 +2953,7 @@
         var rest = (n["Possible fit"] || 0) + (n["Not recommended"] || 0);
         if (rest) html += cell("Lower fit", rest, "is-low");
       }
-      if (selected.length && !(CURATED && CURATED.noPrices)) html += cell("Indicative range", priceText([lo, hi]), "is-range");
+      if (selected.length && hi > 0 && !(CURATED && CURATED.noPrices)) html += cell("Indicative range", priceText([lo, hi]), "is-range");
       st.innerHTML = html;
     }
     function renderCurrency() {
@@ -4964,7 +4964,8 @@
           + '<span class="sel-dec3" role="img" aria-label="' + dA + " approved, " + dR + " rejected, " + dW + ' to decide">'
           + '<i class="is-a" style="width:' + (dA / dn * 100).toFixed(1) + '%"></i><i class="is-r" style="width:' + (dR / dn * 100).toFixed(1) + '%"></i></span>']);
       }
-      if (CURATED && CURATED.noPrices) rows = rows.filter(function (r) { return r[0] !== "Indicative range"; });
+      // No range without a price: a link made without prices, or creators with none set, never shows "0 SAR" (audit 2026-11-03).
+      if ((CURATED && CURATED.noPrices) || !(hi > 0)) rows = rows.filter(function (r) { return r[0] !== "Indicative range"; });
       if (CURATED && CURATED.platform) rows.splice(1, 0, ["Quoted for", CURATED.platform]);
       if (dropped) rows.push(["Not in this roster", String(dropped)]);
       $("sel-summary").innerHTML = rows.map(function (r) {

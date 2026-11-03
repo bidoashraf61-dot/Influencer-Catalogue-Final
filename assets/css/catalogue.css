@@ -286,7 +286,7 @@ a.cat-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 .cat-card__platform[data-n="5"] .cat-card__mark svg, .cat-card__platform[data-n="6"] .cat-card__mark svg {
   width: 16px; height: 16px; padding: 6px;
 }
-.cat-card__platform[data-n="5"] .cat-card__platform-hint, .cat-card__platform[data-n="6"] .cat-card__platform-hint { font-size: 11px; }
+.cat-card__platform[data-n="5"] .cat-card__platform-hint, .cat-card__platform[data-n="6"] .cat-card__platform-hint { font-size: 12px; }
 
 /* Projected reach: a range in the summary, minimum to best case */
 .cat-reach { display: inline-flex; align-items: baseline; gap: 10px; }
@@ -877,10 +877,10 @@ body[data-page="selection"] .cat-card__check { display: none; }
 /* The tier of one account, on that account's row. Orange because it is a
    judgement about the creator rather than a fact off the platform, and the
    card already spends grey on the platform names.
-   #d75212 is the brand orange taken a step darker: white on #ff691e is too
+   #b8460f is the brand orange taken two steps darker: white on #ff691e is too
    pale to read at 11px. */
-.cat-card__band{font-style:normal;font-size:11px;font-weight:600;letter-spacing:.02em;
-  padding:2px 7px;border-radius:999px;background:#d75212;color:var(--white);
+.cat-card__band{font-style:normal;font-size: 12px;font-weight:600;letter-spacing:.02em;
+  padding:2px 7px;border-radius:999px;background:#b8460f;color:var(--white);   /* 5.3:1 (was 4.1:1) */
   /* A tier like "HCP - Mid-Tier" must not be split down the middle. When it
      will not fit beside the number it drops whole to the line below, which is
      what the flex-wrap on the row above is for. */
@@ -948,7 +948,7 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cat-dd__group--cols { display: grid; grid-template-columns: 1fr; }
 .cat-dd--wide .cat-dd__group--cols { grid-template-columns: 1fr 1fr; column-gap: 8px; }
 .cat-dd__title {
-  font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
   color: var(--gray); margin: 8px 8px 4px;
 }
 .cat-dd__cities { padding-left: 26px; }
@@ -1368,13 +1368,13 @@ body[data-page="selection"] .cat-card__check { display: none; }
 }
 .cat-score b { font-size: 21px; line-height: 1; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
 .cat-score__pct { font-style: normal; font-size: .58em; font-weight: 800; margin-left: 1px; vertical-align: .32em; letter-spacing: 0; }
-.cat-score small { font-size: 8px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; opacity: .9; margin-top: 2px; }
+.cat-score small { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; opacity: .9; margin-top: 2px; }
 .cat-score--g { background: #14884a; }
 .cat-score--l { background: #7d8f00; }
 .cat-score--a { background: #d99a00; color: #121212; }
 .cat-score--r { background: #d02424; }
 .cat-score--none { background: rgba(60,60,60,.85); border-style: dashed; width: 64px; height: 64px; }
-.cat-score--none b { font-size: 18px; } .cat-score--none small { font-size: 7px; }
+.cat-score--none b { font-size: 18px; } .cat-score--none small { font-size: 12px; }
 .cat-score:hover, .cat-score:focus-visible { transform: rotate(0) scale(1.06); outline: 3px solid var(--lime); outline-offset: 2px; }
 .cat-score-tip {
   position: fixed; z-index: 1000; background: var(--ink); color: var(--white); border-radius: 16px; padding: 16px 18px;
@@ -1385,7 +1385,7 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cst-head > b { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-size: 19px; font-weight: 800; color: #fff; background: #14884a; flex: none; }
 .cst-head b.l, .cst-bar b.l { background: #7d8f00; } .cst-head b.a, .cst-bar b.a { background: #d99a00; } .cst-head b.r, .cst-bar b.r { background: #d02424; }
 .cst-head strong { display: block; font-size: 15px; } .cst-head small { opacity: .7; }
-.cst-h { margin: 12px 0 4px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; opacity: .6; font-weight: 700; }
+.cst-h { margin: 12px 0 4px; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; opacity: .6; font-weight: 700; }
 .cst-g, .cst-w { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
 .cst-g li::before { content: "✓ "; color: var(--lime); font-weight: 800; }
 .cst-w li::before { content: "! "; color: #ffb74d; font-weight: 800; }
@@ -1410,7 +1410,7 @@ body[data-page="selection"] .cat-card__check { display: none; }
 /* Tags on a selection card: sit between the creator's details and the analysis button; each
    tag has its own soft colour, the client's own tags are outlined and removable. */
 .cat-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 6px; margin: 14px 0 12px; padding: 12px 0 0; border-top: 1px solid rgba(18,18,18,.1); }
-.cat-tags__label { flex-basis: 100%; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgba(18,18,18,.5); margin-bottom: 2px; }
+.cat-tags__label { flex-basis: 100%; font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgba(18,18,18,.5); margin-bottom: 2px; }
 .cat-tag {
   --tg-bg: #e3f6ea; --tg-fg: #0c5a2d; --tg-dot: #1b9b52;
   display: inline-flex; align-items: center; gap: 7px; min-height: 28px; padding: 0 12px; border-radius: 999px;
@@ -1436,7 +1436,7 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cat-score--basic small { letter-spacing: .1em; }
 .cst-basic { margin: 12px 0 0; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.1); font-size: 12px; line-height: 1.4; opacity: .9; }
 .cst-basic b { display: block; margin-bottom: 2px; }
-.cst-basic--warn { background: rgba(255, 183, 77, .22); border-left: 3px solid #ffb74d; }
+.cst-basic--warn { background: rgba(255, 183, 77, .22); box-shadow: inset 0 0 0 1px rgba(255, 183, 77, .55); }
 .cst-c { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
 .cst-c li::before { font-weight: 800; margin-right: 6px; }
 .cst-c li.ok::before { content: "\2713"; color: var(--lime); }
@@ -1452,12 +1452,12 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cat-selhead__title { font-family: var(--heading); font-weight: 400; line-height: .98; margin: 0 0 16px; color: var(--ink); font-size: clamp(2.6rem, 1.2rem + 5vw, 5.4rem); overflow-wrap: anywhere; }
 .cat-selhead__brief { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 .cat-selhead__chip { display: inline-flex; flex-direction: column; gap: 1px; padding: 8px 14px; border: 1.5px solid var(--ink); border-radius: 14px; font-weight: 700; font-size: 14px; line-height: 1.2; background: var(--white); }
-.cat-selhead__chip small { font-size: 9px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; opacity: .5; }
+.cat-selhead__chip small { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; opacity: .5; }
 .cat-selhead__hint { margin: 0; font-size: 14px; color: var(--gray); }
 .cat-selhead__side { display: grid; gap: 18px; justify-items: end; }
 .cat-selhead__stats { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin: 0; }
 .cat-selhead__stats > div { background: var(--ink); color: var(--white); border-radius: 16px; padding: 12px 18px; min-width: 96px; }
-.cat-selhead__stats dt { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; opacity: .65; margin: 0 0 4px; }
+.cat-selhead__stats dt { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; opacity: .65; margin: 0 0 4px; }
 .cat-selhead__stats dd { margin: 0; font-family: var(--heading); font-size: 34px; line-height: 1; letter-spacing: .01em; }
 .cat-selhead__stats .is-range dd { font-size: 24px; font-family: inherit; font-weight: 800; line-height: 1.15; }
 .cat-selhead__stats .is-strong { background: #14884a; } .cat-selhead__stats .is-good { background: #7d8f00; }
@@ -1478,7 +1478,7 @@ body[data-page="selection"] .cat-card__check { display: none; }
 
 /* "Score on": which platform a creator's match is read from; and the second stamp for "Both". */
 .cat-plat { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; }
-.cat-plat__label { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgba(18,18,18,.5); margin-right: 2px; }
+.cat-plat__label { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgba(18,18,18,.5); margin-right: 2px; }
 .cat-plat button { font: inherit; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 999px; border: 1.5px solid rgba(18,18,18,.25); background: transparent; color: var(--ink); cursor: pointer; }
 .cat-plat button:hover { border-color: var(--ink); }
 .cat-plat button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--lime); }
@@ -1580,7 +1580,7 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 
 /* The audience behind this score is assumed, not measured: a small tag beside the stamp. */
 .cat-score__est { position: absolute; left: 100%; top: 50%; margin-left: 6px; transform: translateY(-50%) rotate(8deg); white-space: nowrap;
-  font-style: normal; font-size: 8px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  font-style: normal; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
   background: var(--white); color: var(--ink); padding: 3px 6px 2px; border-radius: var(--r-pill);
   box-shadow: 0 1px 4px rgba(0,0,0,.25); }
 .cat-score--multi .cat-score__est { display: none; }   /* two stamps side by side: the tooltip says it */
@@ -1670,7 +1670,7 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 .cat-cover__title { margin: 0; font-weight: 400; display: flex; flex-direction: column; align-items: center; }
 .cat-hero--cover .cat-cover__brand {
   font-size: clamp(1rem, .75rem + .7vw, 1.45rem); padding: 8px 22px; letter-spacing: .08em;
-  margin: 0 0 -.55rem; transform: rotate(-5deg);
+  margin: 0 0 .5rem; transform: rotate(-5deg);   /* sits above the title, never on its letters (audit 2026-11-03) */
   box-shadow: 0 8px 24px rgba(0,0,0,.35);
 }
 .cat-cover__line {
@@ -1783,14 +1783,14 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 
 .cat-hero--short .cat-cover__body { padding-bottom: clamp(28px, 5vh, 52px); }
 .cat-hero--cover .cat-selhead { display: block; padding: 0; }
-/* The tag is pressed onto the name: rotated, and biting into its cap height,
-   the same lock-up as the catalogue's Creator Roster pill. */
+/* The tag sits just above the name, rotated like the catalogue's welcome pill. It no longer bites into the
+   cap height: it hid the first letters of the title (audit 2026-11-03). */
 .cat-selhead__lock { position: relative; max-width: min(100%, 760px, 60vw); }
 .cat-hero--cover .cat-selhead__tag {
   position: relative; z-index: 2; display: inline-block;
   font-size: clamp(.95rem, .7rem + .55vw, 1.3rem); letter-spacing: .1em;
   padding: 7px 18px; transform: rotate(-6deg); transform-origin: left bottom;
-  margin: 0 0 -.65rem clamp(.4rem, 1.2vw, 1.2rem);
+  margin: 0 0 .55rem clamp(.4rem, 1.2vw, 1.2rem);
   box-shadow: 0 6px 18px rgba(0,0,0,.35);
 }
 .cat-hero--cover .cat-selhead__title {
@@ -1829,7 +1829,7 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
   background: rgba(232,255,118,.12); border: 1px solid rgba(232,255,118,.45);
 }
 .cat-selhead__obj small {
-  font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
   color: var(--ink); background: var(--lime); padding: 6px 12px; border-radius: var(--r-pill);
 }
 .cat-selhead__obj strong {
@@ -2426,7 +2426,7 @@ body[data-page="selection"] .cat-close__copied { grid-column: 1 / -1; margin: 0;
 body[data-page="selection"] .cat-grid { gap: 24px; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); }
 body[data-page="selection"] .cat-card { border: 1px solid rgba(18,18,18,.08); box-shadow: 0 1px 2px rgba(18,18,18,.04); }
 body[data-page="selection"] .cat-card__body { padding: 18px 20px 20px; }
-body[data-page="selection"] .cat-card__code { font-size: 11px; margin-bottom: 4px; }
+body[data-page="selection"] .cat-card__code { font-size: 12px; margin-bottom: 4px; }
 body[data-page="selection"] .cat-card__name { font-size: 27px; margin-bottom: 12px; }
 /* Facts: quiet labels, firm values; the key numbers lead */
 body[data-page="selection"] .cat-card__meta { margin-bottom: 4px; }
@@ -2523,7 +2523,7 @@ body[data-page="selection"] .cat-group__sub { flex-basis: 100%; order: 10; margi
 .sel-info__pop { position: absolute; left: 10px; right: 10px; bottom: calc(100% - 6px); z-index: 20; display: none;
   padding: 10px 12px; border-radius: 12px; background: var(--ink); color: var(--white); font-size: 12.5px; line-height: 1.45; font-style: normal;
   box-shadow: 0 12px 30px rgba(18,18,18,.3); }
-.sel-info__pop b { display: block; margin-bottom: 3px; color: var(--lime); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.sel-info__pop b { display: block; margin-bottom: 3px; color: var(--lime); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
 @media (hover: hover) { .sel-info:hover .sel-info__pop { display: block; } }
 .sel-info:focus-within .sel-info__pop, .sel-info.is-open .sel-info__pop { display: block; }
 
@@ -2569,7 +2569,7 @@ body[data-page="selection"] .cat-group__sub { flex-basis: 100%; order: 10; margi
 .cx-selact #ev-mi-btn .hv-i { width: 18px; height: 18px; }
 .cx-selact .cx-btn--roi, .cx-selact .cx-btn--roi.is-locked { order: 4; min-height: 34px; padding: 0 12px; border: 1px dashed rgba(255,255,255,.3);
   background: transparent; color: rgba(255,255,255,.6); box-shadow: none; opacity: 1; font: 600 13px var(--body); letter-spacing: 0; }
-.cx-selact .cx-btn--roi.is-locked small { font-size: 11px; opacity: .8; }
+.cx-selact .cx-btn--roi.is-locked small { font-size: 12px; opacity: .8; }
 .cx-selact .cx-btn--roi svg { width: 14px; height: 14px; }
 /* The objective as a quiet info strip; its actions are icon buttons at the right */
 .cat-hero--cover .cat-selhead__brief:not([hidden]) { padding: 8px 10px 8px 8px; border-radius: 18px; background: rgba(255,255,255,.06);
@@ -2674,3 +2674,15 @@ body:has(#cat-tray:not([hidden])) .sel-arr { bottom: 112px; }
 }
 /* the name fills its column so Helvi Select stands right after its last word (balanced lines left a gap) */
 [data-page="selection"] .cat-hero--desk .sel-headrow .cat-selhead__title { text-wrap: wrap; }
+
+/* Audit 2026-11-03: no dead band above the selection title. On a client link the share bar already carries the
+   HELVi Select mark, so the hero's own logo row goes and the title starts near the top. */
+[data-page="selection"] .cat-hero--desk .cat-cover__body { padding-top: 56px; }
+html.hv-shared body[data-page="selection"] .cat-cover__nav .cat-brand { display: none; }
+html.hv-shared body[data-page="selection"] .cat-cover__nav { padding-top: 0; }
+html.hv-shared body[data-page="selection"] .cat-hero--desk .cat-cover__body { padding-top: 28px; }
+/* Audit 2026-11-03: the platform marks on creator cards are 30px; on touch screens their tap area is 44px. */
+@media (pointer: coarse), (max-width: 640px) {
+  .cat-card__mark { position: relative; }
+  .cat-card__mark::after { content: ""; position: absolute; inset: -7px; }
+}

@@ -785,3 +785,6 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
 /* audit: the Completed stage mark is ink, invisible on the cover's ink */
 .mb-pipe .hvb-stico.hvb-lane--completed { background: rgba(255,255,255,.22); color: var(--white); }
 .mx-list--covered .mx-list__items { margin-top: 0; gap: 0; }
+/* Audit 2026-11-03: 44px controls on phones (view switch, Activity on collapsed cards). */
+@media (max-width: 640px) { .hvb-view button { min-height: 44px; } }
+@media (pointer: coarse) { .hvb-card.is-collapsed .hvb-actb { width: 44px; height: 44px; margin: -8px -6px; } }

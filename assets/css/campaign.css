@@ -1004,7 +1004,7 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
 .mx-mood i[style*="ff691e" i], .mx-mood i[style*="e2780f" i] { color: var(--ink); }   /* ink on orange: 7.3:1 (white was 2.9:1) */
 .mx-bar__k small { color: var(--graphite, #383838); font-size: .92em; }
 .mx-quotes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
-.mx-q { margin: 0; padding: 16px 18px; border-radius: var(--r-md); background: var(--white); border: 1px solid var(--line); border-left: 5px solid var(--c); display: flex; flex-direction: column; gap: 6px; }
+.mx-q { margin: 0; padding: 16px 18px; border-radius: var(--r-md); background: color-mix(in srgb, var(--c) 8%, var(--white)); border: 1px solid color-mix(in srgb, var(--c) 30%, var(--line)); display: flex; flex-direction: column; gap: 6px; }
 .mx-q q { font-size: 15px; line-height: 1.55; quotes: "“" "”"; }
 .mx-q__en { margin: 0; font-size: 13px; color: var(--graphite, #383838); font-style: italic; }
 .mx-q__m { margin: auto 0 0; padding-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--graphite, #383838); }
@@ -1169,7 +1169,7 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
   .mx-gantt__today span, .mx-state, .mx-nums dt, .mx-est, .mx-bullet__mark span, .mx-table, .mx-obj__due span, .mx-cc__meta,
   .mx-bar, .mx-key-line, .mx-cc__chips a, .mx-post__tag, .mx-post__lbl, .mx-say__helvi p, .mx-say__nums dt, .mx-tcd__term, .mx-bar__k small { font-size: 12px !important; }
 }
-.mx-late { color: #a85507 !important; font-weight: 600; }
+.mx-late { color: #8a4506 !important; font-weight: 600; }   /* 5.8:1 on linen */
 @media (max-width: 700px) {
   .mx-post__lk, .mx-tab, .mx-chip, .mx-post__go, .mx-saybox__go { min-height: 44px; display: inline-flex; align-items: center; }
   .mx-info { position: relative; }
@@ -1384,3 +1384,13 @@ body[data-only] #mx-report .mx-sec:not(.is-only) { display: none !important; }
 @media (min-width: 900px) { .mx-tabs__in { flex-wrap: wrap !important; overflow: visible !important; gap: 8px !important; } .mx-tab { padding-left: 16px !important; padding-right: 16px !important; } }
 @media (min-width: 900px) { .mx-tab { font-size: 18px !important; padding-left: 14px !important; padding-right: 14px !important; min-height: 42px !important; } .mx-tab .mx-ico { width: 16px; height: 16px; } }
 @media print { #mx-report .mx-carousel { break-inside: avoid !important; page-break-inside: avoid !important; } #mx-report .mx-carousel__head { break-after: avoid !important; } }   /* the creators heading stays with its cards */
+
+/* Audit 2026-11-03: on phones the two logos stay on one line in their chip (HelloVoice used to drop under the
+   client's logo, leaving the × hanging). */
+@media (max-width: 640px) {
+  .mx-bug__brands { flex-wrap: nowrap; gap: 10px; padding: 10px 14px; max-width: 100%; }
+  .mx-bug__brands img { height: 34px !important; max-width: 128px; }
+  .mx-bug__brands .mx-bug__hv { height: 22px !important; max-width: 110px; }
+}
+/* Audit 2026-11-03: the creator's post chips are 44px tall on phones. */
+@media (max-width: 700px) { .mx-cc__chips a { min-height: 44px; } }
