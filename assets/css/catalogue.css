@@ -2688,3 +2688,5 @@ html.hv-shared body[data-page="selection"] .cat-hero--desk .cat-cover__body { pa
 }
 /* Audit 2026-11-03 (round 2): the selection's filter line is 44px tall on phones. */
 @media (max-width: 640px) { .sel-line__b { min-height: 44px; } }
+/* Audit 2026-11-03 (round 2): group headers on phones are 44px rows. */
+@media (max-width: 640px) { .cat-group__tog, .cat-group__fold { min-height: 44px; } }
