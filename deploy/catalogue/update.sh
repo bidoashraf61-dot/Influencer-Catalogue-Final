@@ -80,6 +80,8 @@ cp "$SRC/terms/index.html"          "$DST/terms/index.html"
 # assets/welcome/onboarding-film.mp4, uploaded to the server by hand (not in git: it shows real
 # creators and the repo is public); rsync never deletes it.
 cp "$SRC/welcome/index.html"        "$DST/welcome/index.html"
+mkdir -p "$DST/report"                                   # client report links (item 291)
+cp "$SRC/report/index.html"         "$DST/report/index.html"
 # HELVi Connect app (item 168): the service worker, manifest and offline page live at the site root.
 cp "$SRC/sw.js"                     "$DST/sw.js"
 cp "$SRC/manifest.webmanifest"      "$DST/manifest.webmanifest"
