@@ -288,7 +288,7 @@ body.pp-modal-on { overflow: hidden; }
   .pp-tiles--sm { grid-template-columns: repeat(3, 1fr); }
   .pp-key { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
   .pp-key div { padding: 10px; }
-  .pp-key dt { font-size: 12px; letter-spacing: .08em; }
+  .pp-key dt { font-size: 12px; letter-spacing: .02em; text-transform: none; font-weight: 600; }   /* "Engagement rate" fits its third of the row */
   .pp-key dd { font-size: 24px; }
   .pp-posts { grid-template-columns: 1fr 1fr; }
   .pp-brands { grid-template-columns: repeat(3, 1fr); }
