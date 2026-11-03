@@ -2614,37 +2614,26 @@ body:has(#cat-tray:not([hidden])) .sel-arr { bottom: 112px; }
 .sel-arr__save { background: #e8ff76; color: #111; }
 .sel-arr button[disabled] { opacity: .6; cursor: default; }
 
-/* Helvi Select's factory brands the selection hero (item 305): the whole scene, never cropped, sits on a
-   black plate that melts into the desk grid; the drawn shortlist stays beside the title as the factory's output. */
-.sel-factory {
-  margin: 0 auto 6px; max-width: 1180px; line-height: 0;
-  background: radial-gradient(closest-side, #090909 78%, rgba(9,9,9,0));
-}
-.sel-factory img {
-  display: block; width: 100%; height: auto; max-height: min(380px, 42vh); object-fit: contain;
-  -webkit-mask-image: radial-gradient(farthest-side, #000 88%, transparent);
-          mask-image: radial-gradient(farthest-side, #000 88%, transparent);
-}
+/* Helvi Select brands the selection hero (item 309): the character alone, cut out, standing right beside the
+   name on the hero's own grid; the drawn shortlist stays on the right. */
+.sel-headrow { display: flex; align-items: flex-end; gap: clamp(8px, 1.5vw, 24px); }
+.sel-headrow .cat-selhead__lock { min-width: 0; }
+.sel-char { display: block; flex: none; width: auto; height: clamp(150px, 15vw, 230px); margin-bottom: -4px;
+  -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
 [data-page="selection"] .cat-hero--desk { min-height: 0; }
-[data-page="selection"] .cat-hero--desk .cat-cover__body { padding-top: 84px; }
-/* the shortlist the factory just made: beside the title, standing on the line above the brief */
+[data-page="selection"] .cat-hero--desk .cat-cover__body { padding-top: 110px; }
 [data-page="selection"] .cat-hero--desk .cat-desk {
   top: auto; bottom: 128px; transform: none; z-index: 0; opacity: 1;
   right: clamp(8px, 4vw, 80px); width: clamp(240px, 22vw, 330px);
 }
-@media screen and (max-width: 900px) { [data-page="selection"] .cat-hero--desk .cat-desk { display: none; } }
+@media screen and (max-width: 1100px) { [data-page="selection"] .cat-hero--desk .cat-desk { display: none; } }
+@media screen and (max-width: 600px) { .sel-char { height: 110px; } }
 .cat-hero__logo--select { width: 150px; }
 /* Decisions so far: approved (green) and rejected (red) against the selection, the rest is still to decide. */
 .sel-dec3 { display: flex; height: 8px; margin-top: 10px; border-radius: 99px; overflow: hidden; background: rgba(18,18,18,.1); }
 .sel-dec3 i { display: block; height: 100%; }
 .sel-dec3 .is-a { background: var(--go, #14884a); } .sel-dec3 .is-r { background: var(--vivid-red, #ee1515); }
 .sel-dec3__of { font-size: .45em; color: var(--gray); margin-left: 2px; }
-@media print {
-  html.rs-printing [data-page="selection"] .sel-factory { max-width: 150mm; margin-bottom: 3mm; }
-  html.rs-printing [data-page="selection"] .sel-factory,
-  html.rs-printing [data-page="selection"] .sel-factory img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-}
-
 /* ------------------------------------------------ item 311: the HELVi module switcher
    Replaces the single "Campaign tracking" pill: one ink capsule holding the three products,
    each led by its own character on a linen disc. The page you are on is lime. */

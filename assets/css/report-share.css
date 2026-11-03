@@ -151,12 +151,13 @@ button.rs-fb__b:focus-visible { outline: 3px solid var(--rs-red); outline-offset
 .sel-noprices .cat-summary .cat-note { display: none; }
 
 /* --------------------------------------------------------------------- print */
-.rs-printhead, .rs-printcover { display: none; }
+.rs-printhead { display: none; }
 @media print {
   .rs-bar, .rs-pop, .rs-scrim, .rs-share { display: none !important; }
   .rs-printhead { display: flex !important; align-items: center; gap: 16px; padding: 0 0 12px; margin: 0 0 16px; border-bottom: 2px solid var(--rs-ink);
     -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .rs-printhead img { height: 54px; width: auto; }
+  [data-page="selection"] .rs-printhead img { height: 30mm; }
   .rs-printhead b { display: block; font: 400 30px/1 var(--rs-display); color: var(--rs-ink); }
   .rs-printhead span { font: 400 12px/1.4 var(--rs-body); color: var(--rs-graphite); }
 }
@@ -259,9 +260,6 @@ div.rs-ln__row { cursor: default; }
   html.rs-printing [data-page="selection"] .sel-under-notes { display: none !important; }
 }
 @media print {
-  html.rs-printing .rs-printcover { display: block !important; background: #090909; text-align: center; line-height: 0; margin: 0 0 4mm;
-    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  html.rs-printing .rs-printcover img { width: 46%; height: auto; }
   html.rs-printing [data-page="selection"] .cat-controls { display: none !important; }
   html.rs-printing [data-page="selection"] .sel-glance__viz { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 3mm !important; }
   html.rs-printing [data-page="selection"] .sel-glance__viz > #sel-tiers { grid-column: 1 / -1; }

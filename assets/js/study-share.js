@@ -197,6 +197,13 @@
     });
 
   var refs = {};
+  // The competitors studied, as logos (cover and PDF cover).
+  function comps() {
+    var w = el("div", "ss-comps"), row = el("div", "ss-comps__row");
+    w.appendChild(el("span", "ss-comps__k", "Competitors studied"));
+    (D.competitors || []).forEach(function (c) { row.appendChild(logo(c.name, true)); });
+    w.appendChild(row); return w;
+  }
   function draw() {
     root.textContent = "";
     // cover
@@ -207,12 +214,14 @@
     tx.appendChild(br);
     var h1 = el("h1"); h1.id = "ss-h1";
     h1.appendChild(document.createTextNode("Who to book, ")); h1.appendChild(el("em", null, "already proven")); h1.appendChild(document.createTextNode(" on your competitors"));
-    tx.appendChild(h1); hero.appendChild(tx);
-    var art = el("img", "ss-hero__art");
-    art.src = ROOT + "assets/brand/modules/helvi-intelligence-cover-v2.webp";
-    art.srcset = ROOT + "assets/brand/modules/helvi-intelligence-cover-v2-1200.webp 1200w, " + ROOT + "assets/brand/modules/helvi-intelligence-cover-v2.webp 2400w";
-    art.sizes = "100vw"; art.width = 2400; art.height = 1350;
-    art.alt = "Helvy the detective, magnifier in hand, inspecting creator cards as they come off the HELVi Intelligence machine line";
+    tx.appendChild(h1);
+    // the cover is the detective alone (item 309) with the brands he studied: competitor logos only, no machines
+    tx.appendChild(comps()); hero.appendChild(tx);
+    var art = el("img", "ss-hero__art ss-hero__char");
+    art.src = ROOT + "assets/brand/modules/helvi-intel-character-480.webp";
+    art.srcset = ROOT + "assets/brand/modules/helvi-intel-character-480.webp 1x, " + ROOT + "assets/brand/modules/helvi-intel-character-960.webp 2x";
+    art.width = 267; art.height = 480;
+    art.alt = "Helvy the detective, magnifier in hand";
     hero.appendChild(art); root.appendChild(hero);
     requestAnimationFrame(function () { art.classList.add("in"); });
     // answer + facts
@@ -582,7 +591,9 @@
     var h = el("h1"); h.appendChild(document.createTextNode("Who to book, ")); h.appendChild(el("em", null, "already proven")); h.appendChild(document.createTextNode(" on your competitors")); cv.appendChild(h);
     cv.appendChild(el("p", null, "Competitor study · " + (D.objective || "Awareness") + ". The creators in your selection who already posted for your competitors, ranked by the "
       + (BY_ENG ? "likes and comments" : "views") + " those posts got. Tap any view count or post to open it."));
-    var art = el("img", "ss-pcover__art"); art.src = ROOT + "assets/brand/modules/helvi-intelligence-cover-v2.webp"; art.alt = ""; cv.appendChild(art);
+    var crow = el("div", "ss-pcover__row"), art = el("img", "ss-pcover__char");
+    art.src = ROOT + "assets/brand/modules/helvi-intel-character-960.webp"; art.alt = "";
+    crow.appendChild(comps()); crow.appendChild(art); cv.appendChild(crow);
     var pf = el("div", "ss-pfacts"), posts = 0, views = 0;
     all.forEach(function (v) { posts += v.posts.length; v.organic.forEach(function (q) { views += q.views || 0; }); });
     [[(D.competitors || []).length, "Competitors studied"], [all.length, "Creators in your selection"], [posts, "Competitor posts found"], [num(views), "Views on those posts"]]

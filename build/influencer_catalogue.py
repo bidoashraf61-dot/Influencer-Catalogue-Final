@@ -984,14 +984,16 @@ def build():
     </div></div></div>
 
     <div class="cat-cover__body"><div class="cat-pad"><div class="cat-container">
-      <!-- Helvi Select's factory brands the hero (item 305): the brief goes in, a shortlist of creator cards comes out -->
-      <figure class="sel-factory"><img src="/assets/brand/modules/helvi-select-cover-matte-1800.webp"
-        srcset="/assets/brand/modules/helvi-select-cover-matte-900.webp 900w, /assets/brand/modules/helvi-select-cover-matte-1800.webp 1800w"
-        sizes="(max-width: 1240px) 100vw, 1180px" width="1800" height="767" alt="Helvi Select at the machines that turn a brief into a shortlist of creators" fetchpriority="high"></figure>
       <div class="cat-selhead">
+        <div class="sel-headrow">
         <div class="cat-selhead__lock">
           <span class="cat-selhead__tag">Selection</span>
           <h1 class="cat-selhead__title" id="sel-title">Selection</h1>
+        </div>
+        <!-- Helvi Select himself, right beside the name (item 309: the character only, on the hero's own background) -->
+        <img class="sel-char" src="/assets/brand/modules/helvi-select-character-480.webp"
+             srcset="/assets/brand/modules/helvi-select-character-480.webp 1x, /assets/brand/modules/helvi-select-character-960.webp 2x"
+             width="425" height="480" alt="" fetchpriority="high">
         </div>
         <p class="cat-selhead__client" id="sel-client" hidden></p>
         <div class="cat-selhead__foot">

@@ -106,14 +106,8 @@
   HV.printHead = function (title) {
     var h = document.getElementById("rs-printhead");
     if (!h) { h = el("div", "rs-printhead"); h.id = "rs-printhead"; h.setAttribute("aria-hidden", "true"); document.body.insertBefore(h, document.body.firstChild); }
-    // The hero does not print, so its factory scene (item 305) opens the PDF on its own black band above the head.
-    var fac = document.querySelector(".sel-factory img");
-    if (fac && !document.getElementById("rs-printcover")) {
-      var pc = el("div", "rs-printcover"); pc.id = "rs-printcover"; pc.setAttribute("aria-hidden", "true");
-      pc.innerHTML = '<img src="' + esc(fac.currentSrc || fac.src) + '" alt="">';
-      document.body.insertBefore(pc, h);
-    }
-    h.innerHTML = '<img src="' + ROOT + "assets/brand/modules/" + here[2] + '" alt="">'
+    var ch = document.querySelector(".sel-char");             // the selection's PDF opens on Helvi Select himself (item 309)
+    h.innerHTML = '<img src="' + (ch ? esc(ch.currentSrc || ch.src) : ROOT + "assets/brand/modules/" + here[2]) + '" alt="">'
       + "<div><b>" + esc(title || document.title) + "</b><span>" + esc(HV.asOf()) + " · Prepared by HelloVoice</span></div>";
   };
 
