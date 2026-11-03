@@ -111,7 +111,7 @@ html.rs-modal-open { overflow: hidden; }
 .rs-sub i { font-style: normal; font-weight: 600; letter-spacing: 0; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--rs-lime); color: var(--rs-ink); }
 .rs-links .rs-ln { flex-wrap: wrap; row-gap: 8px; }
 .rs-links .rs-ln__who { flex-basis: 100%; }
-.rs-links .rs-ln__acts { flex-wrap: wrap; }
+.rs-links .rs-ln__acts { flex: 1 1 100%; flex-wrap: wrap; min-width: 0; }
 .rs-fb { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; flex-basis: 100%; }
 .rs-fb--none { font-size: 13px; color: var(--rs-graphite); }
 .rs-fb__b { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 10px; border-radius: 999px; border: 0; background: var(--rs-stone);
