@@ -108,6 +108,12 @@
   font: 500 14px/1 var(--rs-body); cursor: pointer; transition: background-color .2s ease, color .2s ease; }
 .rs-seg__o input:checked + span { background: var(--rs-ink); color: var(--rs-lime); border-color: var(--rs-ink); }
 .rs-seg__o input:focus-visible + span { outline: 3px solid var(--rs-red); outline-offset: 2px; }
+.rs-own { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 6px 0 4px; border-radius: 999px; border: 1px solid var(--rs-rule); font: 500 14px/1 var(--rs-body); }
+.rs-own input { width: 64px; min-height: 30px; border: 0; border-radius: 999px; padding: 0 8px; font: 500 14px var(--rs-body); color: var(--rs-ink); background: var(--rs-stone); -moz-appearance: textfield; }
+.rs-own input::-webkit-outer-spin-button, .rs-own input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.rs-own:focus-within { border-color: var(--rs-ink); outline: 3px solid var(--rs-red); outline-offset: 2px; }
+.rs-own input:focus { outline: none; }
+.rs-own span { padding-right: 8px; color: var(--rs-graphite); }
 .rs-tog { display: inline-flex; align-items: center; gap: 10px; font: 500 14px var(--rs-body); cursor: pointer; }
 .rs-tog input { width: 18px; height: 18px; accent-color: var(--rs-ink); }
 .rs-err { margin: 0; color: var(--rs-red-text); font-size: 14px; }

@@ -247,7 +247,10 @@
       + (here[0] === "selection" ? " They can approve, reject and comment on each creator; it comes back here." : "") + "</p>"
       + rows()
       + '<form class="rs-new" novalidate><label class="rs-f"><span>For</span><input name="label" maxlength="80" placeholder="e.g. Glamy Lab marketing team" autocomplete="off"></label>'
-      + '<fieldset class="rs-seg"><legend>Open for</legend>' + days + "</fieldset>"
+      + '<fieldset class="rs-seg"><legend>Open for</legend>' + days
+      // Any number of days (item 294): typing here takes over from the chips.
+      + '<label class="rs-own"><input type="number" name="own_days" min="1" max="365" inputmode="numeric" placeholder="Other" aria-label="Number of days"><span>days</span></label>'
+      + "</fieldset>"
       + (here[0] === "selection" ? '<label class="rs-tog"><input type="checkbox" name="prices" checked><span>Show prices</span></label>' : "")
       + '<p class="rs-err" role="alert" hidden></p>'
       + '<button class="rs-btn rs-btn--lime rs-new__go" type="submit">' + I_LINK + "<span>Make link</span></button></form>";
@@ -262,6 +265,10 @@
       document.body.appendChild(pop);
       pop.addEventListener("click", onPop);
       pop.addEventListener("submit", onMake);
+      pop.addEventListener("input", function (e) {
+        if (e.target.name === "own_days" && e.target.value) [].forEach.call(pop.querySelectorAll("input[name=rs-days]"), function (r) { r.checked = false; });
+        if (e.target.name === "rs-days") { var o = pop.querySelector("input[name=own_days]"); if (o) o.value = ""; }
+      });
       document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !pop.hidden) close(); });
       document.addEventListener("click", function (e) { if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) close(); });
     }
@@ -299,9 +306,10 @@
   function onMake(e) {
     e.preventDefault();
     var f = e.target, go = f.querySelector(".rs-new__go"), err = f.querySelector(".rs-err");
-    var d = f.querySelector("input[name=rs-days]:checked");
+    var d = f.querySelector("input[name=rs-days]:checked"), own = parseInt(f.own_days.value, 10);
+    if (f.own_days.value && !(own >= 1 && own <= 365)) { err.textContent = "Type a number of days from 1 to 365."; err.hidden = false; f.own_days.focus(); return; }
     go.disabled = true; go.classList.add("is-busy"); err.hidden = true;
-    api("POST", { kind: here[0], ref: ref, label: f.label.value, days: d ? +d.value : STATE.default_days,
+    api("POST", { kind: here[0], ref: ref, label: f.label.value, days: own || (d ? +d.value : STATE.default_days),
                   prices: f.prices ? f.prices.checked : false })
       .then(function (res) {
         if (res.st !== 200 || !res.b.ok) throw new Error((res.b && res.b.message) || "The link was not made. Try again.");
