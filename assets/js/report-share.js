@@ -17,7 +17,7 @@
   var PAGE = { "/campaign/dashboard/": ["campaign", "t", "helvi-track-logo-v4.png", "Helvi Track"],
                "/campaign/": ["campaign", "t", "helvi-track-logo-v4.png", "Helvi Track"],
                "/selection/": ["selection", "s", "helvi-selection-logo-v4.png", "Helvi Selection"],
-               "/creator/": ["creator", "c", "helvi-intelligence-logo-v5.png", "Helvi Intelligence"],
+               "/creator/": ["creator", "c", "helvi-selection-logo-v4.png", "Helvi Select"],     // the creator report is a Select page (Bido 2026-11-03)
                "/market/": ["study", "s", "helvi-intelligence-logo-v5.png", "Helvi Intelligence"] };
   var path = location.pathname.replace(/index\.html$/, "");
   var here = null;
