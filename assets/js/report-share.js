@@ -158,6 +158,9 @@
         // A shared selection is for deciding, not downloading (Bido 2026-11-03): no PDF in its bar.
         + (here[0] === "selection" ? "" : '<button type="button" class="rs-btn rs-btn--lime" id="rs-pdf">' + I_DOWN + "<span>Download PDF</span></button>") + "</div>";
       document.body.insertBefore(bar, document.body.firstChild);
+      // Pages with their own sticky bar sit it under this one (campaign.css .hv-shared .mx-tabs).
+      var barH = function () { document.documentElement.style.setProperty("--rs-bar-h", bar.offsetHeight + "px"); };
+      barH(); window.addEventListener("resize", barH);
       var pdf = document.getElementById("rs-pdf");
       if (pdf) pdf.addEventListener("click", function () { HV.download(this); });
       asked.then(function (res) {
@@ -259,8 +262,15 @@
     if (x.last_open_at) meta.push("last " + ago(x.last_open_at));
     if (x.prices) meta.push("with prices");
     var editing = STATE.editing === x.id;
-    return '<li class="rs-ln' + (on ? "" : " is-gone") + (x.id === STATE.fresh ? " is-new" : "") + '" data-id="' + x.id + '">'
-      + '<div class="rs-ln__who"><b>' + esc(x.label || "No name") + "</b><small>" + esc(meta.join(" · ")) + "</small></div>"
+    // Item 300: each link is one line until it is opened (the new one and the one being edited open by themselves).
+    var shut = !on || (STATE.openId !== x.id && !editing && x.id !== STATE.fresh);
+    if (shut) return '<li class="rs-ln rs-ln--shut' + (on ? "" : " is-gone") + '" data-id="' + x.id + '">'
+      + (on ? '<button type="button" class="rs-ln__row" data-open="' + x.id + '" aria-expanded="false">' : '<div class="rs-ln__row">')
+      + '<b>' + esc(x.label || "No name") + "</b><small>" + esc(meta.slice(0, 2).join(" · ")) + "</small>"
+      + (on ? '<span class="rs-ln__chev" aria-hidden="true"></span></button>' : "</div>") + "</li>";
+    return '<li class="rs-ln' + (x.id === STATE.fresh ? " is-new" : "") + '" data-id="' + x.id + '">'
+      + '<button type="button" class="rs-ln__row" data-open="' + x.id + '" aria-expanded="true"><b>' + esc(x.label || "No name") + "</b><small>"
+      + esc(meta.join(" · ")) + '</small><span class="rs-ln__chev" aria-hidden="true"></span></button>'
       + (on ? fb(x) : "")
       + (on && !editing ? '<div class="rs-ln__acts">'
           + '<button type="button" class="rs-chip" data-copy="' + esc(x.url) + '">Copy link</button>'
@@ -277,10 +287,16 @@
   function rows() {
     var open = STATE.links.filter(function (x) { return x.state === "open"; });
     var gone = STATE.links.filter(function (x) { return x.state !== "open"; }).slice(0, 6);
+    // Item 300: the links stay folded behind their count; many links get a search and scroll inside the panel.
+    var shown = STATE.listOpen || STATE.fresh || STATE.editing;
+    var q = (STATE.q || "").trim().toLowerCase(), list = q ? open.filter(function (x) { return (x.label || "No name").toLowerCase().indexOf(q) >= 0; }) : open;
     return '<section class="rs-links" aria-label="Links">'
-      + '<h3 class="rs-sub">Open links' + (open.length ? " <i>" + open.length + "</i>" : "") + "</h3>"
-      + (open.length ? '<ul class="rs-lns">' + open.map(row).join("") + "</ul>"
-        : '<p class="rs-empty">None yet. Each link opens this ' + (here[0] === "selection" ? "selection" : "report") + " only.</p>")
+      + (open.length ? '<button type="button" class="rs-sub rs-sub--btn" data-list aria-expanded="' + (shown ? "true" : "false") + '">Open links <i>' + open.length
+          + '</i><span class="rs-ln__chev" aria-hidden="true"></span></button>' : '<h3 class="rs-sub">Open links</h3>')
+      + (!open.length ? '<p class="rs-empty">None yet. Each link opens this ' + (here[0] === "selection" ? "selection" : "report") + " only.</p>"
+        : !shown ? ""
+        : (open.length > 5 ? '<label class="rs-find"><input type="search" name="find" placeholder="Find a link by name" aria-label="Find a link by name" value="' + esc(STATE.q || "") + '"></label>' : "")
+          + '<ul class="rs-lns' + (open.length > 5 ? " rs-lns--many" : "") + '">' + (list.length ? list.map(row).join("") : '<li class="rs-empty">No link with that name.</li>') + "</ul>")
       + (gone.length ? '<details class="rs-old"><summary>' + gone.length + " closed link" + (gone.length === 1 ? "" : "s") + '</summary><ul class="rs-lns">'
         + gone.map(row).join("") + "</ul></details>" : "")
       + "</section>";
@@ -342,6 +358,13 @@
         if (e.target.name === "own_days" && e.target.value) [].forEach.call(pop.querySelectorAll("input[name=rs-days]"), function (r) { r.checked = false; });
         if (e.target.name === "rs-days") { var o = pop.querySelector("input[name=own_days]"); if (o) o.value = ""; }
         if (e.target.name === "label") STATE.typed = true;
+        if (e.target.name === "find") {         // filter in place, so the field keeps its focus
+          STATE.q = e.target.value; var q = STATE.q.trim().toLowerCase();
+          [].forEach.call(pop.querySelectorAll(".rs-lns--many > .rs-ln"), function (li) {
+            var b = li.querySelector("b"); li.hidden = !!q && (b ? b.textContent.toLowerCase().indexOf(q) < 0 : true);
+          });
+          return;
+        }
         until();
       });
       document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !pop.hidden) close(); });
@@ -373,6 +396,11 @@
     if (t.closest("[data-close]")) return close();
     var c = t.closest("[data-copy]");
     if (c) return copy(c.getAttribute("data-copy"), c);
+    var lst = t.closest("[data-list]");
+    if (lst) { STATE.listOpen = lst.getAttribute("aria-expanded") !== "true"; STATE.fresh = STATE.listOpen ? STATE.fresh : null; STATE.editing = STATE.listOpen ? STATE.editing : null; return draw(); }
+    var opn = t.closest("[data-open]");
+    if (opn) { var id = +opn.getAttribute("data-open"); var was = STATE.openId === id || STATE.fresh === id;
+      STATE.openId = was ? null : id; if (STATE.fresh === id) STATE.fresh = null; STATE.listOpen = true; return draw(); }
     var see = t.closest("[data-see]");
     if (see) {
       // The page's own status filter (Approved / Rejected) on the selection, then the list.

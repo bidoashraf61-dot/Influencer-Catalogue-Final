@@ -168,7 +168,7 @@
   letter-spacing: .08em; text-transform: uppercase; color: var(--vivid-red); white-space: nowrap;
 }
 .mx-state { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
-.mx-state--done { background: var(--go-soft); color: var(--go); }
+.mx-state--done { background: var(--go-soft); color: #0f6b3a; }   /* 5.6:1 on the soft green (audit 2026-11-03) */
 .mx-state--active { background: var(--lime); color: var(--ink); }
 .mx-state--pending { background: #efede8; color: var(--gray); }
 .mx-note { margin: 18px 0 0; font-size: 18px; line-height: 1.5; max-width: 70ch; }
@@ -188,7 +188,7 @@
   border-radius: var(--r-pill); white-space: nowrap; vertical-align: middle; text-transform: none;
 }
 .mx-sig::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
-.mx-sig--good { color: var(--go); background: var(--go-soft); }
+.mx-sig--good { color: #0f6b3a; background: var(--go-soft); }
 .mx-sig--moderate { color: #a85507; background: var(--amber-soft); }
 .mx-sig--low { color: #c01010; background: var(--red-soft); }
 .mx-sig--none { color: var(--gray); background: #efede8; }
@@ -1000,7 +1000,8 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
 .mx-say__nums dd { margin: 2px 0 0; font-family: var(--heading); font-size: 30px; line-height: 1; }
 .mx-say__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0 28px; }
 .mx-mood { display: flex; height: 26px; border-radius: 999px; overflow: hidden; background: #efece6; margin: 4px 0 14px; }
-.mx-mood i { display: grid; place-items: center; font-style: normal; font-size: 11.5px; font-weight: 700; color: #fff; }
+.mx-mood i { display: grid; place-items: center; font-style: normal; font-size: 12px; font-weight: 700; color: #fff; }
+.mx-mood i[style*="ff691e" i], .mx-mood i[style*="e2780f" i] { color: var(--ink); }   /* ink on orange: 7.3:1 (white was 2.9:1) */
 .mx-bar__k small { color: var(--graphite, #383838); font-size: .92em; }
 .mx-quotes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
 .mx-q { margin: 0; padding: 16px 18px; border-radius: var(--r-md); background: var(--white); border: 1px solid var(--line); border-left: 5px solid var(--c); display: flex; flex-direction: column; gap: 6px; }
@@ -1035,20 +1036,48 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
 .mx-notes ul { margin: 0; padding-left: 18px; font-size: 14px; color: var(--ink); line-height: 1.6; }
 
 /* ------------------------------------------------------------ the magazine (item 294, 2026-11-03) */
-/* Each chapter opens with its sentence, written from the live numbers. */
-.mx-story { flex-basis: 100%; max-width: 62ch; margin: 10px 0 0; font: 400 clamp(1.05rem, .95rem + .4vw, 1.3rem)/1.5 var(--body); color: var(--ink); text-wrap: pretty; }
+/* Each chapter opens with its figure (DESIGN: figure over term) and a short clause, from the live numbers. */
+.mx-story { flex-basis: 100%; margin: 14px 0 0; }
 .mx-story[hidden] { display: none; }
-/* In this report: the chapters and their sentences, a ruled list like a magazine's contents. */
-.mx-toc { padding-top: 40px; padding-bottom: 44px; border-top: 1px solid var(--line); }
-.mx-toc__t { margin: 0 0 18px; font-family: var(--heading); font-weight: 400; font-size: clamp(2rem, 1.4rem + 1.8vw, 3rem); line-height: 1; }
-.mx-toc__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 32px; counter-reset: toc; }
-.mx-toc__list li { counter-increment: toc; border-top: 1px solid var(--line); }
-.mx-toc__list a { display: grid; grid-template-columns: 34px 1fr; column-gap: 12px; padding: 16px 0; color: var(--ink); text-decoration: none; }
-.mx-toc__list a::before { content: counter(toc, decimal-leading-zero); grid-row: span 2; font-family: var(--heading); font-size: 24px; line-height: 1; color: var(--gray); }
-.mx-toc__list b { font-family: var(--heading); font-weight: 400; font-size: 26px; line-height: 1; letter-spacing: .02em; }
-.mx-toc__list span { margin-top: 6px; font-size: 14px; line-height: 1.5; color: var(--gray); }
-.mx-toc__list a:hover b { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
-.mx-toc__list a:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; border-radius: 8px; }
+.mx-stat { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 6px 22px; margin: 0; }
+.mx-stat > div { padding-right: 22px; border-right: 1px solid var(--line); }
+.mx-stat dt { font: 500 12px/1.3 var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--gray); }
+.mx-stat dd { margin: 2px 0 0; font-family: var(--heading); font-weight: 400; font-size: clamp(3rem, 2.2rem + 2.4vw, 4.6rem); line-height: .9; color: var(--ink); }
+.mx-stat p { margin: 0 0 6px; max-width: 40ch; font: 500 17px/1.4 var(--body); color: var(--ink); }
+/* In this report: one card per chapter, figure-led, each with a small picture of what the chapter holds. */
+.mx-toc { padding-top: 40px; padding-bottom: 48px; border-top: 1px solid var(--line); }
+.mx-toc__t { margin: 0 0 20px; font-family: var(--heading); font-weight: 400; font-size: clamp(2rem, 1.4rem + 1.8vw, 3rem); line-height: 1; }
+.mx-tcds { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 14px; counter-reset: tc; }
+@media (min-width: 600px) { .mx-tcds { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 980px) { .mx-tcds { grid-template-columns: repeat(3, 1fr); } }
+.mx-tcds li { counter-increment: tc; display: flex; }
+.mx-tcd { flex: 1; display: grid; grid-template-rows: auto 56px auto auto 1fr; align-content: start; gap: 4px; padding: 16px 18px 18px; border-radius: var(--r-md, 20px);
+  background: var(--linen); color: var(--ink); text-decoration: none; transition: transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s ease; }
+.mx-tcd:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(18,18,18,.14); }
+.mx-tcd:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 3px; }
+.mx-tcd__ch { font-family: var(--heading); font-size: 20px; letter-spacing: .04em; line-height: 1; }
+.mx-tcd__ch::before { content: counter(tc, decimal-leading-zero) "  "; color: var(--gray); }
+.mx-tcd__term { margin-top: 8px; font: 500 11.5px/1.3 var(--body); letter-spacing: .12em; text-transform: uppercase; color: #4a4038; }
+.mx-tcd__fig { font-family: var(--heading); font-weight: 400; font-size: 52px; line-height: .9; }
+.mx-tcd--good .mx-tcd__fig { color: #0f6b3a; } .mx-tcd--moderate .mx-tcd__fig { color: #a85507; } .mx-tcd--low .mx-tcd__fig { color: #c01010; }
+.mx-tcd__line { font-size: 13.5px; line-height: 1.45; color: #2b2622; }
+/* the micro pictures */
+.mx-mv { align-self: center; display: flex; gap: 4px; height: 56px; align-items: center; }
+.mx-mv--goals { flex-direction: column; justify-content: center; gap: 6px; }
+.mx-mv__goal { display: block; width: 100%; height: 7px; border-radius: 99px; background: rgba(18,18,18,.1); overflow: hidden; }
+.mx-mv__goal i { display: block; height: 100%; border-radius: 99px; background: var(--go); }
+.mx-mv__goal i.moderate { background: var(--amber); } .mx-mv__goal i.low { background: var(--vivid-red); }
+.mx-mv--face { position: relative; width: 56px; }
+.mx-mv--face img { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px var(--gold, #d6a52b); }
+.mx-mv__medal { position: absolute; right: -6px; bottom: -2px; width: 22px; height: 22px; border-radius: 50%; background: var(--gold, #d6a52b); color: var(--ink);
+  font: 400 15px/22px var(--heading); text-align: center; }
+.mx-mv--thumbs img, .mx-mv--thumbs i { width: 42px; height: 56px; border-radius: 8px; object-fit: cover; background: rgba(18,18,18,.12); }
+.mx-mv--split, .mx-mv--mood { height: 14px; align-self: center; gap: 2px; border-radius: 99px; overflow: hidden; }
+.mx-mv--split i, .mx-mv--mood i { display: block; height: 100%; }
+.mx-mv--steps { gap: 4px; }
+.mx-mv--steps i { flex: 1; height: 14px; border-radius: 4px; background: rgba(18,18,18,.12); }
+.mx-mv--steps i.done { background: var(--go); } .mx-mv--steps i.active { background: var(--lime); box-shadow: inset 0 0 0 1.5px var(--ink); }
+@media (prefers-reduced-motion: reduce) { .mx-tcd { transition: none; } }
 
 @media print {
   /* Page 1 the cover, page 2 the contents, then one chapter per page. */
@@ -1056,10 +1085,12 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
   .mx-bug__title { font-size: 72px !important; }
   .mx-bug__sels, .mx-saybox__go { display: none !important; }
   .mx-toc { break-after: page; border-top: 0; padding-top: 6mm; }
-  .mx-toc__list { grid-template-columns: 1fr; }
-  .mx-toc__list span { font-size: 12px; }
+  .mx-tcds { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .mx-tcd { break-inside: avoid; padding: 12px 14px; }
+  .mx-tcd__fig { font-size: 44px; }
   #mx-report .mx-sec:not([hidden]) { break-before: page !important; }     /* over the older "auto !important" rule */
-  .mx-story { font-size: 14px; }
+  .mx-stat dd { font-size: 48px; }
+  .mx-stat p { font-size: 13px; }
   .mx-sec__head { break-after: avoid; }
   .mx-panel, .mx-bullet, .mx-pod, .mx-chart, .mx-bar, tr { break-inside: avoid; }
   .mx-wall { grid-template-columns: repeat(3, 1fr) !important; }
@@ -1067,3 +1098,10 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
 /* A shared report (report-share.js): no way back into the portal from the report itself. */
 .hv-shared .mx-top__links, .hv-shared .mx-end, .hv-shared .mx-bug__sels, .hv-shared .mx-cs, .hv-shared .mx-csbar, .hv-shared #mx-bd-bar { display: none !important; }
 .hv-shared .mx-top__logo { pointer-events: none; }
+
+/* Audit fixes (item 299, 2026-11-03) */
+.mx-times { display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 999px; background: var(--lime); color: var(--ink);
+  font: 400 18px/1.2 var(--heading); letter-spacing: .03em; font-style: normal; vertical-align: 1px; }
+/* On a shared link the share bar is sticky too: the chapter bar sits under it, never behind it. */
+.hv-shared .mx-tabs { top: var(--rs-bar-h, 64px); }
+.hv-shared [id^="sec-"] { scroll-margin-top: calc(var(--rs-bar-h, 64px) + 84px); }

@@ -229,3 +229,22 @@ button.rs-fb__b:focus-visible { outline: 3px solid var(--rs-red); outline-offset
   .rs-pop { left: 12px; right: 12px; width: auto; top: auto; bottom: 12px; transform: none; max-height: 85vh; max-height: 85dvh; }
 }
 @media (prefers-reduced-motion: reduce) { .rs-btn, .rs-chip, .rs-seg__o span { transition: none; } }
+
+/* Item 300: links fold. The list sits behind its count; each link is one line until opened; many links search and scroll. */
+.rs-sub--btn { width: 100%; justify-content: flex-start; min-height: 40px; padding: 0; border: 0; background: none; cursor: pointer; }
+.rs-sub--btn .rs-ln__chev { margin-left: auto; }
+.rs-sub--btn:focus-visible, .rs-ln__row:focus-visible { outline: 3px solid var(--rs-red); outline-offset: 2px; border-radius: 10px; }
+.rs-ln__row { display: flex; align-items: baseline; gap: 10px; width: 100%; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+div.rs-ln__row { cursor: default; }
+.rs-ln__row b { font: 400 20px/1.05 var(--rs-display); letter-spacing: .02em; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rs-ln__row small { font: 400 12.5px/1.4 var(--rs-body); color: var(--rs-graphite); flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rs-ln__chev { flex: none; width: 8px; height: 8px; border: solid var(--rs-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); align-self: center; transition: transform .2s ease; }
+[aria-expanded="true"] > .rs-ln__chev { transform: rotate(225deg); }
+.rs-links .rs-ln--shut { padding: 2px 0; }
+.rs-ln__row:hover b { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.rs-find { display: block; margin: 4px 0 8px; }
+.rs-find input { width: 100%; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--rs-rule); font: 400 14px var(--rs-body); }
+.rs-find input:focus { outline: 3px solid var(--rs-red); outline-offset: 2px; border-color: var(--rs-ink); }
+.rs-lns--many { max-height: 320px; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+.rs-lns .rs-ln[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .rs-ln__chev { transition: none; } }

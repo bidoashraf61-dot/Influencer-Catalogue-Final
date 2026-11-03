@@ -594,7 +594,7 @@
 
   function render(t) {
     var c = R.campaign;
-    document.title = c.name + " — Campaign report — HELVi Connect";
+    document.title = c.name + " — Campaign report — HELVi Track";
     renderBug(c);
     renderScoreline();
     renderProgress(c);
@@ -619,64 +619,74 @@
   // Rule-based, no AI: it can only say what the numbers say.
   var CHAPTERS = [["overview", "Overview"], ["leaderboard", "Leaderboard"], ["content", "Content"], ["performance", "Performance"],
                   ["say", "What people say"], ["clicks", "Affiliate clicks"], ["timeline", "Timeline"]];
+  // Item 298/299 (audit 2026-11-03): each chapter leads with ONE figure under its term (DESIGN: figure over term), a short
+  // clause, and a small picture of the chapter; the same in the contents, the chapter opener and the PDF.
   function stories() {
     var t = R.total || {}, c = R.campaign || {}, out = {}, g = {};
     (R.progress && R.progress.items || []).forEach(function (i) { g[i.key] = i; });
-    var v = R.verdict || {}, obj = R.objective && R.objective.label;
-    var parts = [];
-    if (!unscored() && v.label) parts.push(v.label + (R.progress && R.progress.score != null ? "" : ""));
-    if (g.views) parts.push("views at " + Math.round(g.views.pct) + "% of the goal");
-    if (g.engagement) parts.push("engagement at " + Math.round(g.engagement.pct) + "%");
-    var posts = full(t.delivered) + (t.planned ? " of " + t.planned : "") + " posts live";
-    out.overview = parts.length ? (parts[0].charAt(0).toUpperCase() + parts.join(", ").slice(1)) + "; " + posts + (obj ? ", for " + obj + "." : ".")
-      : num(t.views) + " views and " + num(t.engagement) + " engagements from " + posts + ".";
+    var v = R.verdict || {};
+    var gk = g.views || g.engagement || g.posts;
+    var bars = ["posts", "views", "engagement", "er"].filter(function (k) { return g[k]; }).map(function (k) {
+      return '<span class="mx-mv__goal"><i class="' + esc(g[k].grade || "") + '" style="width:' + Math.min(100, g[k].pct).toFixed(0) + '%"></i></span>';
+    }).join("");
+    out.overview = gk ? { fig: gk.pct >= 150 ? times(gk.pct) : Math.round(gk.pct) + "%", term: (gk === g.views ? "the views goal" : gk === g.engagement ? "the engagement goal" : "the posts goal"),
+                          line: (!unscored() && v.label ? v.label + " · " : "") + full(t.delivered) + (t.planned ? " of " + t.planned : "") + " posts live",
+                          viz: bars ? '<span class="mx-mv mx-mv--goals">' + bars + "</span>" : "", grade: gk.grade }
+      : { fig: num(t.views), term: "views", line: full(t.delivered) + " posts live" };
     var ranked = (R.creators || []).filter(function (x) { return x.rank; }).slice().sort(function (a, b) { return a.rank - b.rank; });
     if (ranked.length) {
-      var a = ranked[0], b = ranked[1], n0 = splitName(a.name).en;
-      out.leaderboard = n0 + " led with " + num(a.views || 0) + " views"
-        + (b && b.views ? ", " + (a.views / b.views >= 1.95 ? Math.round(a.views / b.views * 10) / 10 + "× the next creator" : "ahead of " + splitName(b.name).en) : "") + ".";
+      var a = ranked[0], b = ranked[1];
+      out.leaderboard = { fig: num(a.views || 0), term: "top creator's views",
+        line: splitName(a.name).en + (b && b.views ? (a.views / b.views >= 1.95 ? " · " + Math.round(a.views / b.views * 10) / 10 + "× the next creator" : " · ahead of " + splitName(b.name).en) : ""),
+        viz: a.photo ? '<span class="mx-mv mx-mv--face"><img src="' + esc(a.photo) + '" alt=""><span class="mx-mv__medal">1</span></span>' : "" };
     }
     var list = (R.posts || []).filter(function (p) { return p.section === "campaign"; }), plats = {};
     list.forEach(function (p) { plats[p.platform] = (plats[p.platform] || 0) + (p.views || 0); });
     var pieces = mergePieces(list).sort(function (x, y) { return (y.views || 0) - (x.views || 0); }), np = Object.keys(plats).length;
-    if (list.length) out.content = list.length + " posts across " + np + " platform" + (np === 1 ? "" : "s")
-      + (pieces[0] && pieces[0].views ? "; the strongest video reached " + num(pieces[0].views) + " views" : "") + ".";
+    if (list.length) out.content = { fig: String(list.length), term: "posts on " + np + " platform" + (np === 1 ? "" : "s"),
+      line: pieces[0] && pieces[0].views ? "Best video: " + num(pieces[0].views) + " views" : "",
+      viz: '<span class="mx-mv mx-mv--thumbs">' + pieces.slice(0, 3).map(function (p) { return p.thumb ? '<img src="' + esc(p.thumb) + '" alt="">' : "<i></i>"; }).join("") + "</span>" };
     var tot = 0; Object.keys(plats).forEach(function (k) { tot += plats[k]; });
-    var top = Object.keys(plats).sort(function (x, y) { return plats[y] - plats[x]; })[0];
-    out.performance = num(t.views) + " views and " + num(t.engagement) + " engagements so far"
-      + (top && tot ? "; " + top + " carried " + Math.round(plats[top] / tot * 100) + "% of the views." : ".");
+    var order = Object.keys(plats).sort(function (x, y) { return plats[y] - plats[x]; });
+    out.performance = { fig: num(t.views), term: "views", line: num(t.engagement) + " engagements" + (order[0] && tot ? " · " + order[0] + " " + Math.round(plats[order[0]] / tot * 100) + "%" : ""),
+      viz: tot ? '<span class="mx-mv mx-mv--split">' + order.map(function (k, i) { return '<i title="' + esc(k) + '" style="width:' + (plats[k] / tot * 100).toFixed(1) + "%;background:" + PALETTE[i % PALETTE.length] + '"></i>'; }).join("") + "</span>" : "" };
     var st = sayTotals();
     if (st && st.n) {
       var th = Object.keys(st.themes).sort(function (x, y) { return st.themes[y] - st.themes[x]; })[0];
-      out.say = "Helvi read " + full(st.n) + " comments: " + sayPct(st.pos, st.n) + " positive, " + sayPct(st.intent, st.n) + " ask how to buy"
-        + (th ? ", and most of the talk is about " + th.toLowerCase() : "") + ".";
+      out.say = { fig: sayPct(st.intent, st.n), term: "ask how to buy", line: full(st.n) + " comments read" + (th ? " · most about " + th.toLowerCase() : ""),
+        viz: '<span class="mx-mv mx-mv--mood">' + MOOD.map(function (m) { var w = st[m[0]] / st.n * 100; return w ? '<i style="width:' + w.toFixed(1) + "%;background:" + m[2] + '"></i>' : ""; }).join("") + "</span>" };
     }
     var cl = R.clicks;
-    if (R.visibility.clicks && cl && cl.links && cl.has_destination) out.clicks = full(cl.clicks) + " clicks from " + full(cl.uniques) + " people" + (t.ctr != null ? ", " + pct(t.ctr) + " click-through." : ".");
+    if (R.visibility.clicks && cl && cl.links && cl.has_destination) out.clicks = { fig: full(cl.clicks), term: "link clicks", line: "from " + full(cl.uniques) + " people" + (t.ctr != null ? " · " + pct(t.ctr) + " click-through" : "") };
     var steps = c.steps || [], done = steps.filter(function (x) { return x.state === "done"; }).length;
-    if (steps.length) out.timeline = done + " of " + steps.length + " steps done" + (c.ends_at ? "; the campaign " + (Date.now() / 1000 > c.ends_at ? "ended " : "ends ") + day(c.ends_at, true) + "." : ".");
+    if (steps.length) out.timeline = { fig: done + "/" + steps.length, term: "steps done", line: c.ends_at ? (Date.now() / 1000 > c.ends_at ? "Ended " : "Ends ") + day(c.ends_at, true) : "",
+      viz: '<span class="mx-mv mx-mv--steps">' + steps.map(function (x) { return '<i class="' + esc(x.state || "") + '"></i>'; }).join("") + "</span>" };
     return out;
   }
-  // The contents line of a chapter with nothing to report; the chapter itself already says it.
-  var TOC_EMPTY = { clicks: "No tracking links in this campaign.", say: "The comments have not been read yet." };
+  function statHtml(x) {
+    return '<dl class="mx-stat"><div><dt>' + esc(x.term) + "</dt><dd>" + esc(x.fig) + "</dd></div>" + (x.line ? "<p>" + esc(x.line) + "</p>" : "") + "</dl>";
+  }
   function renderStory() {
     var S = stories();
     CHAPTERS.forEach(function (ch) {
       var sec = $("sec-" + ch[0]), head = sec && sec.querySelector(".mx-sec__head");
       if (!head) return;
       var p = head.querySelector(".mx-story");
-      if (!p) { p = document.createElement("p"); p.className = "mx-story"; head.querySelector(".mx-h2").insertAdjacentElement("afterend", p); }
-      p.textContent = S[ch[0]] || ""; p.hidden = !S[ch[0]];
+      if (!p) { p = document.createElement("div"); p.className = "mx-story"; head.querySelector(".mx-h2").insertAdjacentElement("afterend", p); }
+      p.innerHTML = S[ch[0]] ? statHtml(S[ch[0]]) : ""; p.hidden = !S[ch[0]];
     });
-    // Contents: every chapter with its sentence. On screen it jumps; in the PDF it is page 2.
+    // Contents: a card per chapter with its figure and picture. A chapter with nothing to report is left out.
     var toc = $("mx-toc");
     if (!toc) { toc = document.createElement("nav"); toc.id = "mx-toc"; toc.className = "mx-toc cat-pad"; toc.setAttribute("aria-label", "In this report");
       document.querySelector(".mx-tabs").insertAdjacentElement("beforebegin", toc); }
-    var rows = CHAPTERS.filter(function (ch) { var sec = $("sec-" + ch[0]); return sec && !sec.hidden; }).map(function (ch) {
-      var line = S[ch[0]] || TOC_EMPTY[ch[0]] || "";
-      return '<li><a href="#sec-' + ch[0] + '" data-toc="' + ch[0] + '"><b>' + esc(ch[1]) + "</b><span>" + esc(line) + "</span></a></li>";
+    var cards = CHAPTERS.filter(function (ch) { var sec = $("sec-" + ch[0]); return sec && !sec.hidden && S[ch[0]]; }).map(function (ch) {
+      var x = S[ch[0]];
+      return '<li><a href="#sec-' + ch[0] + '" data-toc="' + ch[0] + '" class="mx-tcd' + (x.grade ? " mx-tcd--" + esc(x.grade) : "") + '">'
+        + '<span class="mx-tcd__ch">' + esc(ch[1]) + "</span>" + (x.viz || "")
+        + '<span class="mx-tcd__term">' + esc(x.term) + '</span><b class="mx-tcd__fig">' + esc(x.fig) + "</b>"
+        + (x.line ? '<span class="mx-tcd__line">' + esc(x.line) + "</span>" : "") + "</a></li>";
     }).join("");
-    toc.innerHTML = '<div class="cat-container"><h2 class="mx-toc__t">In this report</h2><ol class="mx-toc__list">' + rows + "</ol></div>";
+    toc.innerHTML = '<div class="cat-container"><h2 class="mx-toc__t">In this report</h2><ol class="mx-tcds">' + cards + "</ol></div>";
     pageFooter();          // the PDF footer is always set, however the print is started
   }
   document.addEventListener("click", function (e) {
@@ -689,7 +699,7 @@
     var st = $("mx-pagefoot") || document.head.appendChild(Object.assign(document.createElement("style"), { id: "mx-pagefoot" }));
     var asof = window.HVReport && window.HVReport.asOf ? window.HVReport.asOf() : "Data as of " + new Date().toLocaleString("en-GB");
     var name = (R && R.campaign ? R.campaign.name : "Campaign report").replace(/["\\]/g, "");
-    st.textContent = '@page { @bottom-left { content: "' + name + " · " + asof.replace(/"/g, "") + ' · HELVi Connect by HelloVoice"; font: 9px "DM Sans", Arial, sans-serif; color: #383838; margin-left: 12mm; }'
+    st.textContent = '@page { @bottom-left { content: "' + name + " · " + asof.replace(/"/g, "") + ' · HELVi Track by HelloVoice"; font: 9px "DM Sans", Arial, sans-serif; color: #383838; margin-left: 12mm; }'
       + ' @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 9px "DM Sans", Arial, sans-serif; color: #383838; margin-right: 12mm; } }';
   }
 
@@ -716,7 +726,8 @@
     var ours = /^\s*hello\s*voice\b/i.test(c.client || "");
     $("mx-brands").innerHTML = logos ? logos + (ours ? "" : '<span class="mx-bug__x" aria-hidden="true">×</span><img class="mx-bug__hv" src="../assets/brand/logo.png" alt="HelloVoice">') : "";
     $("mx-title").textContent = c.name;
-    $("mx-sub").textContent = [c.client, c.platform ? c.platform + " campaign" : ""].filter(Boolean).join(" · ");
+    var who = /@/.test(c.client || "") ? "" : c.client;          // an email is a contact, not the client (item 299)
+    $("mx-sub").textContent = [who, c.platform ? c.platform + " campaign" : ""].filter(Boolean).join(" · ");
     // Every selection the campaign holds (item 174), one tap away.
     var sl = $("mx-sels") || (function () { var p = document.createElement("p"); p.id = "mx-sels"; p.className = "mx-bug__sels"; $("mx-sub").insertAdjacentElement("afterend", p); return p; })();
     sl.innerHTML = (c.selections || []).length ? '<span>' + ((c.selections.length === 1) ? "Selection" : "Selections") + "</span>" + c.selections.map(function (x) {
@@ -1043,6 +1054,8 @@
   /* ---------------------------------------------------------- targets */
 
   var TLABEL = { posts: "Posts", views: "Views", reach: "Reach", engagement: "Engagement", er: "Avg ER", clicks: "Affiliate clicks" };
+  // 889% of a goal reads as "8.9×" (item 299): a multiple is what a reader can picture.
+  function times(p) { var x = p / 100; return (x >= 10 ? Math.round(x) : Math.round(x * 10) / 10) + "×"; }
   function renderTargets() {
     var p = R.progress || { items: [] }, bm = R.benchmarks, t = R.total;
     var ran = Math.round((p.elapsed || 0) * 100);
@@ -1056,7 +1069,8 @@
         + '<div class="mx-bullet__track" role="img" aria-label="' + TLABEL[i.key] + " " + Math.round(i.pct) + '% of goal">'
         + '<div class="mx-bullet__fill ' + i.grade + '" style="width:' + fill + '%"></div>'
         + (mark == null ? "" : '<div class="mx-bullet__mark" style="left:' + mark + '%"><span>expected by now</span></div>') + "</div>"
-        + '<div class="mx-bullet__num"><b>' + (isRate ? pct(i.actual) : num(i.actual)) + "</b>of " + (isRate ? pct(i.goal, 1) : num(i.goal)) + " goal</div></div>";
+        + '<div class="mx-bullet__num"><b>' + (isRate ? pct(i.actual) : num(i.actual)) + "</b>of " + (isRate ? pct(i.goal, 1) : num(i.goal)) + " goal"
+        + (!isRate && i.pct >= 150 ? '<em class="mx-times">' + times(i.pct) + " the goal</em>" : "") + "</div></div>";
     }).join("") : "";
     var ex = [];
     // One rule: with a campaign ER goal, the card grades against it, like the score line (owner, 2026-10-19).
