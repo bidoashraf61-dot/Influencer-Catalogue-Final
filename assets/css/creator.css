@@ -607,3 +607,4 @@ body.pp-modal-on { overflow: hidden; }
   .pp-id .pp-key div::after { display: none; }
   .pp-story__card { break-inside: avoid; }
 }
+@media print { html.pp-printing .pp-card--long, html.pp-printing .pp-grid > .pp-card { break-inside: auto !important; page-break-inside: auto !important; } }   /* long lists continue on the next page rather than leaving one half empty */
