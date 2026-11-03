@@ -345,7 +345,10 @@
         until();
       });
       document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !pop.hidden) close(); });
-      document.addEventListener("click", function (e) { if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) close(); });
+      // A click inside the panel that redrew it (Edit, Cancel) leaves its target detached: that is not "outside".
+      document.addEventListener("click", function (e) {
+        if (!pop.hidden && e.target.isConnected && !pop.contains(e.target) && !btn.contains(e.target)) close();
+      });
     }
     STATE.editing = null; STATE.typed = false;
     var old = pop.querySelector("form.rs-new"); if (old) old.remove();      // a fresh form each time it opens
