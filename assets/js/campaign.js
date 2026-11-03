@@ -613,7 +613,7 @@
     renderSay();
     renderStory();
     $("tab-clicks").hidden = !R.visibility.clicks && !R._noLinks;
-    markTab("overview");
+    markTab(document.body.dataset.only || "all");
     $("mx-csv").href = API + "/api/campaign.csv?t=" + encodeURIComponent(t);
     $("mx-dash").href = $("mx-dash-end").href = "dashboard/#t=" + encodeURIComponent(t); $("mx-dash").hidden = false;
     // Arriving from the dashboard's "Download PDF": open the print dialog.
