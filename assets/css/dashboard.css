@@ -2120,10 +2120,18 @@ details.db-vt > .db-wall { padding: 12px; }
    380px; when the buttons do not fit beside it they move to their own row instead of crushing it. Phones keep the
    640px layout above. */
 @media (min-width: 641px) {
-  .db-head { flex-wrap: wrap; row-gap: 10px; }
-  .db-head__title { flex: 1 1 380px; min-width: min(380px, 100%); }
-  .db-head__actions { flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+  .db-head { flex-wrap: wrap; row-gap: 8px; gap: 12px; padding-top: 6px; padding-bottom: 6px; }
+  .db-head__title { flex: 1 1 340px; min-width: min(340px, 100%); }
+  .db-head__actions { flex-wrap: wrap; justify-content: flex-end; margin-left: auto; gap: 6px; }
+  /* Condensed (Bido 2026-11-03, item 296: "leave more space for the dashboard"): smaller marks, title and buttons
+     so the header is one row on a desktop and the board starts higher. */
+  .db-head__logo img { width: 140px; }
+  .db-head__brands img { height: 46px; max-width: 150px; }
+  .db-head__title h1 { font-size: 30px; }
+  .db-head__actions .db-btn, .db-head__actions .rs-share { min-height: 34px; padding: 0 13px; font-size: 16px; letter-spacing: .04em; }
+  .db-head__actions .rs-share svg { width: 14px; height: 14px; }
 }
+@media (min-width: 900px) { .db-head { padding-right: 170px; } }   /* room for the account chip, which is ~150px wide */
 @media (max-width: 640px) {
   /* the Share button (report-share.js) takes the full row when it is the odd one out, like the other buttons */
   .db-head__actions > .rs-share:last-child:nth-child(odd) { grid-column: 1 / -1; }
