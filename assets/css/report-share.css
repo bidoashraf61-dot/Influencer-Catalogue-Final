@@ -103,7 +103,28 @@ html.rs-modal-open { overflow: hidden; }
 .rs-old { margin: -4px 0 14px; font-size: 13px; color: var(--rs-graphite); }
 .rs-old summary { cursor: pointer; padding: 4px 0; }
 .rs-old .rs-lns { margin: 6px 0 0; }
-.rs-new { display: grid; gap: 12px; padding-top: 14px; border-top: 1px solid var(--rs-rule); }
+.rs-new { display: grid; gap: 12px; padding: 4px 0 18px; border-bottom: 1px solid var(--rs-rule); }
+/* Item 296: the form leads; the links and what each one did follow. */
+.rs-until { font-style: normal; letter-spacing: .04em; text-transform: none; color: var(--rs-ink); }
+.rs-links { padding-top: 16px; }
+.rs-sub { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font: 500 12px/1.3 var(--rs-body); letter-spacing: .12em; text-transform: uppercase; color: var(--rs-graphite); }
+.rs-sub i { font-style: normal; font-weight: 600; letter-spacing: 0; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--rs-lime); color: var(--rs-ink); }
+.rs-links .rs-ln { flex-wrap: wrap; row-gap: 8px; }
+.rs-links .rs-ln__who { flex-basis: 100%; }
+.rs-links .rs-ln__acts { flex-wrap: wrap; }
+.rs-fb { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; flex-basis: 100%; }
+.rs-fb--none { font-size: 13px; color: var(--rs-graphite); }
+.rs-fb__b { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 0 10px; border-radius: 999px; border: 0; background: var(--rs-stone);
+  font: 500 13px/1 var(--rs-body); color: var(--rs-ink); }
+.rs-fb__b b { font-weight: 700; }
+button.rs-fb__b { cursor: pointer; transition: background-color .2s ease, color .2s ease; }
+.rs-fb__b--approved { background: var(--rs-green-soft); color: var(--rs-green); }
+.rs-fb__b--rejected { background: rgba(238,21,21,.08); color: var(--rs-red-text); }
+button.rs-fb__b:hover { background: var(--rs-ink); color: var(--rs-lime); }
+button.rs-fb__b:focus-visible { outline: 3px solid var(--rs-red); outline-offset: 2px; }
+.rs-chip { display: inline-flex; align-items: center; text-decoration: none; }
+.rs-chip--line { background: transparent; }
+.rs-ed { flex-basis: 100%; display: grid; gap: 10px; padding: 10px 0 2px; }
 .rs-f { display: grid; gap: 6px; }
 .rs-f span, .rs-seg legend { font: 500 12px/1.3 var(--rs-body); letter-spacing: .12em; text-transform: uppercase; color: var(--rs-graphite); }
 .rs-f input { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--rs-rule); font: 400 15px var(--rs-body); color: var(--rs-ink); background: var(--rs-white); }

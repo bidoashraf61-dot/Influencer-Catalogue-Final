@@ -226,41 +226,101 @@
     var d = Math.ceil((r.expires_at - Date.now() / 1000) / 86400);
     return d <= 1 ? "Ends today" : d + " days left";
   }
+  function ago(sec) {
+    if (!sec) return "";
+    var m = Math.max(0, Math.round((Date.now() / 1000 - sec) / 60));
+    return m < 2 ? "just now" : m < 60 ? m + " min ago" : m < 1440 ? Math.round(m / 60) + " h ago" : Math.round(m / 1440) + " d ago";
+  }
+  // Who the link is for, filled in from the page: the selection's "Prepared for …" line.
+  function forWhom() {
+    var c = document.getElementById("sel-client");
+    var t = c && !c.hidden ? c.textContent.replace(/^\s*Prepared for\s*/i, "").trim() : "";
+    return t.length > 80 ? "" : t;
+  }
 
+  /* Item 296 (Bido 2026-11-03): the panel leads with making a link; each open link shows its use (opens, last
+     open, and on a selection what the client decided) and is managed in place: Copy, Preview, +7 days, Edit
+     (name, prices), Revoke. Closed links fold into one line. */
+  function fb(x) {
+    var f = x.feedback;
+    if (!f) return "";
+    var bits = [["approved", f.approved, "approved"], ["rejected", f.rejected, "rejected"], ["", f.notes, f.notes === 1 ? "note" : "notes"]]
+      .filter(function (b) { return b[1]; });
+    if (!bits.length) return '<p class="rs-fb rs-fb--none">' + (x.opens ? "Opened, no decisions yet" : "Not opened yet") + "</p>";
+    return '<p class="rs-fb">' + bits.map(function (b) {
+      return b[0] ? '<button type="button" class="rs-fb__b rs-fb__b--' + b[0] + '" data-see="' + b[0] + '" title="Show the ' + b[2] + ' creators"><b>' + b[1] + "</b> " + b[2] + "</button>"
+                  : '<span class="rs-fb__b"><b>' + b[1] + "</b> " + b[2] + "</span>";
+    }).join("") + "</p>";
+  }
+  function row(x) {
+    var on = x.state === "open", meta = [];
+    meta.push(on ? left(x) + " · until " + day(x.expires_at) : x.state === "revoked" ? "Revoked" : "Ended " + day(x.expires_at));
+    meta.push(x.opens === 1 ? "1 open" : x.opens + " opens");
+    if (x.last_open_at) meta.push("last " + ago(x.last_open_at));
+    if (x.prices) meta.push("with prices");
+    var editing = STATE.editing === x.id;
+    return '<li class="rs-ln' + (on ? "" : " is-gone") + (x.id === STATE.fresh ? " is-new" : "") + '" data-id="' + x.id + '">'
+      + '<div class="rs-ln__who"><b>' + esc(x.label || "No name") + "</b><small>" + esc(meta.join(" · ")) + "</small></div>"
+      + (on ? fb(x) : "")
+      + (on && !editing ? '<div class="rs-ln__acts">'
+          + '<button type="button" class="rs-chip" data-copy="' + esc(x.url) + '">Copy link</button>'
+          + '<a class="rs-chip rs-chip--line" href="' + esc(x.page) + '" target="_blank" rel="noopener">Preview</a>'
+          + '<button type="button" class="rs-chip rs-chip--line" data-extend="' + x.id + '" title="Keep it open 7 more days">+7 days</button>'
+          + '<button type="button" class="rs-chip rs-chip--line" data-edit="' + x.id + '">Edit</button>'
+          + '<button type="button" class="rs-chip rs-chip--ghost" data-revoke="' + x.id + '">Revoke</button></div>' : "")
+      + (on && editing ? '<div class="rs-ed"><label class="rs-f"><span>For</span><input name="ed_label" maxlength="80" value="' + esc(x.label) + '"></label>'
+          + (here[0] === "selection" ? '<label class="rs-tog"><input type="checkbox" name="ed_prices"' + (x.prices ? " checked" : "") + "><span>Show prices</span></label>" : "")
+          + '<div class="rs-ln__acts"><button type="button" class="rs-chip" data-save="' + x.id + '">Save</button>'
+          + '<button type="button" class="rs-chip rs-chip--line" data-cancel>Cancel</button></div></div>' : "")
+      + "</li>";
+  }
   function rows() {
     var open = STATE.links.filter(function (x) { return x.state === "open"; });
-    var gone = STATE.links.filter(function (x) { return x.state !== "open"; }).slice(0, 4);
-    function row(x, fresh) {
-      return '<li class="rs-ln' + (x.state !== "open" ? " is-gone" : "") + (fresh ? " is-new" : "") + '">'
-        + '<div class="rs-ln__who"><b>' + esc(x.label || "No name") + "</b><small>"
-        + (x.state === "open" ? left(x) : x.state === "revoked" ? "Revoked" : "Ended")
-        + " · " + (x.opens === 1 ? "1 open" : x.opens + " opens") + (x.prices ? " · with prices" : "") + "</small></div>"
-        + (x.state === "open" ? '<div class="rs-ln__acts"><button type="button" class="rs-chip" data-copy="' + esc(x.url) + '">Copy</button>'
-          + '<button type="button" class="rs-chip rs-chip--ghost" data-revoke="' + x.id + '">Revoke</button></div>' : "")
-        + "</li>";
-    }
-    return (open.length ? '<ul class="rs-lns">' + open.map(function (x) { return row(x, x.id === STATE.fresh); }).join("") + "</ul>"
-      : '<p class="rs-empty">No open links yet. A link opens this report only, live, with no sign-in.</p>')
-      + (gone.length ? '<details class="rs-old"><summary>Closed links</summary><ul class="rs-lns">' + gone.map(function (x) { return row(x); }).join("") + "</ul></details>" : "");
+    var gone = STATE.links.filter(function (x) { return x.state !== "open"; }).slice(0, 6);
+    return '<section class="rs-links" aria-label="Links">'
+      + '<h3 class="rs-sub">Open links' + (open.length ? " <i>" + open.length + "</i>" : "") + "</h3>"
+      + (open.length ? '<ul class="rs-lns">' + open.map(row).join("") + "</ul>"
+        : '<p class="rs-empty">None yet. Each link opens this ' + (here[0] === "selection" ? "selection" : "report") + " only.</p>")
+      + (gone.length ? '<details class="rs-old"><summary>' + gone.length + " closed link" + (gone.length === 1 ? "" : "s") + '</summary><ul class="rs-lns">'
+        + gone.map(row).join("") + "</ul></details>" : "")
+      + "</section>";
   }
 
   function draw() {
+    var keep = pop.querySelector("form.rs-new"), was = keep ? { label: keep.label.value, own: keep.own_days.value,
+      d: (keep.querySelector("input[name=rs-days]:checked") || {}).value, p: keep.prices ? keep.prices.checked : null } : null;
     var days = STATE.days.map(function (d) {
       return '<label class="rs-seg__o"><input type="radio" name="rs-days" value="' + d + '"' + (d === STATE.default_days ? " checked" : "") + "><span>" + d + " days</span></label>";
     }).join("");
     pop.innerHTML = '<div class="rs-pop__h"><h2 id="rs-pop-t">Share with client</h2>'
       + '<button type="button" class="rs-x" data-close aria-label="Close">×</button></div>'
-      + '<p class="rs-pop__lede">' + esc(STATE.title) + " — live, read-only, no sign-in and no way into the rest of the portal."
-      + (here[0] === "selection" ? " They can approve, reject and comment on each creator; it comes back here." : "") + "</p>"
-      + rows()
+      + '<p class="rs-pop__lede">' + esc(STATE.title) + " · live, read-only, no sign-in."
+      + (here[0] === "selection" ? " Their approvals, rejections and notes come back here." : "") + "</p>"
       + '<form class="rs-new" novalidate><label class="rs-f"><span>For</span><input name="label" maxlength="80" placeholder="e.g. Glamy Lab marketing team" autocomplete="off"></label>'
-      + '<fieldset class="rs-seg"><legend>Open for</legend>' + days
+      + '<fieldset class="rs-seg"><legend>Open for <em class="rs-until" aria-live="polite"></em></legend>' + days
       // Any number of days (item 294): typing here takes over from the chips.
       + '<label class="rs-own"><input type="number" name="own_days" min="1" max="365" inputmode="numeric" placeholder="Other" aria-label="Number of days"><span>days</span></label>'
       + "</fieldset>"
       + (here[0] === "selection" ? '<label class="rs-tog"><input type="checkbox" name="prices" checked><span>Show prices</span></label>' : "")
       + '<p class="rs-err" role="alert" hidden></p>'
-      + '<button class="rs-btn rs-btn--lime rs-new__go" type="submit">' + I_LINK + "<span>Make link</span></button></form>";
+      + '<button class="rs-btn rs-btn--lime rs-new__go" type="submit">' + I_LINK + "<span>Make link</span></button></form>"
+      + rows();
+    var f = pop.querySelector("form.rs-new");
+    if (was) {
+      f.label.value = was.label; f.own_days.value = was.own;
+      if (was.d) { var r = f.querySelector("input[name=rs-days][value='" + was.d + "']"); if (r) r.checked = true; }
+      else if (was.own) [].forEach.call(f.querySelectorAll("input[name=rs-days]"), function (r) { r.checked = false; });
+      if (f.prices && was.p !== null) f.prices.checked = was.p;
+    } else f.label.value = forWhom();
+    until();
+  }
+  // The end date beside "Open for", following the chips and the typed number.
+  function until() {
+    var f = pop && pop.querySelector("form.rs-new"), u = f && f.querySelector(".rs-until");
+    if (!u) return;
+    var own = parseInt(f.own_days.value, 10), d = f.querySelector("input[name=rs-days]:checked");
+    var n = own >= 1 && own <= 365 ? own : d ? +d.value : 0;
+    u.textContent = n ? "· until " + day(Date.now() / 1000 + n * 86400) : "";
   }
 
   function open() {
@@ -280,11 +340,15 @@
       pop.addEventListener("input", function (e) {
         if (e.target.name === "own_days" && e.target.value) [].forEach.call(pop.querySelectorAll("input[name=rs-days]"), function (r) { r.checked = false; });
         if (e.target.name === "rs-days") { var o = pop.querySelector("input[name=own_days]"); if (o) o.value = ""; }
+        until();
       });
       document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !pop.hidden) close(); });
       document.addEventListener("click", function (e) { if (!pop.hidden && !pop.contains(e.target) && !btn.contains(e.target)) close(); });
     }
+    STATE.editing = null;
+    var old = pop.querySelector("form.rs-new"); if (old) old.remove();      // a fresh form each time it opens
     draw();
+    refresh();                                                                 // opens and decisions as they are now
     scrim.hidden = false;
     pop.hidden = false;
     document.documentElement.classList.add("rs-modal-open");
@@ -304,6 +368,26 @@
     if (t.closest("[data-close]")) return close();
     var c = t.closest("[data-copy]");
     if (c) return copy(c.getAttribute("data-copy"), c);
+    var see = t.closest("[data-see]");
+    if (see) {
+      // The page's own status filter (Approved / Rejected) on the selection, then the list.
+      close();
+      var chip = document.querySelector('[data-st-filter="' + see.getAttribute("data-see") + '"]');
+      if (chip) { if (chip.getAttribute("aria-pressed") !== "true") chip.click(); chip.scrollIntoView({ behavior: "smooth", block: "center" }); }
+      return;
+    }
+    var ed = t.closest("[data-edit]");
+    if (ed) { STATE.editing = +ed.getAttribute("data-edit"); draw(); var i = pop.querySelector("input[name=ed_label]"); if (i) i.focus(); return; }
+    if (t.closest("[data-cancel]")) { STATE.editing = null; return draw(); }
+    var sv = t.closest("[data-save]");
+    if (sv) {
+      var li = sv.closest(".rs-ln"), pr = li.querySelector("input[name=ed_prices]");
+      var body = { edit: +sv.getAttribute("data-save"), label: li.querySelector("input[name=ed_label]").value };
+      if (pr) body.prices = pr.checked;
+      return change(sv, body, function () { STATE.editing = null; });
+    }
+    var ex = t.closest("[data-extend]");
+    if (ex) return change(ex, { edit: +ex.getAttribute("data-extend"), extend: 7 });
     var rv = t.closest("[data-revoke]");
     if (rv) {
       if (!window.confirm("Revoke this link? It stops working at once.")) return;
@@ -312,6 +396,15 @@
         if (res.st === 200) refresh(); else { rv.disabled = false; window.alert("That did not work. Try again."); }
       });
     }
+  }
+
+  function change(b, body, after) {
+    b.disabled = true;
+    api("POST", body).then(function (res) {
+      if (res.st !== 200 || !res.b.ok) throw new Error((res.b && res.b.message) || "That did not work. Try again.");
+      if (after) after();
+      return refresh();
+    }).catch(function (x) { b.disabled = false; window.alert(x.message); });
   }
 
   function onMake(e) {
@@ -325,6 +418,7 @@
       .then(function (res) {
         if (res.st !== 200 || !res.b.ok) throw new Error((res.b && res.b.message) || "The link was not made. Try again.");
         STATE.fresh = res.b.link.id;
+        f.label.value = ""; f.own_days.value = "";
         return refresh().then(function () {
           var c = pop.querySelector(".rs-ln.is-new [data-copy]");
           if (c) copy(c.getAttribute("data-copy"), c);
@@ -337,8 +431,8 @@
   function refresh() {
     return api("GET").then(function (res) {
       if (res.st !== 200) return;
-      var fresh = STATE && STATE.fresh;
-      STATE = res.b; STATE.fresh = fresh;
+      var fresh = STATE && STATE.fresh, editing = STATE && STATE.editing;
+      STATE = res.b; STATE.fresh = fresh; STATE.editing = editing;
       if (pop && !pop.hidden) draw();
       if (btn) btn.querySelector("[data-n]").textContent = count();
     });

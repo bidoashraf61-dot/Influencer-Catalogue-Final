@@ -789,13 +789,28 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(403, {"ok": False}, self.cors() + [("Cache-Control", "no-store")])
         return self.send_json(200, {"ok": True, "can": True, "title": title, "kind": kind,
                                     "days": list(report_shares.DAYS), "default_days": report_shares.DEFAULT_DAYS,
-                                    "links": [report_shares.public(x, mailer.SITE) for x in report_shares.for_item(kind, ref)]},
+                                    "links": [dict(report_shares.public(x, mailer.SITE), feedback=report_shares.feedback(x))
+                                              for x in report_shares.for_item(kind, ref)]},
                               self.cors() + [("Cache-Control", "no-store")])
 
     def api_report_shares_post(self):
-        """POST {kind, ref, label, days, prices} makes a link; {revoke: id} revokes one."""
+        """POST {kind, ref, label, days, prices} makes a link; {revoke: id} revokes one; {edit: id, label?, prices?,
+        extend?} renames it, shows or hides prices, or adds days (item 296)."""
         import mailer
         b = self.json_body()
+        if b.get("edit"):
+            r = report_shares.get(rid=kam_scope._int(b.get("edit")) or 0)
+            if r is None:
+                return self.send_json(404, {"ok": False}, self.cors())
+            who, _ = self.share_allowed(r["kind"], r["ref"])
+            if who is None:
+                return self.send_json(403, {"ok": False}, self.cors())
+            if r["revoked_at"] is not None:
+                return self.send_json(409, {"ok": False, "message": "A revoked link cannot be changed. Make a new one."}, self.cors())
+            history.set_actor(who["email"])
+            r = report_shares.edit(r["id"], who["email"], label=b.get("label"),
+                                   prices=(bool(b.get("prices")) if "prices" in b else None), extend=b.get("extend"))
+            return self.send_json(200, {"ok": True, "link": report_shares.public(r, mailer.SITE)}, self.cors())
         if b.get("revoke"):
             r = report_shares.get(rid=kam_scope._int(b.get("revoke")) or 0)
             if r is None:

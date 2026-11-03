@@ -136,6 +136,63 @@ def revoke(rid, by=""):
     return get(rid=r["id"])
 
 
+def edit(rid, by="", label=None, prices=None, extend=None):
+    """Change an open or ended link (item 296): rename it, show or hide prices (selection only), or add ``extend``
+    days from today or from its end, whichever is later (an ended link opens again). A revoked link stays closed."""
+    import history
+    r = get(rid=rid)
+    if r is None or r["revoked_at"] is not None:
+        return r
+    sets, args, said = [], [], []
+    if label is not None and _clean(label, 80) != (r["label"] or ""):
+        sets.append("label = ?"); args.append(_clean(label, 80)); said.append("renamed it")
+    if prices is not None and r["kind"] == "selection" and bool(prices) != bool(r["prices"]):
+        sets.append("prices = ?"); args.append(1 if prices else 0); said.append("prices on" if prices else "prices off")
+    if extend:
+        try:
+            days = max(1, min(int(extend), 365))
+        except (TypeError, ValueError):
+            days = 7
+        now = db.now()
+        sets.append("expires_at = ?"); args.append(min(max(now, r["expires_at"]) + days * 86400, now + 365 * 86400))
+        said.append("+%d days" % days)
+    if not sets:
+        return r
+    before = history.snapshot("share", r["id"])
+    sel = db.selection(token=r["ref"], deleted=True) if r["kind"] == "selection" and "label = ?" in sets else None
+    with db.connect() as c:
+        c.execute("UPDATE report_shares SET %s WHERE id = ?" % ", ".join(sets), args + [r["id"]])
+        if sel is not None:
+            # The decisions made through the link carry its name (feedback()): they follow the rename.
+            c.execute("UPDATE selection_status SET by_name = ? WHERE selection_id = ? AND by_name = ?",
+                      (((_clean(label, 80) or "Client") + " (shared link)")[:80], sel["id"],
+                       ((r["label"] or "Client") + " (shared link)")[:80]))
+    history.record("edited", "share", r["id"], "Client link to %s: %s" % (r["title"] or r["ref"], ", ".join(said)),
+                   before, history.snapshot("share", r["id"]))
+    return get(rid=r["id"])
+
+
+def feedback(r):
+    """What a selection link's holder decided: the creators approved, rejected or noted as "<label> (shared link)"
+    (server._status_who). None for other kinds."""
+    if r["kind"] != "selection":
+        return None
+    sel = db.selection(token=r["ref"], deleted=True)
+    if sel is None:
+        return None
+    by = ((r["label"] or "Client") + " (shared link)")[:80]
+    with db.connect() as c:
+        rows = c.execute("SELECT status, COUNT(*), SUM(CASE WHEN COALESCE(note, '') <> '' THEN 1 ELSE 0 END) "
+                         "FROM selection_status WHERE selection_id = ? AND by_name = ? GROUP BY status",
+                         (sel["id"], by)).fetchall()
+    out = {"approved": 0, "rejected": 0, "review": 0, "notes": 0}
+    for st, n, notes in rows:
+        if st in out:
+            out[st] += n
+        out["notes"] += notes or 0
+    return out
+
+
 def for_item(kind, ref, limit=30):
     """An item's links, open ones first, newest first."""
     with db.connect() as c:
@@ -171,6 +228,7 @@ def public(r, site, with_link=True):
            "last_open_at": r["last_open_at"], "state": state(r)}
     if with_link:
         out["url"] = link(r, site)
+        out["page"] = page(r)          # Preview as client: the report itself, so the preview is not counted as an open
     return out
 
 
