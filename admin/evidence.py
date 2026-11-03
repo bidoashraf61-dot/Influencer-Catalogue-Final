@@ -885,7 +885,8 @@ def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locke
                     "paid_only": not organic,
                     "posts": [{"id": r["id"], "url": r["url"], "date": r["posted_at"], "competitor": r["competitor"], "platform": r["platform"],
                                "collab": COLLAB_LABEL.get(r["collab_type"], r["collab_type"] or ""), "views": r["views"], "likes": r["likes"],
-                               "comments": r["comments"], "er": r["er_views"], "paid_boost": bool(r["likely_paid_boost"]),
+                               "comments": r["comments"], "shares": r["shares"], "saves": r["saves"],
+                               "er": r["er_views"], "paid_boost": bool(r["likely_paid_boost"]),
                                "same_category": r["relevance"] == "match", "save_rate": r["save_rate"] if "save_rate" in r.keys() else None,
                                "summary": r["collab_type"] == "tiktok_summary"} for r in ps]})
     out.sort(key=lambda p: -(p["rank_value"] or 0))

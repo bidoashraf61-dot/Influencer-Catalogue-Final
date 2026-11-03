@@ -155,6 +155,19 @@
   }
 
   // One post as a linked thumbnail (rules 2 + 4).
+  function postCard(q) {
+    var w = el("div", "ss-dpost"); w.appendChild(thumb(q));
+    var dl = el("dl", "ss-dstats");
+    [["Views", q.views], ["Likes", q.likes], ["Comments", q.comments], ["Shares", q.shares], ["Saves", q.saves]].forEach(function (x) {
+      if (x[1] == null && x[0] !== "Likes") return;
+      var d = el("div"); d.appendChild(el("dt", null, x[0])); d.appendChild(el("dd", null, x[1] == null ? "Hidden" : num(x[1]))); dl.appendChild(d);
+    });
+    if (q.er != null) { var e = el("div", "ss-dstats__er"); e.appendChild(el("dt", null, "Engagement")); e.appendChild(el("dd", null, pct(q.er))); dl.appendChild(e); }
+    w.appendChild(dl);
+    var meta = [q.collab, q.paid_boost ? "Likely boosted: not counted" : ""].filter(Boolean).join(" · ");
+    if (meta) w.appendChild(el("p", "ss-dpost__meta", meta));
+    return w;
+  }
   function thumb(q, who) {
     var u = safeUrl(q.url), a = el(u ? "a" : "div", "ss-thumb"), k = kindOf(q);
     if (u) { a.href = u; a.target = "_blank"; a.rel = "noopener noreferrer";
@@ -525,7 +538,8 @@
       .forEach(function (y) { var d = el("div"); d.appendChild(el("b", null, y[0])); d.appendChild(el("span", null, y[1])); dn.appendChild(d); });
     body.appendChild(dn);
     body.appendChild(el("h3", null, v.posts.length + (v.posts.length === 1 ? " competitor post" : " competitor posts")));
-    var dw = el("div", "ss-dwall"); v.posts.forEach(function (q) { dw.appendChild(thumb(q)); }); body.appendChild(dw);
+    // Every number we hold for each post, under its picture (Bido 2026-11-03: the panel showed only the views).
+    var dw = el("div", "ss-dwall"); v.posts.forEach(function (q) { dw.appendChild(postCard(q)); }); body.appendChild(dw);
     body.appendChild(el("h3", null, "Notes from your team"));
     var nb = el("div"); body.appendChild(nb); drawNotes(nb, c, first);
     dos.appendChild(body);

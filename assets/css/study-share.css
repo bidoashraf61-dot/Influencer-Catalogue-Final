@@ -360,3 +360,13 @@ html.ss-on #ev-market { display: none; }
 .ss-pgaps .ss-gap { padding: 4mm; border-radius: 12px; gap: 2mm; }
 .ss-pgaps .ss-gap__pic { margin: -4mm -4mm 1mm; aspect-ratio: 16 / 7; border-radius: 12px 12px 0 0; }
 @media screen { html.ss-printing .ss-print { display: block; position: absolute; left: -10000px; top: 0; } }
+
+/* The side panel: every number for each post under its picture (Bido 2026-11-03). */
+.ss-dpost { display: grid; gap: 8px; align-content: start; }
+.ss-dstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 0; border: 1px solid rgba(18,18,18,.1); border-radius: 14px; overflow: hidden; }
+.ss-dstats > div { margin: 0; padding: 8px 10px; border-right: 1px solid rgba(18,18,18,.08); border-bottom: 1px solid rgba(18,18,18,.08); min-width: 0; }
+.ss-dstats > div:nth-child(3n) { border-right: 0; }
+.ss-dstats dt { font: 500 10.5px/1.2 "DM Sans", Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #5a5a5a; }
+.ss-dstats dd { margin: 3px 0 0; font: 400 20px/1 Bebasneue, "Bebas Neue", Arial, sans-serif; letter-spacing: .02em; color: #121212; }
+.ss-dstats__er { background: #e8ff76; }
+.ss-dpost__meta { margin: 0; font: 500 12px/1.35 "DM Sans", Arial, sans-serif; color: #5a5a5a; }
