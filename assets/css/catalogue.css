@@ -2690,3 +2690,9 @@ html.hv-shared body[data-page="selection"] .cat-hero--desk .cat-cover__body { pa
 @media (max-width: 640px) { .sel-line__b { min-height: 44px; } }
 /* Audit 2026-11-03 (round 2): group headers on phones are 44px rows. */
 @media (max-width: 640px) { .cat-group__tog, .cat-group__fold { min-height: 44px; } }
+/* Audit 2026-11-03 (round 4): on touch screens the selection card's small controls (Score on Instagram / TikTok /
+   Both, Add a note, Change) keep their look; each tap area reaches 44px tall. */
+@media (pointer: coarse), (max-width: 640px) {
+  .cat-plat button, .sel-note, .sel-st__change { position: relative; }
+  .cat-plat button::after, .sel-note::after, .sel-st__change::after { content: ""; position: absolute; left: 0; right: 0; top: -8px; bottom: -8px; }
+}
