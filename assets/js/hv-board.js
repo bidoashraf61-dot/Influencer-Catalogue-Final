@@ -135,7 +135,7 @@
                     ["Eng. rate", n.er != null ? Number(n.er).toFixed(2) : "–", n.er != null ? "%" : ""]]
                  : [["Creators", String(k.creators || 0)], ["Approved", String(k.approved || 0)], ["To review", String(k.review || 0)]];
     return {
-      key: c.token, name: c.name, stage: c.stage, moves: c.moves || [], client: c.client || "", logos: c.logos || [],
+      key: c.token, name: c.name, stage: c.stage, moves: c.moves || [], client: c.client || "", logos: c.logos || [], size: k.creators || 0,
       href: c.report ? ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token)
         : (c.selections && c.selections.length ? ROOT + "selection/#s=" + encodeURIComponent(c.selections[0].token) : ""),
       open: c.report ? "Open dashboard" : (c.selections && c.selections.length ? "Open selection" : ""),
@@ -176,7 +176,7 @@
       key1: [String(k.creators || 0), k.creators === 1 ? "creator" : "creators"],
       sels: [{ label: s.name, button: selLabel(s, k), href: ROOT + "selection/#s=" + encodeURIComponent(s.token) }],
       dash: (s.campaigns || []).filter(function (c) { return c.live; }).map(function (c) { return ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token); })[0] || "",
-      when: s.owner ? s.owner + "’s" : "", kam: s.kam || "", badge: badge || null,
+      when: s.owner ? s.owner + "’s" : "", owner: s.owner || "", size: k.creators || 0, kam: s.kam || "", badge: badge || null,
       figures: [["Creators", String(k.creators || 0)], ["Approved", String(k.approved || 0)], ["To review", String(k.review || 0)]],
       links: (s.campaigns || []).map(function (c) {
         return { label: c.name, sub: c.live ? "Live" : "Campaign", live: c.live, href: c.live ? ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token) : ROOT + "campaign/" };
@@ -192,7 +192,7 @@
     var sel = st.selection;
     var map = sel ? ROOT + "market/#s=" + encodeURIComponent(sel.token) : (st.opens || "");
     return {
-      key: String(st.id), name: st.title, stage: st.stage, moves: st.moves || [], client: st.client || "",
+      key: String(st.id), name: st.title, stage: st.stage, moves: st.moves || [], client: st.client || "", size: st.posts || 0,
       logos: st.logos || [], href: map, open: map ? "Open study" : "",
       key1: [String(st.competitors || 0), st.competitors === 1 ? "competitor" : "competitors"],
       sels: sel ? [{ label: sel.name, button: st.stage === "ready" ? "Selection · share" : "Selection", href: ROOT + "selection/#s=" + encodeURIComponent(sel.token) }] : [],
@@ -954,15 +954,35 @@
       if (opts.view === "table") table(); else draw();
     });
     // Item 205: search and filters (remembered in this browser): text, client, account manager, Mine, Pinned, Overdue.
-    var F = { q: "", client: "", kam: "", chips: {}, tests: true };
+    var F = { q: "", client: "", kam: "", owner: "", age: "", stage: "", sort: "", chips: {}, tests: true };
     try { F = JSON.parse(localStorage.getItem("hvb-filter-" + noun) || "null") || F; } catch (e) { /* blocked */ }
     F.chips = F.chips || {};
     function keepF() { try { localStorage.setItem("hvb-filter-" + noun, JSON.stringify(F)); } catch (e) { /* blocked */ } }
     function uniq(f) { var o = {}; items.forEach(function (x) { var v = f(x); if (v) o[v] = 1; }); return Object.keys(o).sort(); }
     var me = (opts.me || "").toLowerCase();
-    function shown() {
+    var SORTS = [["", "Default order"], ["updated", "Recently updated"], ["idle", "Longest idle"], ["name", "Name A to Z"],
+                 ["client", "Client A to Z"], ["kam", "Account manager"], ["size", noun === "study" ? "Most posts" : "Most creators"], ["due", "Next step due"]];
+    function cmpFor(k) {
+      var tx = function (a, b) { return String(a || "~").localeCompare(String(b || "~"), undefined, { sensitivity: "base" }); };
+      return {
+        updated: function (a, b) { return (b.updated || 0) - (a.updated || 0); },
+        idle: function (a, b) { return (a.updated || 0) - (b.updated || 0); },
+        name: function (a, b) { return tx(a.name, b.name); },
+        client: function (a, b) { return tx(a.client, b.client) || tx(a.name, b.name); },
+        kam: function (a, b) { return tx(a.kam, b.kam) || tx(a.name, b.name); },
+        size: function (a, b) { return (b.size || 0) - (a.size || 0); },
+        due: function (a, b) { var x = a.next && a.next.due || 9e12, y = b.next && b.next.due || 9e12; return x - y; }
+      }[k] || null;
+    }
+    // Sort by a table column too: the toolbar's choice picks the matching column.
+    var SORT_COL = { updated: ["when", -1], idle: ["when", 1], name: ["name", 1], client: ["client", 1], kam: ["kam", 1], size: ["creators", -1] };
+    function shown(skipStage) {
       var q = (F.q || "").trim().toLowerCase();
-      return items.filter(function (it) {
+      var cutoff = F.age ? Date.now() / 1000 - Number(F.age) * 86400 : 0;
+      var out = items.filter(function (it) {
+        if (!skipStage && F.stage && it.stage !== F.stage) return false;
+        if (F.owner && (it.owner || "") !== F.owner) return false;
+        if (cutoff && !((it.updated || 0) >= cutoff)) return false;
         if (q && (it.name + " " + (it.client || "") + " " + (it.kam || "")).toLowerCase().indexOf(q) < 0) return false;
         if (F.client && (it.client || "") !== F.client) return false;
         if (F.kam && (it.kam || "") !== F.kam) return false;
@@ -976,6 +996,9 @@
         if (F.tests !== false && !F.q && isTest(it) && !it.demo) return false;
         return true;
       });
+      var cmp = cmpFor(F.sort);
+      if (cmp) out.sort(function (a, b) { return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || cmp(a, b); });
+      return out;
     }
     B.shown = shown;
     var search = h("input", { type: "search", class: "hvb-search__in", value: F.q || "", placeholder: "Search " + plural(noun) + ", clients, KAMs",
@@ -998,14 +1021,47 @@
       });
       return b;
     }
-    var filters = h("div", { class: "hvb-filters" },
+    var filters = h("div", { class: "hvb-filters" });
+    function buildFilters() {
+      filters.textContent = "";
+      [
       h("label", { class: "hvb-search" }, svg("search"), search),
       picker("All clients", "client", uniq(function (x) { return x.client; })),
       picker("All account managers", "kam", uniq(function (x) { return x.kam; })),
+      picker("All owners", "owner", uniq(function (x) { return x.owner; })),
+      ageSel(), sortSel(),
       chip("mine", "Mine", !!me && items.some(function (x) { return x.kamEmail; })),
       chip("pinned", "Pinned", !!opts.onPin),
       chip("overdue", "Overdue", items.some(function (x) { return x.next && x.next.due; })),
-      items.some(isTest) ? testChip() : null);
+      items.some(isTest) ? testChip() : null].forEach(function (n) { if (n) filters.appendChild(n); });
+    }
+    function rebuildFilters() { search.value = F.q || ""; buildFilters(); }
+    function ageSel() {
+      var sel = h("select", { class: "hvb-filter", "aria-label": "Updated within" },
+        [["", "Any time"], ["7", "Last 7 days"], ["30", "Last 30 days"], ["90", "Last 90 days"]].map(function (o) { return h("option", { value: o[0], selected: String(F.age || "") === o[0] || null }, o[0] ? "Updated: " + o[1] : "Updated: " + o[1]); }));
+      sel.addEventListener("change", function () { F.age = sel.value; keepF(); redraw(); });
+      return sel;
+    }
+    function sortSel() {
+      var sel = h("select", { class: "hvb-filter hvb-sortsel", "aria-label": "Sort by" },
+        SORTS.map(function (o) { return h("option", { value: o[0], selected: (F.sort || "") === o[0] || null }, "Sort: " + o[1]); }));
+      sel.addEventListener("change", function () {
+        F.sort = sel.value; keepF();
+        var c = SORT_COL[F.sort]; if (c) { SORT = { k: c[0], d: c[1] }; keep("hvb-sort-" + noun, SORT); }
+        redraw();
+      });
+      return sel;
+    }
+    var count = h("p", { class: "hvb-count", role: "status", "aria-live": "polite" });
+    var clearBtn = h("button", { type: "button", class: "hvb-tool hvb-clear" }, "Clear filters");
+    clearBtn.addEventListener("click", function () { F = { q: "", client: "", kam: "", owner: "", age: "", stage: "", sort: F.sort, chips: {}, tests: F.tests }; keepF(); rebuildFilters(); redraw(); });
+    function activeFilters() { return !!(F.q || F.client || F.kam || F.owner || F.age || F.stage || Object.keys(F.chips).length); }
+    function drawCount() {
+      var n = shown().length;
+      count.textContent = "";
+      count.appendChild(document.createTextNode("Showing " + n + " of " + items.length + " " + (items.length === 1 ? noun : plural(noun))));
+      if (activeFilters()) count.appendChild(clearBtn);
+    }
     function testChip() {
       var b = h("button", { type: "button", class: "hvb-chipf", "aria-pressed": F.tests !== false ? "true" : "false", title: "Hide test, QA and sample items" }, "Hide tests");
       b.addEventListener("click", function () { F.tests = F.tests === false; keepF(); b.setAttribute("aria-pressed", F.tests !== false ? "true" : "false"); redraw(); });
@@ -1075,7 +1131,9 @@
     root.appendChild(status);
     root.appendChild(tools);
     root.appendChild(need);
+    buildFilters();
     root.appendChild(filters);
+    root.appendChild(count);
     root.appendChild(tabBar);
     // One scroller holds the stage heads and the client bands, so they slide sideways together.
     root.appendChild(h("div", { class: "hvb-scroll" }, grid, bands));
@@ -1090,7 +1148,7 @@
       opts.stages.forEach(function (s) {
         var L = lanes[s.key], list = by[s.key] || [];
         // The stalest shortlists first (pinned ones stay on top), so the oldest ask for attention.
-        if (s.key === "shortlisting") list.sort(function (a, b) { return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (a.updated || 0) - (b.updated || 0); });
+        if (!F.sort && s.key === "shortlisting") list.sort(function (a, b) { return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (a.updated || 0) - (b.updated || 0); });
         list.forEach(function (it) { L.cards.appendChild(card(it, B)); });
         if (!list.length) L.cards.appendChild(h("p", { class: "hvb-empty" }, (list0.length < items.length && (F.q || F.client || F.kam || Object.keys(F.chips).length)) ? "None match" : (opts.empty && opts.empty[s.key]) || "No " + plural(noun) + " here"));
         L.count.textContent = String(list.length);
@@ -1385,7 +1443,23 @@
       }, 80);
     }, { passive: true });
 
-    function redraw() { drawNeed(); if (opts.view === "table") table(); else draw(); }
+    function redraw() {
+      drawNeed(); drawCount();
+      if (opts.view === "table") table(); else draw();
+      try {
+        var save = F.stage; F.stage = "";
+        var per = {}; shown().forEach(function (x) { per[x.stage] = (per[x.stage] || 0) + 1; });
+        F.stage = save;
+        window.dispatchEvent(new CustomEvent("hvb:filter", { detail: { noun: noun, stage: F.stage || "", counts: per } }));
+      } catch (e) { /* old browsers */ }
+    }
+    if (window.__hvbSet && window.__hvbSet[noun]) window.removeEventListener("hvb:setstage", window.__hvbSet[noun]);
+    window.__hvbSet = window.__hvbSet || {};
+    window.__hvbSet[noun] = function (e) {
+      if (!e.detail || e.detail.noun !== noun) return;
+      F.stage = e.detail.stage === F.stage ? "" : (e.detail.stage || ""); keepF(); redraw();
+    };
+    window.addEventListener("hvb:setstage", window.__hvbSet[noun]);
     redraw();
     host.appendChild(root);
     dockRoom(root, tools);
@@ -1468,16 +1542,32 @@
     var counts = {}, max = 0;
     (o.items || []).forEach(function (it) { counts[it.stage] = (counts[it.stage] || 0) + 1; });
     (o.stages || []).forEach(function (st) { max = Math.max(max, counts[st.key] || 0); });
-    var pipe = h("ol", { class: "mb-pipe" + ((o.stages || []).length <= 4 ? " mb-pipe--few" : ""), role: "img", "aria-label": "By stage: " + (o.stages || []).map(function (st) { return st.label + " " + (counts[st.key] || 0); }).join(", ") });
-    (o.stages || []).forEach(function (st) {
-      var n = counts[st.key] || 0;
-      var bar = h("span", { class: "mb-pipe__bar" + (HOT[st.key] ? " is-hot" : "") + (n ? "" : " is-zero") });
-      bar.style.setProperty("--h", max ? Math.max(n / max, n ? .08 : 0).toFixed(3) : "0");
-      pipe.appendChild(h("li", { class: "mb-pipe__st", "aria-hidden": "true" },
-        // The stage mark sits inside its well, so the label underneath is text only and never collides.
-        h("b", { class: "mb-pipe__n" }, String(n)), h("span", { class: "mb-pipe__well" }, stageIcon(st.key, "hvb-stico--mini"), bar),
-        h("span", { class: "mb-pipe__lab" }, st.label)));
+    // Stage chips: each names a stage and its count; tapping one filters the board below to it (tap again to clear).
+    var noun = { select: "selection", track: "campaign", intelligence: "study" }[o.mod] || "item";
+    var saved = ""; try { saved = (JSON.parse(localStorage.getItem("hvb-filter-" + noun) || "null") || {}).stage || ""; } catch (e) { /* blocked */ }
+    var pipe = h("div", { class: "mb-chips", role: "group", "aria-label": "Show one stage" });
+    var chipEls = {};
+    function paint(stage, per) {
+      Object.keys(chipEls).forEach(function (k) {
+        var n = k === "" ? (o.items || []).length : (per ? (per[k] || 0) : (counts[k] || 0));
+        if (k === "" && per) n = Object.keys(per).reduce(function (a, x) { return a + per[x]; }, 0);
+        var b = chipEls[k];
+        b.querySelector("b").textContent = String(n);
+        b.setAttribute("aria-pressed", (stage || "") === k ? "true" : "false");
+        b.classList.toggle("is-zero", !n);
+      });
+    }
+    [{ key: "", label: "All" }].concat(o.stages || []).forEach(function (st) {
+      var b = h("button", { type: "button", class: "mb-chip" + (HOT[st.key] ? " is-hot" : ""), "aria-pressed": "false", "data-stage": st.key },
+        st.key ? stageIcon(st.key, "hvb-stico--mini") : null, h("span", null, st.label), h("b", null, "0"));
+      b.addEventListener("click", function () { window.dispatchEvent(new CustomEvent("hvb:setstage", { detail: { noun: noun, stage: st.key } })); });
+      chipEls[st.key] = b; pipe.appendChild(b);
     });
+    paint(saved, null);
+    if (window.__hvbCover && window.__hvbCover[noun]) window.removeEventListener("hvb:filter", window.__hvbCover[noun]);
+    window.__hvbCover = window.__hvbCover || {};
+    window.__hvbCover[noun] = function (e) { if (e.detail && e.detail.noun === noun) paint(e.detail.stage, e.detail.counts); };
+    window.addEventListener("hvb:filter", window.__hvbCover[noun]);
     var stats = h("dl", { class: "mb-cover__stats" });
     (o.stats || []).forEach(function (x) {
       stats.appendChild(h("div", null, h("dd", null, typeof x[0] === "number" ? short(x[0]) : String(x[0])), h("dt", null, x[1])));

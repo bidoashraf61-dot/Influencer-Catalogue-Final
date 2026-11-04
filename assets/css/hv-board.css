@@ -827,3 +827,20 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
 .hvb-t__pick input { width: 22px; height: 22px; accent-color: var(--ink); cursor: pointer; }
 .hvb-linkbtn { min-height: 44px; }
 .hvb-linkbtn:disabled { opacity: .7; cursor: progress; }
+
+/* ---- Stage chips on the cover (replace the bar strip): name + count, tap to filter ---- */
+.mb-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; }
+.mb-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px 0 10px; border-radius: var(--r-pill); cursor: pointer;
+  background: rgba(255,255,255,.1); color: var(--white); border: 1px solid rgba(255,255,255,.28); font: 600 14px/1 var(--body, inherit); }
+.mb-chip b { font-family: var(--heading); font-size: 20px; font-weight: 400; color: var(--lime); }
+.mb-chip:not(:has(.hvb-stico)) { padding-left: 16px; }
+.mb-chip:hover { background: rgba(255,255,255,.2); }
+.mb-chip.is-zero { opacity: .62; }
+.mb-chip[aria-pressed="true"] { background: var(--lime); color: var(--ink); border-color: var(--lime); opacity: 1; }
+.mb-chip[aria-pressed="true"] b { color: var(--ink); }
+.mb-chip:focus-visible { outline: 3px solid var(--white); outline-offset: 2px; }
+.mb-cover .mb-chips { grid-area: p; }
+.hvb-count { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 12px; font-size: 14px; color: rgba(18,18,18,.78); }
+.hvb-clear { min-height: 36px; }
+@media (max-width: 640px) { .mb-chip { padding-right: 12px; } .mb-chip b { font-size: 18px; } }
+@media (max-width: 760px) { .mb-cover .mb-chips { grid-area: auto; grid-column: 1 / -1; margin-bottom: 16px; } }
