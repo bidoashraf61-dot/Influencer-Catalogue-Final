@@ -147,7 +147,7 @@
         HVBoard.mount($("mb-host"), {
           stages: B.stages, noun: "study", empty: { requested: "Nothing requested. Ask HelloVoice to study a competitor.", running: "No study is being captured." }, locked: B.can_move ? [] : B.stages.map(function (s) { return s.key; }), view: view,
           tools: HVBoard.viewSwitch("intelligence", view, function () { draw(); }, ["board", "table"]),
-          items: list.map(HVBoard.fromStudy), me: B.me || "",
+          items: list.map(HVBoard.fromStudy), me: B.me || "", onChange: function () { intelligence(); },
           extra: B.can_move ? function (it) {
             var st = list.filter(function (y) { return String(y.id) === it.key; })[0];
             if (!st || !st.selection || st.stage !== "ready") return null;

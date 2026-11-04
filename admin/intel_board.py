@@ -10,6 +10,10 @@ company's studies that HelloVoice made visible to them. Only admins move cards.
 
     GET  /api/evidence/board          payload()
     POST /api/evidence/board/stage    {id, to} -> move()
+    GET  /api/evidence/board/manage?id=   manage_view(): the Manage drawer (item 331)
+    POST /api/evidence/board/manage       manage_act():  {id, do: stage | meta | visibility | delete, ...}
+
+Manage matrix: owner all; admin all but delete; KAM on her own clients stage and next step/notes; nobody else.
 """
 import time
 
@@ -31,10 +35,31 @@ CREATE TABLE IF NOT EXISTS evidence_stage (
 );
 """
 
+META = """
+CREATE TABLE IF NOT EXISTS study_meta (
+    pack_id INTEGER PRIMARY KEY,
+    next_text TEXT,
+    next_due INTEGER,
+    notes TEXT,
+    last_move TEXT,
+    updated_by TEXT,
+    updated_at INTEGER
+);
+"""
+
+
+def ensure(conn):
+    """Here too, not only at start-up: a trial link's database is a copy of a template that never ran init()."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'study_meta'").fetchone():
+        conn.executescript(META)
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'evidence_stage'").fetchone():
+        conn.executescript(SCHEMA)
+
 
 def init():
     with db.connect() as conn:
         conn.executescript(SCHEMA)
+        ensure(conn)
 
 
 def _shared_refs(conn):
@@ -56,10 +81,11 @@ def derived(n_posts, n_measured, shared):
 
 
 def _rows(conn):
+    ensure(conn)
     return conn.execute(
         "SELECT p.id, p.title, p.code_id, p.selection_id, p.objective, p.platforms, p.client_visible, p.updated_at, "
         "p.created_at, p.brands, s.token sel_token, s.name sel_name, s.deleted_at sel_deleted, c.label code_label, "
-        "u.company company, u.kam kam, st.stage manual, "
+        "u.company company, u.kam kam, st.stage manual, sm.next_text next_text, sm.next_due next_due, "
         "(SELECT COUNT(*) FROM evidence_posts x WHERE x.pack_id = p.id) n_posts, "
         "(SELECT COUNT(*) FROM evidence_posts x WHERE x.pack_id = p.id AND x.views IS NOT NULL) n_measured, "
         "(SELECT COUNT(DISTINCT x.competitor) FROM evidence_posts x WHERE x.pack_id = p.id) n_comp, "
@@ -71,7 +97,7 @@ def _rows(conn):
         "AND x.handle IS NOT NULL AND instr(lower(x.handle), lower(replace(x.competitor, ' ', ''))) = 0 GROUP BY x.handle ORDER BY SUM(x.views) DESC LIMIT 1) top "
         "FROM evidence_packs p LEFT JOIN selections s ON s.id = p.selection_id "
         "LEFT JOIN codes c ON c.id = p.code_id LEFT JOIN users u ON u.code_id = p.code_id "
-        "LEFT JOIN evidence_stage st ON st.pack_id = p.id "
+        "LEFT JOIN evidence_stage st ON st.pack_id = p.id LEFT JOIN study_meta sm ON sm.pack_id = p.id "
         "WHERE p.deleted_at IS NULL ORDER BY p.updated_at DESC").fetchall()
 
 
@@ -120,7 +146,11 @@ def card(r, role, shared_refs, logo_dir):
                    "brands": int(t.get("brands") or 0), "on_roster": bool(t.get("code"))}
         except (ValueError, TypeError):
             top = None
-    return {"id": r["id"], "top": top, "title": r["title"], "stage": stage, "opens": opens, "auto_stage": auto, "manual": stage != auto,
+    nxt = None
+    if r["next_text"]:
+        nxt = {"text": r["next_text"], "due": r["next_due"],
+               "overdue": bool(r["next_due"] and r["next_due"] < time.time() and stage != "shared")}
+    return {"id": r["id"], "top": top, "next": nxt, "manage": role in ("admin", "kam"), "title": r["title"], "stage": stage, "opens": opens, "auto_stage": auto, "manual": stage != auto,
             "moves": [s for s in STAGES if s != stage] if role == "admin" else [],
             "client": client, "logos": logos[:1], "kam": r["kam"] or "",
             "selection": {"token": r["sel_token"], "name": r["sel_name"]} if r["sel_token"] and not r["sel_deleted"] else None,
@@ -163,3 +193,117 @@ def move(h, pack_id, to, actor=""):
                          "ON CONFLICT(pack_id) DO UPDATE SET stage = excluded.stage, by = excluded.by, at = excluded.at",
                          (pack_id, to, actor, int(time.time())))
     return True, "Moved to %s." % LABEL[to]
+
+
+# ------------------------------------------------------------ the Manage drawer (item 331)
+def _actor(h):
+    import board
+    import team
+    role, who = board.viewer(h)
+    if role == "admin":
+        role = "owner" if team.role_of(who) == "owner" else "admin"
+    return role, board._me(h) or ""
+
+
+def _one(h, pack_id, level):
+    """(row, can) for this study, or (None, None) when this person may not see it."""
+    try:
+        pid = int(pack_id)
+    except (TypeError, ValueError):
+        return None, None
+    with db.connect() as conn:
+        rows = [r for r in _rows(conn) if r["id"] == pid]
+    if not rows:
+        return None, None
+    r = rows[0]
+    off = {"stage": False, "meta": False, "visibility": False, "delete": False}
+    if level in ("owner", "admin"):
+        return r, dict(off, stage=True, meta=True, visibility=True, delete=(level == "owner"))
+    if level == "kam" and _visible(h, "kam", None, [r]):
+        return r, dict(off, stage=True, meta=True)
+    return r, off
+
+
+def manage_view(h, pack_id):
+    level, _ = _actor(h)
+    if level is None:
+        return 401, {"ok": False, "reason": "signin"}
+    r, can = _one(h, pack_id, level)
+    if r is None or not any(can.values()):
+        return 403, {"ok": False, "message": "You cannot manage this study."}
+    with db.connect() as conn:
+        m = conn.execute("SELECT * FROM study_meta WHERE pack_id = ?", (r["id"],)).fetchone()
+        refs = _shared_refs(conn)
+    shared = bool(r["sel_token"]) and r["sel_token"] in refs
+    auto = derived(r["n_posts"], r["n_measured"], shared)
+    stage = r["manual"] if r["manual"] in STAGES else auto
+    return 200, {"ok": True, "level": level, "can": can, "id": r["id"], "name": r["title"], "stage": stage, "by_hand": stage != auto,
+                 "stages": [{"key": k, "label": LABEL[k]} for k in STAGES], "hidden": not r["client_visible"],
+                 "next_text": (m["next_text"] if m else "") or "", "next_due": m["next_due"] if m else None,
+                 "notes": (m["notes"] if m else "") or "", "last_move": (m["last_move"] if m else "") or ""}
+
+
+def _meta_set(pid, email, **cols):
+    keys = list(cols)
+    with db.connect() as conn:
+        ensure(conn)
+        conn.execute("INSERT INTO study_meta (pack_id, %s, updated_by, updated_at) VALUES (?, %s, ?, ?) "
+                     "ON CONFLICT(pack_id) DO UPDATE SET %s, updated_by = excluded.updated_by, updated_at = excluded.updated_at"
+                     % (", ".join(keys), ", ".join("?" * len(keys)), ", ".join("%s = excluded.%s" % (k, k) for k in keys)),
+                     [pid] + [cols[k] for k in keys] + [email, int(time.time())])
+
+
+def manage_act(h, b):
+    import evidence
+    level, email = _actor(h)
+    if level is None:
+        return 401, {"ok": False, "reason": "signin"}
+    r, can = _one(h, b.get("id"), level)
+    if r is None:
+        return 404, {"ok": False, "message": "That study is not here any more."}
+    do = str(b.get("do") or "")
+    if not (can or {}).get(do):
+        return 403, {"ok": False, "message": "That is not yours to change."}
+    pid = r["id"]
+    if do == "stage":
+        to = str(b.get("to") or "")
+        if to not in STAGES:
+            return 400, {"ok": False, "message": "That is not a column on this board."}
+        with db.connect() as conn:
+            auto = derived(r["n_posts"], r["n_measured"], bool(r["sel_token"]) and r["sel_token"] in _shared_refs(conn))
+        now = r["manual"] if r["manual"] in STAGES else auto
+        if to == now:
+            return 200, {"ok": True, "stage": now, "message": "Already in %s." % LABEL[to]}
+        reason = " ".join(str(b.get("reason") or "").split())[:300]
+        if STAGES.index(to) - STAGES.index(now) != 1 and len(reason) < 3:
+            return 400, {"ok": False, "need_reason": True, "message": "Say why: moving back, or skipping a stage, needs a short reason."}
+        with db.connect() as conn:
+            if to == auto:
+                conn.execute("DELETE FROM evidence_stage WHERE pack_id = ?", (pid,))
+            else:
+                conn.execute("INSERT INTO evidence_stage (pack_id, stage, by, at) VALUES (?, ?, ?, ?) "
+                             "ON CONFLICT(pack_id) DO UPDATE SET stage = excluded.stage, by = excluded.by, at = excluded.at",
+                             (pid, to, email, int(time.time())))
+        _meta_set(pid, email, last_move="%s to %s by %s%s" % (LABEL[now], LABEL[to], email or level, (": " + reason) if reason else ""))
+        return 200, {"ok": True, "stage": to, "message": "Moved to %s." % LABEL[to]}
+    if do == "meta":
+        due = None
+        raw = str(b.get("next_due") or "").strip()
+        if raw:
+            try:
+                due = int(time.mktime(time.strptime(raw[:10], "%Y-%m-%d"))) + 12 * 3600
+            except ValueError:
+                return 400, {"ok": False, "message": "The due date must be a day, like 2026-11-20."}
+        _meta_set(pid, email, next_text=" ".join(str(b.get("next_text") or "").split())[:200], next_due=due,
+                  notes=str(b.get("notes") or "").strip()[:2000])
+        return 200, {"ok": True, "message": "Saved."}
+    if do == "visibility":
+        hide = bool(b.get("hidden"))
+        evidence.save(pid, r["title"], r["selection_id"], not hide)
+        return 200, {"ok": True, "hidden": hide, "message": "Hidden from the client." if hide else "Visible to the client again."}
+    if do == "delete":
+        if " ".join(str(b.get("confirm") or "").split()).lower() != " ".join((r["title"] or "").split()).lower():
+            return 400, {"ok": False, "message": "Type the study's name exactly to delete it."}
+        evidence.delete(pid)
+        return 200, {"ok": True, "deleted": True, "message": "Study deleted."}
+    return 400, {"ok": False, "message": "Unknown action."}

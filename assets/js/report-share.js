@@ -229,7 +229,8 @@
 
   // Where the button goes on each page: beside the page's own Download PDF.
   function slot() {
-    if (here[0] === "campaign") return document.querySelector(".db-head__actions") || document.querySelector(".mx-top__links");
+    if (here[0] === "campaign") return document.querySelector(".db-head__actions") || document.getElementById("mx-csbar-acts")
+      || (window.hvReportActs && window.hvReportActs()) || document.querySelector(".mx-top__links");
     if (here[0] === "creator") return document.getElementById("pp-actions");
     if (here[0] === "selection") return document.getElementById("cx-selact") || (late ? document.getElementById("rs-slot-selection") : null);
     var hd = document.querySelector("#ev-market .ev-mi__hd");

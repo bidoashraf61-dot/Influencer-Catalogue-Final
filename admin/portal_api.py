@@ -457,6 +457,11 @@ class PortalMixin(connect_api.ConnectMixin):
             else:
                 self.send_json(200, dict(board.brief_view(self, k), ok=True), self.cors() + [("Cache-Control", "no-store")])
             return True
+        if path == "/api/evidence/board/manage":
+            import intel_board
+            status, body = intel_board.manage_view(self, str(query.get("id") or ""))
+            self.send_json(status, body, self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path == "/api/board/selection-manage":
             import sel_manage
             status, body = sel_manage.view(self, str(query.get("s") or ""))
@@ -702,6 +707,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/evidence/board/stage": self.api_intel_stage,
             "/api/board/selection-archive": self.api_board_selection_archive,
             "/api/board/selection-manage": self.api_board_selection_manage,
+            "/api/evidence/board/manage": self.api_intel_manage,
             "/api/analysis/decide": self.api_analysis_decide,
             "/api/board/edit": self.api_board_edit, "/api/board/logo": self.api_board_logo,
             "/api/board/detach": self.api_board_detach, "/api/board/save": self.api_board_save, "/api/board/plan": self.api_board_plan,
@@ -1357,6 +1363,14 @@ class PortalMixin(connect_api.ConnectMixin):
         if self._throttled("selmanage:%s" % (self.client_address[0] if hasattr(self, "client_address") else ""), 240, 3600):
             return
         status, body = sel_manage.act(self, self.json_body() or {})
+        self.send_json(status, body, self.cors())
+
+    def api_intel_manage(self):
+        """{id, do, ...}: the Manage drawer on the Intelligence board; intel_board.manage_act checks who may."""
+        import intel_board
+        if self._throttled("intelmanage:%s" % self.client_ip(), 240, 3600):
+            return
+        status, body = intel_board.manage_act(self, self.json_body() or {})
         self.send_json(status, body, self.cors())
 
     def api_board_selection_archive(self):

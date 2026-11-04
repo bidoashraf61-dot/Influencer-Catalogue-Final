@@ -178,7 +178,7 @@
       dash: (s.campaigns || []).filter(function (c) { return c.live; }).map(function (c) { return ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token); })[0] || "",
       when: s.owner ? s.owner + "’s" : "", owner: s.owner || "", size: k.creators || 0, kam: s.kam || "",
       badge: s.hidden ? h("span", { class: "lc-chip lc-chip--draft" }, h("i", { "aria-hidden": "true" }), "Hidden from client") : (badge || null),
-      next: s.next || null, manage: !!s.manage,
+      next: s.next || null, manage: !!s.manage, options: !!s.options,
       figures: [["Creators", String(k.creators || 0)], ["Approved", String(k.approved || 0)], ["To review", String(k.review || 0)]],
       links: (s.campaigns || []).map(function (c) {
         return { label: c.name, sub: c.live ? "Live" : "Campaign", live: c.live, href: c.live ? ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token) : ROOT + "campaign/" };
@@ -201,7 +201,7 @@
       dash: (st.campaigns || []).filter(function (c) { return c.live; }).map(function (c) { return ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token); })[0] || "",
       when: st.manual ? "Moved by hand" : (st.posts ? big(st.posts) + " posts read" : ""), kam: st.kam || "", badge: st.visible ? null : h("span", { class: "lc-chip lc-chip--draft" }, h("i", { "aria-hidden": "true" }), "Staff only"),
       figures: [["Posts", String(st.posts || 0)], ["Creators", String(st.creators || 0)], ["On roster", String(st.matched || 0)]],
-      book: st.top && st.top.handle ? st.top : null,
+      book: st.top && st.top.handle ? st.top : null, next: st.next || null, manage: !!st.manage,
       links: (sel ? [{ label: sel.name, sub: "Selection", live: false, href: ROOT + "selection/#s=" + encodeURIComponent(sel.token) }] : [])
         .concat((st.campaigns || []).map(function (c) {
           return { label: c.name, sub: c.live ? "Live" : "Campaign", live: c.live, href: c.live ? ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token) : ROOT + "campaign/" };
@@ -292,8 +292,9 @@
     }
     if (it.dash) out.push(h("a", { class: "hvb-go hvb-go--dash", href: it.dash }, svg("chart"), "Dashboard", h("span", { class: "hvb-sr" }, ": " + it.name)));
     // Item 331: every control for one selection, in one drawer.
-    if (B && it.manage) {
-      var mb = h("button", { type: "button", class: "hvb-go hvb-go--edit", "aria-haspopup": "dialog", title: "Stage, next step, notes, visibility, archive" }, svg("pen"), "Manage", h("span", { class: "hvb-sr" }, ": " + it.name));
+    if (B && (it.manage || it.options)) {
+      var mb = h("button", { type: "button", class: "hvb-go hvb-go--edit", "aria-haspopup": "dialog", title: it.manage ? "Stage, next step, notes, visibility" : "Rename, approve, request changes" },
+        svg("pen"), it.manage ? "Manage" : "Options", h("span", { class: "hvb-sr" }, ": " + it.name));
       mb.addEventListener("click", function () { manage(it, B, mb); });
       out.push(mb);
     }
@@ -306,7 +307,7 @@
       out.push(bb);
     }
     if (B && it.canEdit) {
-      var eb = h("button", { type: "button", class: "hvb-go hvb-go--edit", "aria-label": "Edit " + it.name, title: "Edit this campaign" }, svg("pen"), "Edit");
+      var eb = h("button", { type: "button", class: "hvb-go hvb-go--edit", "aria-label": "Manage " + it.name, title: "Stage, details, brief, targets, selections" }, svg("pen"), "Manage");
       eb.addEventListener("click", function () { panel(it, B, "details", eb); });
       out.push(eb);
     }
@@ -592,6 +593,10 @@
       f.ends = h("input", { type: "date", value: ymd(c.ends_at) });
       f.next = h("input", { type: "text", value: (it.edit && it.edit.next) || "", maxlength: "140", placeholder: "e.g. Send the quote to the client" });
       f.due = h("input", { type: "date", value: ymd(it.edit && it.edit.due) });
+      if (it.moves.length) {
+        section("stage", "Stage", [h("div", { class: "hvb-panel__row" }, moveMenu(it, B.opts.stages, function (to, sel) { B.move(it, to); sel.value = ""; }))],
+          "Go live and Unlive stay on the card.");
+      }
       section("details", "Details", [field("Name", f.name), field("Client", f.client),
         h("div", { class: "hvb-panel__two" }, field("First day", f.starts), field("Last day", f.ends)),
         field("Next step", f.next), field("Next step due", f.due)]);
@@ -809,12 +814,14 @@
      the drawer only draws what the answer says this person may do. */
   function manage(it, B, opener) {
     var changed = false;
+    var CFG = B.noun === "study" ? { path: "/api/evidence/board/manage", key: "id", word: "study" } : { path: "/api/board/selection-manage", key: "s", word: "selection" };
+    var who = {}; who[CFG.key] = it.key;
     var live = h("p", { class: "hvb-panel__msg", role: "status", "aria-live": "polite" });
     function tell(t, bad) { live.textContent = t || ""; live.className = "hvb-panel__msg" + (bad ? " is-bad" : ""); }
-    var shut = h("button", { type: "button", class: "hvb-panel__x", "aria-label": "Close Manage" }, svg("x"));
+    var shut = h("button", { type: "button", class: "hvb-panel__x", "aria-label": "Close" }, svg("x"));
     var body = h("div", { class: "hvb-panel__body", "aria-busy": "true" }, h("p", { class: "is-muted" }, "Loading…"));
     var panel = h("section", { class: "hvb-panel", role: "dialog", "aria-modal": "true", "aria-labelledby": "hvb-mg-t" },
-      h("header", { class: "hvb-panel__head" }, brand(it), h("h2", { id: "hvb-mg-t", class: "hvb-panel__t" }, "Manage"), shut,
+      h("header", { class: "hvb-panel__head" }, brand(it), h("h2", { id: "hvb-mg-t", class: "hvb-panel__t" }, it.manage ? "Manage" : "Options"), shut,
         h("p", { class: "hvb-mg__name" }, it.name)),
       body);
     var back = h("div", { class: "hvb hvb-panel-back" }, panel);
@@ -844,7 +851,7 @@
     function send(payload, btn) {
       if (btn) btn.disabled = true;
       tell("Saving…");
-      return call("POST", "/api/board/selection-manage", Object.assign({ s: it.key }, payload)).then(function (r) {
+      return call("POST", CFG.path, Object.assign({}, who, payload)).then(function (r) {
         if (btn) btn.disabled = false;
         var ok = r.b && r.b.ok;
         tell((r.b && r.b.message) || (ok ? "Saved." : "Couldn’t save. Please try again."), !ok);
@@ -859,18 +866,60 @@
     }
     function field(label, ctl) { return h("label", { class: "hvb-field" }, label, ctl); }
 
-    call("GET", "/api/board/selection-manage?s=" + encodeURIComponent(it.key)).then(function (r) {
+    call("GET", CFG.path + "?" + CFG.key + "=" + encodeURIComponent(it.key)).then(function (r) {
       body.textContent = "";
       body.removeAttribute("aria-busy");
       var M = r.b;
       if (!M || !M.ok) {
-        body.appendChild(h("p", { class: "is-muted", role: "status" }, (M && M.message) || "Couldn’t load this selection. Close this and try again."));
+        body.appendChild(h("p", { class: "is-muted", role: "status" }, (M && M.message) || "Couldn’t load this. Close and try again."));
         return;
       }
       body.appendChild(live);
       var C = M.can;
+      var stageLabel = (M.stages.filter(function (x) { return x.key === M.stage; })[0] || {}).label || M.stage;
+      if (M.level === "client") {
+        var St = sec("Where it stands");
+        St.appendChild(h("p", { class: "hvb-mg__fact" }, h("b", null, stageLabel)));
+        if (M.next_text) St.appendChild(h("p", { class: "hvb-mg__fact" }, "Next: " + M.next_text + (M.next_due ? " (due " + dm(M.next_due) + ")" : "")));
+      }
+      if (C.approve) {
+        var Ap = sec("Approve the quote", "Your account manager is told and sets up the campaign.");
+        var yes = h("button", { type: "button", class: "hvb-btn" }, "Approve quote");
+        yes.addEventListener("click", function () {
+          if (!confirm("Approve the quote for " + it.name + "?")) return;
+          yes.disabled = true; tell("Saving…");
+          call("POST", "/api/selection/quote/approve", { token: it.key }).then(function (x) {
+            var ok = x.b && x.b.ok;
+            tell(ok ? "Quote approved. HelloVoice is setting up the campaign." : ((x.b && x.b.message) || "Couldn’t approve it. Please try again."), !ok);
+            if (ok) changed = true; else yes.disabled = false;
+          });
+        });
+        Ap.appendChild(yes);
+      }
+      if (C.request) {
+        var Rq = sec("Request changes", "Tell your account manager what you would like different.");
+        var rt = h("textarea", { rows: "3", maxlength: "500" });
+        var rb = h("button", { type: "button", class: "hvb-btn" }, "Send");
+        rb.addEventListener("click", function () { send({ do: "request", text: rt.value }, rb).then(function (j) { if (j.ok) rt.value = ""; }); });
+        Rq.appendChild(field("What should change", rt)); Rq.appendChild(rb);
+      }
+      if (C.rename) {
+        var Rn = sec("Name");
+        var rn = h("input", { type: "text", maxlength: "120", value: M.name || "" });
+        var rs = h("button", { type: "button", class: "hvb-btn" }, "Rename");
+        rs.addEventListener("click", function () {
+          rs.disabled = true; tell("Saving…");
+          call("POST", "/api/selection/rename", { token: it.key, name: rn.value }).then(function (x) {
+            rs.disabled = false;
+            var ok = x.b && x.b.ok;
+            tell((x.b && x.b.message) || (ok ? "Renamed." : "Couldn’t rename it."), !ok);
+            if (ok) changed = true;
+          });
+        });
+        Rn.appendChild(field("Selection name", rn)); Rn.appendChild(rs);
+      }
       if (C.stage) {
-        var S = sec("Stage", M.by_hand ? "Set by hand. It no longer follows its quote and campaigns." : "");
+        var S = sec("Stage", M.last_move ? "Last move: " + M.last_move : (M.by_hand ? "Set by hand. It no longer follows its quote and campaigns." : ""));
         var to = h("select", null, M.stages.map(function (x) { return h("option", { value: x.key, selected: x.key === M.stage || null }, x.label); }));
         var why = h("input", { type: "text", maxlength: "300", placeholder: "Needed when moving back or skipping a stage" });
         var go = h("button", { type: "button", class: "hvb-btn" }, "Move");
@@ -908,8 +957,47 @@
         });
         K.appendChild(field("Who follows it", ks)); K.appendChild(kb);
       }
+      if (C.move) {
+        var Mv = sec("Client and owner", "The account it is filed under is both its client and its owner. Moving it takes its campaigns along and rings the client’s bell.");
+        var mq = h("input", { type: "search", autocomplete: "off", placeholder: "Search a client or company" });
+        var mres = h("ul", { class: "hvb-mg__res", "aria-label": "Matching clients" });
+        var mt = null;
+        var pickTo = function (u) {
+          mres.textContent = ""; mq.value = u.name || u.email || "";
+          var ok = h("button", { type: "button", class: "hvb-btn" }, "Move to " + (u.name || u.email || "this client"));
+          ok.addEventListener("click", function () {
+            ok.disabled = true; tell("Moving…");
+            call("POST", "/api/hub/move", { kind: "selection", ref: M.id, to: u.id, code: u.kind === "code" ? u.code_id : null, related: true, tell: true }).then(function (x) {
+              ok.disabled = false;
+              var good = x.b && x.b.ok;
+              tell((x.b && x.b.message) || (good ? "Moved." : "Couldn’t move it."), !good);
+              if (good) changed = true;
+            });
+          });
+          mres.appendChild(h("li", null, ok));
+        };
+        mq.addEventListener("input", function () {
+          clearTimeout(mt);
+          var v = mq.value.trim();
+          mres.textContent = "";
+          if (v.length < 2) return;
+          mt = setTimeout(function () {
+            call("GET", "/api/hub/people?q=" + encodeURIComponent(v)).then(function (x) {
+              mres.textContent = "";
+              var list = (x.b && (x.b.people || x.b.items || x.b.results)) || [];
+              if (!list.length) mres.appendChild(h("li", { class: "is-muted" }, "No matching client"));
+              list.slice(0, 8).forEach(function (u) {
+                var b = h("button", { type: "button", class: "hvb-mg__pick" }, (u.name || u.email || "") + (u.company ? " · " + u.company : ""));
+                b.addEventListener("click", function () { pickTo(u); });
+                mres.appendChild(h("li", null, b));
+              });
+            });
+          }, 220);
+        });
+        Mv.appendChild(field("Move to", mq)); Mv.appendChild(mres);
+      }
       if (C.visibility) {
-        var V = sec("Client visibility", "Hiding takes it off the client’s boards. A link already shared keeps working until you revoke it.");
+        var V = sec("Client visibility", B.noun === "study" ? "Hiding takes the study off the client’s pages." : "Hiding takes it off the client’s boards. A link already shared keeps working until you revoke it.");
         var vb = h("input", { type: "checkbox", checked: M.hidden || null });
         vb.addEventListener("change", function () {
           vb.disabled = true;
@@ -917,8 +1005,22 @@
         });
         V.appendChild(h("label", { class: "hvb-mg__check" }, vb, "Hide from the client"));
       }
+      if (C.remove) {
+        var Rm = sec("Remove");
+        var rmb = h("button", { type: "button", class: "hvb-mg__del" }, "Delete this selection");
+        rmb.addEventListener("click", function () {
+          if (!confirm("Delete " + it.name + "? It leaves your lists and its link stops opening.")) return;
+          rmb.disabled = true; tell("Saving…");
+          call("POST", "/api/selection/delete", { token: it.key }).then(function (x) {
+            var ok = x.b && x.b.ok;
+            tell(ok ? "Deleted." : ((x.b && x.b.message) || "Couldn’t delete it. A selection a campaign holds has to stay."), !ok);
+            if (ok) { changed = true; close(); } else rmb.disabled = false;
+          });
+        });
+        Rm.appendChild(rmb);
+      }
       if (C.archive || C.delete) {
-        var L = sec("Archive or delete");
+        var L = sec(C.archive ? "Archive or delete" : "Delete");
         if (C.archive) {
           var ab = h("button", { type: "button", class: "hvb-tool" }, "Archive this selection");
           ab.addEventListener("click", function () {
@@ -1723,10 +1825,12 @@
         h("div", { class: "mb-cover__main" },
           h("h1", { class: "mb-cover__title" }, o.title || ""),
           o.lede ? h("p", { class: "mb-cover__lede" }, o.lede) : null,
-          stats, pipe),
+          stats),
         h("img", { class: "mb-cover__char", src: ROOT + "assets/brand/modules/" + c + "-440.webp",
                    srcset: ROOT + "assets/brand/modules/" + c + "-440.webp 1x, " + ROOT + "assets/brand/modules/" + c + "-880.webp 2x",
                    alt: "", width: "365", height: "440", decoding: "async" })))));
+    // The stage chips sit in their own section under the cover (Bido 2026-11-04), on white with the board below them.
+    host.appendChild(h("section", { class: "mb-stages cat-pad", "aria-label": "Stages" }, h("div", { class: "cat-container" }, pipe)));
   }
 
   window.HVBoard = { mount: mount, cover: cover, fromCampaign: fromCampaign, fromSelection: fromSelection, fromStudy: fromStudy, viewSwitch: viewSwitch, viewOf: viewOf };

@@ -113,6 +113,16 @@
     $("mx-empty").hidden = which !== "empty";
     // "Back to dashboard" belongs to one campaign's report, not to the list.
     if (which !== "report") $("mx-dash").hidden = true;
+    // On a report the header holds the logo and the modules; its buttons sit on the row beneath (Bido 2026-11-04).
+    if (which === "report") {
+      var acts = reportActs();
+      acts.appendChild($("mx-catalogue")); acts.appendChild($("mx-dash"));
+      var shareBtn = document.querySelector(".mx-top__links .rs-share");
+      if (shareBtn) acts.appendChild(shareBtn);
+    } else {
+      var top = document.querySelector(".mx-top__links");
+      top.insertBefore($("mx-catalogue"), top.firstChild); top.appendChild($("mx-dash"));
+    }
   }
   function empty(msg) { $("mx-empty").textContent = msg; show("empty"); }
 
@@ -124,7 +134,6 @@
     Promise.all([get("/api/board"), get("/api/campaigns").catch(function () { return {}; })]).then(function (r) {
       unlocked();
       CAN_START = !!r[1].can_start && r[0].role === "client";
-      $("mx-all").hidden = true;
       BOARD = r[0];
       showBoard();
     }).catch(function (err) { if (err && err.locked) lock(); else empty("Could not load your campaigns. Please try again."); });
@@ -243,6 +252,16 @@
   }
 
   /* ------------------------------------------------------ campaign switcher */
+  window.hvReportActs = function () { return reportActs(); };
+  function reportActs() {
+    var bar = reportBar(), acts = $("mx-csbar-acts");
+    if (!acts) {
+      acts = document.createElement("div");
+      acts.className = "mx-csbar__acts"; acts.id = "mx-csbar-acts";
+      bar.appendChild(acts);
+    }
+    return acts;
+  }
   function reportBar() {
     var bar = $("mx-csbar");
     if (!bar) {
@@ -272,7 +291,7 @@
       + '<div class="mx-cs__pop" id="mx-cs-pop" role="dialog" aria-label="Switch campaign" hidden>'
       + '<label class="mx-cs__q">' + SVG.search + '<input type="search" placeholder="Find a campaign" aria-label="Find a campaign" autocomplete="off"></label>'
       + '<ul class="mx-cs__list"></ul>'
-      + '<a class="mx-cs__all" href="#list">All campaigns on the board ' + SVG.arrow + "</a></div>";
+      + "</div>";
     links.appendChild(wrap);
     var btn = wrap.querySelector(".mx-cs__btn"), pop = wrap.querySelector(".mx-cs__pop"), q = wrap.querySelector("input"), ul = wrap.querySelector("ul");
     function draw() {
@@ -429,7 +448,6 @@
       if (!same) window.scrollTo(0, 0);
       get("/api/board").then(function (x) {
         BOARD = x;
-        $("mx-all").hidden = !(x.campaigns || []).length;
         mountSwitcher(x.campaigns || [], t);
       }).catch(function () {});
     }).catch(function (err) {

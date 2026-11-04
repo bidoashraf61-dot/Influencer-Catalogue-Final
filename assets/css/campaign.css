@@ -1176,18 +1176,11 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
   .mx-info::after { content: ""; position: absolute; inset: -9px; }
 }
 
-/* One dark header (Bido 2026-11-03, replaces the items 301-303 cover): the selection page's ink grid with a lime glow,
+/* White logo-and-modules header above the report (Bido 2026-11-04); its buttons sit on the row beneath. Then the dark cover:
+   the selection page's ink grid with a lime glow,
    the client's logos on a white chip, the title, live line and verdict, and Helvi Track standing beside them.
    On a shared link the share bar already carries the Helvi Track mark, so the white logo strip goes. */
 .hv-shared .mx-top { display: none !important; }
-body:has(#mx-report:not([hidden])) .mx-top {
-  background: var(--ink);
-  background-image: linear-gradient(rgba(255,255,255,.043) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.043) 1px, transparent 1px);
-  background-size: 56px 56px; padding-bottom: 0; }
-body:has(#mx-report:not([hidden])) .mx-top__logo { display: none; }
-body:has(#mx-report:not([hidden])) .mx-top__in { justify-content: flex-end; }
-body:has(#mx-report:not([hidden])) .mx-top .mx-link { color: var(--white); border-color: rgba(255,255,255,.35); background: transparent; }
-body:has(#mx-report:not([hidden])) .mx-top .mx-link:hover { color: var(--lime); border-color: var(--lime); }
 .mx-bug {
   position: relative; isolation: isolate; overflow: hidden; color: var(--white); padding: 40px 0 44px !important;
   background-color: var(--ink);
@@ -1399,4 +1392,36 @@ body[data-only] #mx-report .mx-sec:not(.is-only) { display: none !important; }
   .mx-tc__links a { position: relative; }
   .mx-tc__links a::after { content: ""; position: absolute; inset: -9px; }
   .mx-cc__name { display: inline-flex; align-items: center; min-height: 44px; }
+}
+
+/* The row under the header: back to the board on the start, the report's buttons and the campaign switcher at the end. */
+.mx-csbar__acts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-inline-start: auto; }
+.mx-csbar__in { flex-wrap: wrap; row-gap: 10px; }
+
+/* Report header, tightened (Bido 2026-11-04, "a lot of negative spaces"): identity and modules on one 64px row, the page's
+   actions on one 52px row directly under it, all on the same 40px control height; 44px where fingers are the pointer. */
+.mx-top { padding-top: 10px; padding-bottom: 10px; }
+.mx-top__logo img { width: 88px; }
+.mx-top .hv-mod { min-height: 40px; padding-inline-end: 14px; gap: 7px; font-size: 16px; }
+.mx-top .hv-mod img { width: 34px; height: 34px; }
+.mx-csbar { padding-top: 0; padding-bottom: 10px; }
+.mx-csbar__back { min-height: 40px; font-size: 18px; }
+.mx-csbar__acts { gap: 8px; }
+.mx-csbar__acts .mx-link, .mx-csbar__acts .mx-dash, .mx-csbar__acts .rs-share { min-height: 40px; padding-top: 0; padding-bottom: 0; }
+.mx-csbar__acts .mx-dash { padding-inline: 16px; font-size: 16px; }
+.mx-csbar .mx-cs > :first-child { min-height: 40px; }
+@media (pointer: coarse), (max-width: 640px) {
+  .mx-csbar__acts .mx-link, .mx-csbar__acts .mx-dash, .mx-csbar__acts .rs-share, .mx-csbar .mx-cs > :first-child, .mx-csbar__back { min-height: 44px; }
+}
+.mx-csbar__acts .mx-link { order: 1; } .mx-csbar__acts .mx-dash { order: 2; } .mx-csbar__acts .rs-share { order: 3; }
+@media (max-width: 640px) {
+  /* Phones: the modules sit in a single 44px line, and the actions form a two-column block, not a tall stack. */
+  html body .mx-top .hv-mod { flex-direction: row; min-width: 0; min-height: 44px; padding: 2px 12px 2px 2px; gap: 6px; border-radius: var(--r-pill); font-size: 15px; }
+  html body .mx-top .hv-mods { border-radius: var(--r-pill); }
+  html body .mx-top .hv-mod:not([aria-current="page"]) { padding-inline-end: 2px; }
+  .mx-csbar__acts { display: grid; grid-template-columns: 1fr 1fr; width: 100%; margin-inline-start: 0; }
+  .mx-csbar__acts > * { justify-content: center; min-width: 0; }
+  .mx-csbar__acts .rs-share { order: 2; } .mx-csbar__acts .mx-dash { order: 3; grid-column: 1 / -1; }
+  .mx-csbar .mx-cs { flex: 1 1 100%; width: 100%; }
+  .mx-csbar .mx-cs > :first-child { width: 100%; justify-content: space-between; }
 }

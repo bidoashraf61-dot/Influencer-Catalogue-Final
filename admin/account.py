@@ -294,6 +294,7 @@ def summary(user, code_id, secret=b"", logo_dir=None):
                            # The Manage drawer (item 331): admins and owners everywhere, a KAM on her own clients' work.
                            "manage": bool(is_admin or (kam_sc is not None and ((s["code_id"] is not None and int(s["code_id"]) in kam_sc)
                                                                                or s["id"] in kam_sc.sel_ids))),
+                           "options": portal.owns(code_id, s["code_id"]) and not is_admin and kam_sc is None,
                            "created_at": s["created_at"], "client": sclient,
                            "kam": _kam_label(s["kam"]),
                            "campaigns": [{"name": k["name"], "token": k["token"], "live": k["status"] == "live"} for k in held][:3],

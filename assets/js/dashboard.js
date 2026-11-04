@@ -102,7 +102,6 @@
     var go = TOKEN ? Promise.resolve(TOKEN) : get("/api/campaigns").then(function (b) {
       var l = b.campaigns || [];
       location.replace("../#list"); throw { moved: true }; });
-    get("/api/campaigns").then(function (b) { $("db-all").hidden = !(b.campaigns || []).length; }).catch(function () {});
     go.then(function (t) { TOKEN = t; return get("/api/campaign?t=" + encodeURIComponent(t) + (shareTok() ? "&share=" + encodeURIComponent(shareTok()) : "")); })
       .then(function (b) {
         R = b.report;

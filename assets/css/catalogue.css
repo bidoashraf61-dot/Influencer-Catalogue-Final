@@ -2696,3 +2696,17 @@ html.hv-shared body[data-page="selection"] .cat-hero--desk .cat-cover__body { pa
   .cat-plat button, .sel-note, .sel-st__change { position: relative; }
   .cat-plat button::after, .sel-note::after, .sel-st__change::after { content: ""; position: absolute; left: 0; right: 0; top: -8px; bottom: -8px; }
 }
+
+/* The selection page's header is white like every other page (Bido 2026-11-04): logo, modules and account on white,
+   the dark cover starts beneath, and "Full catalogue" moves down into the cover's button row.
+   A client link keeps its own share bar, so it is left alone. */
+html:not(.hv-shared) [data-page="selection"] .cat-cover__nav { position: relative; z-index: 3; padding-top: 14px; padding-bottom: 14px; background: var(--white); border-bottom: 1px solid rgba(18,18,18,.08); }
+html:not(.hv-shared) [data-page="selection"] .cat-cover__nav .hv-mods { background: var(--ink); border-color: var(--ink); }
+html:not(.hv-shared) [data-page="selection"] .cat-cover__nav .cat-hero__logo { content: url("../brand/modules/helvi-selection-logo-v4.png"); }
+html:not(.hv-shared) [data-page="selection"] .cat-topbar__links .cat-track--cat { display: none; }
+html:not(.hv-shared) [data-page="selection"] .cat-selhead__foot .cat-back { display: inline-flex; margin-bottom: 0; }
+html:not(.hv-shared) [data-page="selection"] .cat-cover__nav { padding-top: 10px; padding-bottom: 10px; }
+html:not(.hv-shared) [data-page="selection"] .cat-cover__nav .cat-hero__logo { width: 88px; height: auto; }
+html:not(.hv-shared) [data-page="selection"] .cat-cover__nav .hv-mod { min-height: 40px; padding-inline-end: 14px; gap: 7px; font-size: 16px; }
+html:not(.hv-shared) [data-page="selection"] .cat-cover__nav .hv-mod img { width: 34px; height: 34px; }
+html:not(.hv-shared) [data-page="selection"] .cat-selhead__foot .cat-back[hidden] { display: inline-flex !important; }

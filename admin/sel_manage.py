@@ -14,7 +14,9 @@ own clients' selections):
     delete      owner               forever, after typing the selection's name
     KAM change  owner, admin        through the existing /api/hub/assign-kam
 
-Clients and other team logins get nothing here (their own rename / share / archive keep working as before).
+A client, on a selection they own, gets their own options instead: rename, approve a ready quote (both through the
+existing routes), remove (when the existing rule allows it) and request changes (do: request; tells the KAM and the team,
+and lands in the internal notes). They never receive notes, the KAM's email, or any staff control. Other team logins get nothing.
 Every change is recorded in History, and the selection's owner and KAM get a bell notice (never the actor).
 """
 import time
@@ -68,11 +70,22 @@ def actor(h):
 
 
 def can(h, level, sel):
-    off = {"stage": False, "meta": False, "visibility": False, "archive": False, "delete": False, "kam": False}
+    off = {"stage": False, "meta": False, "visibility": False, "archive": False, "delete": False, "kam": False,
+           "move": False, "rename": False, "approve": False, "request": False, "remove": False}
     if level in ("owner", "admin"):
-        return dict(off, stage=True, meta=True, visibility=True, archive=True, kam=True, delete=(level == "owner"))
+        return dict(off, stage=True, meta=True, visibility=True, archive=True, kam=True, move=True, rename=True, delete=(level == "owner"))
     if level == "kam" and h.admin_like_for(sel["code_id"], sel["id"], None):
-        return dict(off, stage=True, meta=True, archive=True)
+        return dict(off, stage=True, meta=True, archive=True, move=True, rename=True)
+    if level == "client":
+        import lifecycle
+        import portal
+        import selrename
+        cid = board.viewer(h)[1]
+        if cid is None or not portal.owns(cid, sel["code_id"]):
+            return off
+        return dict(off, rename=bool(selrename.client_may(cid, sel, db.admin_code_id())), request=True,
+                    approve=lifecycle.chip(sel)["key"] == "ready",
+                    remove=(sel["origin"] or "admin") == "client" and int(cid) != int(db.admin_code_id()))
     return off
 
 
@@ -98,6 +111,13 @@ def view(h, token):
     allow = can(h, level, sel)
     if not any(allow.values()):
         return 403, {"ok": False, "message": "You cannot manage this selection."}
+    if level == "client":
+        m = meta_of(sel["id"])
+        if m is not None and m["hidden"]:
+            return 404, {"ok": False, "message": "That selection is not here any more."}
+        return 200, {"ok": True, "level": level, "can": allow, "id": sel["id"], "name": sel["name"], "stage": _stage_now(sel)[0],
+                     "stages": [{"key": k, "label": LABEL[k]} for k in STAGES],
+                     "next_text": (m["next_text"] if m else "") or "", "next_due": (m["next_due"] if m else None)}
     m = meta_of(sel["id"])
     stage, derived = _stage_now(sel)
     kam = db.kam_of_item("selection", sel["id"]) or ""
@@ -151,6 +171,27 @@ def act(h, b):
     history.set_actor(email or level)
     sid = int(sel["id"])
     name = sel["name"]
+
+    if do == "request":
+        text = _clean(b.get("text"), 500)
+        if len(text) < 3:
+            return 400, {"ok": False, "message": "Say what you would like changed."}
+        import notify
+        import portal
+        u = portal.user_for_code(sel["code_id"]) if sel["code_id"] is not None else None
+        kam = (u["kam"] if u is not None and "kam" in u.keys() else None) or db.kam_of_item("selection", sid)
+        with history.tracked("selection", str(sid), "Client asked for changes on %s: %s" % (name, text)):
+            with db.connect() as conn:
+                r = conn.execute("SELECT notes FROM selection_meta WHERE sel_id = ?", (sid,)).fetchone()
+                line = "%s asked for changes: %s" % (email or "The client", text)
+                notes = ((r["notes"] + "\n") if r and r["notes"] else "") + line
+                conn.execute("INSERT INTO selection_meta (sel_id, notes, updated_by, updated_at) VALUES (?,?,?,?) "
+                             "ON CONFLICT(sel_id) DO UPDATE SET notes = excluded.notes, updated_by = excluded.updated_by, "
+                             "updated_at = excluded.updated_at", (sid, notes[-2000:], email, db.now()))
+                conn.execute("UPDATE selections SET updated_at = ? WHERE id = ?", (db.now(), sid))
+        notify.send("quote_changed", ["Changes requested on %s" % name, text, email], kam=kam)
+        _tell(sel, email, "Changes requested on %s" % name, text)
+        return 200, {"ok": True, "message": "Sent. Your account manager will come back to you."}
 
     if do == "stage":
         to = str(b.get("to") or "")
