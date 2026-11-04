@@ -94,10 +94,11 @@
       if (!list.length) { closed("No selections yet", "Shortlist creators on the catalogue and your selections will gather here."); return; }
       draw();
       function draw() {
-        var view = HVBoard.viewOf("selections");
+        var view = HVBoard.viewOf("selections", ["board", "table"]);
+        $("mb-host").textContent = "";          // a switch replaces the board; it never stacks a second one under the first
         HVBoard.mount($("mb-host"), {
           stages: SEL_STAGES, noun: "selection", locked: ["live", "completed"], view: view,
-          tools: HVBoard.viewSwitch("selections", view, function () { draw(); }),
+          tools: HVBoard.viewSwitch("selections", view, function () { draw(); }, ["board", "table"]),
           items: list.map(function (s) { return HVBoard.fromSelection(s, chip(s.quote)); }),
           say: say,
           bulk: isAdmin ? { archive: function (picked) {
@@ -141,6 +142,7 @@
       draw();
       function draw() {
         var view = HVBoard.viewOf("intelligence", ["board", "table"]);
+        $("mb-host").textContent = "";
         HVBoard.mount($("mb-host"), {
           stages: B.stages, noun: "study", empty: { requested: "Nothing requested. Ask HelloVoice to study a competitor.", running: "No study is being captured." }, locked: B.can_move ? [] : B.stages.map(function (s) { return s.key; }), view: view,
           tools: HVBoard.viewSwitch("intelligence", view, function () { draw(); }, ["board", "table"]),
