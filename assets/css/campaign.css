@@ -1436,3 +1436,6 @@ body[data-only] #mx-report .mx-sec:not(.is-only) { display: none !important; }
   .mx-top__in { flex-wrap: wrap; gap: 10px; }
   .mx-top__links { flex-basis: 100%; }
 }
+
+/* A report is one campaign's page: the three module switches stay off its header (Bido 2026-11-04). The board keeps them. */
+body:has(#mx-report:not([hidden])) .mx-top .hv-mods { display: none; }
