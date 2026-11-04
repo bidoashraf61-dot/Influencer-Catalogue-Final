@@ -17,6 +17,7 @@ They are only ever served through the API to the signed-in owner (or an
 admin), never by a public URL.
 """
 import json
+import time
 import urllib.parse
 import os
 import secrets
@@ -238,12 +239,17 @@ def summary(user, code_id, secret=b"", logo_dir=None):
     granted = sorted(set(db.granted_selection_ids(code_id)) | portal.sample_ids_for(code_id)) or [-1]
     gq = ",".join("?" * len(granted))
     with db.connect() as conn:
+        import sel_manage
+        sel_manage.ensure(conn)
         sels = conn.execute(
             "SELECT s.id, s.name, s.token, s.codes, s.updated_at, s.code_id, s.origin, s.request_id, s.created_at, s.stage, "
+            "s.stage_override, m.next_text, m.next_due, COALESCE(m.hidden, 0) hidden, "
             "u.name owner, u.company company, u.kam kam, c.label code_label FROM selections s "
             "LEFT JOIN users u ON u.code_id = s.code_id LEFT JOIN codes c ON c.id = s.code_id "
-            "WHERE (s.code_id IN (%s) OR s.id IN (%s)) AND s.archived_at IS NULL ORDER BY s.updated_at DESC LIMIT 60"
-            % (",".join("?" * len(team)), gq), team + granted).fetchall()
+            "LEFT JOIN selection_meta m ON m.sel_id = s.id "
+            "WHERE (s.code_id IN (%s) OR s.id IN (%s)) AND s.archived_at IS NULL%s ORDER BY s.updated_at DESC LIMIT 60"
+            % (",".join("?" * len(team)), gq,
+               "" if (is_admin or kam_sc is not None) else " AND COALESCE(m.hidden, 0) = 0"), team + granted).fetchall()
         camps = conn.execute(
             "SELECT * FROM campaigns WHERE (code_id IN (%s) OR selection_id IN (%s)) AND status != 'draft' "
             "ORDER BY CASE status WHEN 'live' THEN 0 ELSE 1 END, starts_at DESC LIMIT 30" % (",".join("?" * len(team)), gq),
@@ -278,7 +284,16 @@ def summary(user, code_id, secret=b"", logo_dir=None):
                     "@/api/campaign-logo?t=%s&n=%s" % (urllib.parse.quote(k["token"]), urllib.parse.quote(ref.rsplit("/", 1)[-1])))
                 if url not in logos:
                     logos.append(url)       # "@" = under the admin API (the page adds its own base)
+        nxt = None
+        if s["next_text"]:
+            nxt = {"text": s["next_text"], "due": s["next_due"], "overdue": bool(s["next_due"] and s["next_due"] < time.time()
+                                                                              and stage not in ("live", "completed"))}
         selections.append({"stage": stage, "moves": board.selection_moves(may, chip["key"], stage), "logos": logos[:1],
+                           "next": nxt, "hidden": bool(s["hidden"]) if (is_admin or kam_sc is not None) else False,
+                           "by_hand": bool(s["stage_override"]),
+                           # The Manage drawer (item 331): admins and owners everywhere, a KAM on her own clients' work.
+                           "manage": bool(is_admin or (kam_sc is not None and ((s["code_id"] is not None and int(s["code_id"]) in kam_sc)
+                                                                               or s["id"] in kam_sc.sel_ids))),
                            "created_at": s["created_at"], "client": sclient,
                            "kam": _kam_label(s["kam"]),
                            "campaigns": [{"name": k["name"], "token": k["token"], "live": k["status"] == "live"} for k in held][:3],

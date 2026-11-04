@@ -101,6 +101,7 @@
           tools: HVBoard.viewSwitch("selections", view, function () { draw(); }, ["board", "table"]),
           items: list.map(function (s) { return HVBoard.fromSelection(s, chip(s.quote)); }),
           say: say,
+          onChange: function () { selections(); },
           bulk: isAdmin ? { archive: function (picked) {
             return api("POST", "/api/board/selection-archive", { tokens: picked.map(function (x) { return x.key; }) }).then(function (x) { return x.b || {}; });
           } } : null,

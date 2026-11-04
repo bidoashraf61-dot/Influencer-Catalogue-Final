@@ -176,7 +176,9 @@
       key1: [String(k.creators || 0), k.creators === 1 ? "creator" : "creators"],
       sels: [{ label: s.name, button: selLabel(s, k), href: ROOT + "selection/#s=" + encodeURIComponent(s.token) }],
       dash: (s.campaigns || []).filter(function (c) { return c.live; }).map(function (c) { return ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token); })[0] || "",
-      when: s.owner ? s.owner + "’s" : "", owner: s.owner || "", size: k.creators || 0, kam: s.kam || "", badge: badge || null,
+      when: s.owner ? s.owner + "’s" : "", owner: s.owner || "", size: k.creators || 0, kam: s.kam || "",
+      badge: s.hidden ? h("span", { class: "lc-chip lc-chip--draft" }, h("i", { "aria-hidden": "true" }), "Hidden from client") : (badge || null),
+      next: s.next || null, manage: !!s.manage,
       figures: [["Creators", String(k.creators || 0)], ["Approved", String(k.approved || 0)], ["To review", String(k.review || 0)]],
       links: (s.campaigns || []).map(function (c) {
         return { label: c.name, sub: c.live ? "Live" : "Campaign", live: c.live, href: c.live ? ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token) : ROOT + "campaign/" };
@@ -289,6 +291,12 @@
       out.push(d);
     }
     if (it.dash) out.push(h("a", { class: "hvb-go hvb-go--dash", href: it.dash }, svg("chart"), "Dashboard", h("span", { class: "hvb-sr" }, ": " + it.name)));
+    // Item 331: every control for one selection, in one drawer.
+    if (B && it.manage) {
+      var mb = h("button", { type: "button", class: "hvb-go hvb-go--edit", "aria-haspopup": "dialog", title: "Stage, next step, notes, visibility, archive" }, svg("pen"), "Manage", h("span", { class: "hvb-sr" }, ": " + it.name));
+      mb.addEventListener("click", function () { manage(it, B, mb); });
+      out.push(mb);
+    }
     // Item 204: the brief, anchored to the campaign card; item 197: every edit from the card.
     if (B && it.briefs && it.briefs.length) {
       var has = it.briefs.some(function (x) { return x.brief; });
@@ -797,6 +805,141 @@
     });
   }
 
+  /* ------------------------------------------- the Manage drawer (item 331). The server decides (admin/sel_manage.py);
+     the drawer only draws what the answer says this person may do. */
+  function manage(it, B, opener) {
+    var changed = false;
+    var live = h("p", { class: "hvb-panel__msg", role: "status", "aria-live": "polite" });
+    function tell(t, bad) { live.textContent = t || ""; live.className = "hvb-panel__msg" + (bad ? " is-bad" : ""); }
+    var shut = h("button", { type: "button", class: "hvb-panel__x", "aria-label": "Close Manage" }, svg("x"));
+    var body = h("div", { class: "hvb-panel__body", "aria-busy": "true" }, h("p", { class: "is-muted" }, "Loading…"));
+    var panel = h("section", { class: "hvb-panel", role: "dialog", "aria-modal": "true", "aria-labelledby": "hvb-mg-t" },
+      h("header", { class: "hvb-panel__head" }, brand(it), h("h2", { id: "hvb-mg-t", class: "hvb-panel__t" }, "Manage"), shut,
+        h("p", { class: "hvb-mg__name" }, it.name)),
+      body);
+    var back = h("div", { class: "hvb hvb-panel-back" }, panel);
+    function close() {
+      document.removeEventListener("keydown", keys, true);
+      back.remove();
+      document.body.classList.remove("hvb-panel-open");
+      if (changed && B.opts.onChange) B.opts.onChange();
+      else if (opener && document.contains(opener)) opener.focus();
+    }
+    function keys(e) {
+      if (e.key === "Escape") { e.preventDefault(); close(); return; }
+      if (e.key !== "Tab") return;
+      var f = panel.querySelectorAll("button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])");
+      if (!f.length) return;
+      var a = f[0], z = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); }
+      else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); }
+    }
+    shut.addEventListener("click", close);
+    back.addEventListener("click", function (e) { if (e.target === back) close(); });
+    document.addEventListener("keydown", keys, true);
+    document.body.appendChild(back);
+    document.body.classList.add("hvb-panel-open");
+    shut.focus({ preventScroll: true });
+
+    function send(payload, btn) {
+      if (btn) btn.disabled = true;
+      tell("Saving…");
+      return call("POST", "/api/board/selection-manage", Object.assign({ s: it.key }, payload)).then(function (r) {
+        if (btn) btn.disabled = false;
+        var ok = r.b && r.b.ok;
+        tell((r.b && r.b.message) || (ok ? "Saved." : "Couldn’t save. Please try again."), !ok);
+        if (ok) changed = true;
+        return r.b || {};
+      });
+    }
+    function sec(title, hint) {
+      var el = h("section", { class: "hvb-panel__sec" }, h("h3", null, title), hint ? h("p", { class: "is-muted" }, hint) : null);
+      body.appendChild(el);
+      return el;
+    }
+    function field(label, ctl) { return h("label", { class: "hvb-field" }, label, ctl); }
+
+    call("GET", "/api/board/selection-manage?s=" + encodeURIComponent(it.key)).then(function (r) {
+      body.textContent = "";
+      body.removeAttribute("aria-busy");
+      var M = r.b;
+      if (!M || !M.ok) {
+        body.appendChild(h("p", { class: "is-muted", role: "status" }, (M && M.message) || "Couldn’t load this selection. Close this and try again."));
+        return;
+      }
+      body.appendChild(live);
+      var C = M.can;
+      if (C.stage) {
+        var S = sec("Stage", M.by_hand ? "Set by hand. It no longer follows its quote and campaigns." : "");
+        var to = h("select", null, M.stages.map(function (x) { return h("option", { value: x.key, selected: x.key === M.stage || null }, x.label); }));
+        var why = h("input", { type: "text", maxlength: "300", placeholder: "Needed when moving back or skipping a stage" });
+        var go = h("button", { type: "button", class: "hvb-btn" }, "Move");
+        go.addEventListener("click", function () {
+          send({ do: "stage", to: to.value, reason: why.value }, go).then(function (j) {
+            if (j.need_reason) why.focus();
+            if (j.ok) { M.stage = j.stage; why.value = ""; }
+          });
+        });
+        S.appendChild(field("Move to", to)); S.appendChild(field("Reason", why)); S.appendChild(go);
+      }
+      if (C.meta) {
+        var N = sec("Next step", "The next step and due date show on the card, clients included. Notes stay internal.");
+        var nt = h("input", { type: "text", maxlength: "200", value: M.next_text || "" });
+        var nd = h("input", { type: "date", value: M.next_due ? ymd(M.next_due) : "" });
+        var no = h("textarea", { rows: "4", maxlength: "2000" });
+        no.value = M.notes || "";
+        var sv = h("button", { type: "button", class: "hvb-btn" }, "Save");
+        sv.addEventListener("click", function () { send({ do: "meta", next_text: nt.value, next_due: nd.value, notes: no.value }, sv); });
+        N.appendChild(field("What happens next", nt)); N.appendChild(field("Due", nd)); N.appendChild(field("Internal notes", no)); N.appendChild(sv);
+      }
+      if (C.kam && M.kam_options) {
+        var K = sec("Account manager");
+        var ks = h("select", null, [h("option", { value: "" }, "Pick an account manager")].concat(M.kam_options.map(function (o) {
+          return h("option", { value: o.email, selected: o.email === M.kam || null }, o.name || o.email); })));
+        var kb = h("button", { type: "button", class: "hvb-btn" }, "Assign");
+        kb.addEventListener("click", function () {
+          kb.disabled = true; tell("Saving…");
+          call("POST", "/api/hub/assign-kam", { kind: "selection", ref: M.id, kam: ks.value }).then(function (x) {
+            kb.disabled = false;
+            var ok = x.b && x.b.ok;
+            tell((x.b && x.b.message) || (ok ? "Assigned." : "Couldn’t assign."), !ok);
+            if (ok) changed = true;
+          });
+        });
+        K.appendChild(field("Who follows it", ks)); K.appendChild(kb);
+      }
+      if (C.visibility) {
+        var V = sec("Client visibility", "Hiding takes it off the client’s boards. A link already shared keeps working until you revoke it.");
+        var vb = h("input", { type: "checkbox", checked: M.hidden || null });
+        vb.addEventListener("change", function () {
+          vb.disabled = true;
+          send({ do: "visibility", hidden: vb.checked }).then(function (j) { vb.disabled = false; if (!j.ok) vb.checked = !vb.checked; });
+        });
+        V.appendChild(h("label", { class: "hvb-mg__check" }, vb, "Hide from the client"));
+      }
+      if (C.archive || C.delete) {
+        var L = sec("Archive or delete");
+        if (C.archive) {
+          var ab = h("button", { type: "button", class: "hvb-tool" }, "Archive this selection");
+          ab.addEventListener("click", function () {
+            if (!confirm("Archive " + it.name + "? You can bring it back from the admin archive.")) return;
+            send({ do: "archive" }, ab).then(function (j) { if (j.ok) close(); });
+          });
+          L.appendChild(ab);
+        }
+        if (C.delete) {
+          var dn = h("input", { type: "text", autocomplete: "off" });
+          var db = h("button", { type: "button", class: "hvb-mg__del", disabled: true }, "Delete forever");
+          var norm = function (x) { return String(x || "").replace(/\s+/g, " ").trim().toLowerCase(); };
+          dn.addEventListener("input", function () { db.disabled = norm(dn.value) !== norm(M.name); });
+          db.addEventListener("click", function () { send({ do: "delete", confirm: dn.value }, db).then(function (j) { if (j.ok) close(); }); });
+          L.appendChild(field("Type “" + M.name + "” to delete it", dn));
+          L.appendChild(db);
+        }
+      }
+    });
+  }
+
   function card(it, B) {
     var can = it.moves.length > 0;
     var open = B.isOpen(it.key);
@@ -1059,7 +1202,9 @@
     function drawCount() {
       var n = shown().length;
       count.textContent = "";
-      count.appendChild(document.createTextNode("Showing " + n + " of " + items.length + " " + (items.length === 1 ? noun : plural(noun))));
+      var hiddenTests = F.tests !== false && !F.q ? items.filter(function (it) { return isTest(it) && !it.demo; }).length : 0;
+      count.appendChild(document.createTextNode("Showing " + n + " of " + items.length + " " + (items.length === 1 ? noun : plural(noun))
+        + (hiddenTests ? " (" + hiddenTests + (hiddenTests === 1 ? " test" : " tests") + " hidden)" : "")));
       if (activeFilters()) count.appendChild(clearBtn);
     }
     function testChip() {

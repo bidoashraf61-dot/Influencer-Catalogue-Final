@@ -7654,6 +7654,8 @@ def main():
     evidence.init()
     import intel_board
     intel_board.init()                      # the Intelligence board's hand-set stages (item 313)
+    import sel_manage
+    sel_manage.init()                       # the Manage drawer: next step, notes, visibility, hand-set stage (item 331)
     import push
     push.init()
     apify.start_scheduler()

@@ -457,6 +457,11 @@ class PortalMixin(connect_api.ConnectMixin):
             else:
                 self.send_json(200, dict(board.brief_view(self, k), ok=True), self.cors() + [("Cache-Control", "no-store")])
             return True
+        if path == "/api/board/selection-manage":
+            import sel_manage
+            status, body = sel_manage.view(self, str(query.get("s") or ""))
+            self.send_json(status, body, self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path == "/api/evidence/board":
             # The Helvi Intelligence board (item 313): competitor studies by stage, scoped like the campaign board.
             import intel_board
@@ -696,6 +701,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/board/selection-stage": self.api_board_selection_stage,
             "/api/evidence/board/stage": self.api_intel_stage,
             "/api/board/selection-archive": self.api_board_selection_archive,
+            "/api/board/selection-manage": self.api_board_selection_manage,
             "/api/analysis/decide": self.api_analysis_decide,
             "/api/board/edit": self.api_board_edit, "/api/board/logo": self.api_board_logo,
             "/api/board/detach": self.api_board_detach, "/api/board/save": self.api_board_save, "/api/board/plan": self.api_board_plan,
@@ -1344,6 +1350,14 @@ class PortalMixin(connect_api.ConnectMixin):
         history.set_actor(board._me(self) or "client")
         ok, msg, extra = board.move_selection(self, sel, str(b.get("to") or ""))
         self._board_done(ok, msg, extra)
+
+    def api_board_selection_manage(self):
+        """{s, do, ...}: the Manage drawer's actions; sel_manage.act checks who may do what (item 331)."""
+        import sel_manage
+        if self._throttled("selmanage:%s" % (self.client_address[0] if hasattr(self, "client_address") else ""), 240, 3600):
+            return
+        status, body = sel_manage.act(self, self.json_body() or {})
+        self.send_json(status, body, self.cors())
 
     def api_board_selection_archive(self):
         """{tokens: [...]}: an admin archives several selections from the Select table (up to 100). Archiving is

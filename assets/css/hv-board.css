@@ -844,3 +844,18 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
 .hvb-clear { min-height: 36px; }
 @media (max-width: 640px) { .mb-chip { padding-right: 12px; } .mb-chip b { font-size: 18px; } }
 @media (max-width: 760px) { .mb-cover .mb-chips { grid-area: auto; grid-column: 1 / -1; margin-bottom: 16px; } }
+
+/* ---- The Manage drawer (item 331) ---- */
+.hvb-mg__name { grid-column: 1 / -1; margin: 0; font-size: 14px; color: var(--gray); overflow-wrap: anywhere; }
+.hvb-field textarea { width: 100%; padding: 10px 14px; border: 1px solid rgba(18,18,18,.2); border-radius: var(--r-sm); background: var(--white); color: var(--ink);
+  font: 400 15px/1.45 var(--body); letter-spacing: 0; text-transform: none; resize: vertical; }
+.hvb-field textarea:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(232,255,118,.9); }
+.hvb-mg__check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; cursor: pointer; }
+.hvb-mg__check input { width: 22px; height: 22px; accent-color: var(--ink); }
+.hvb-mg__del { justify-self: start; min-height: 44px; padding: 0 22px; border: 1px solid #b3261e; border-radius: var(--r-pill); background: var(--white); color: #b3261e; font: 600 14px/1 var(--body); cursor: pointer; }
+.hvb-mg__del:not(:disabled):hover { background: #b3261e; color: var(--white); }
+.hvb-mg__del:disabled { opacity: .55; cursor: not-allowed; }
+.hvb-mg__del:focus-visible, .hvb-mg__check input:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+/* Audit 2026-11-04: the figures wrap instead of running under the character; each stage mark stays visible on the ink cover. */
+.mb-cover__stats { flex-wrap: wrap; }
+.mb-chip .hvb-stico { box-shadow: 0 0 0 1px rgba(255,255,255,.55); }

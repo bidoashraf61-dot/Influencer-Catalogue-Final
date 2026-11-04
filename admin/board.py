@@ -770,8 +770,11 @@ _SEL_FROM_QUOTE = {"approved": "approved", "live": "live", "completed": "complet
 _SEL_OPEN = ("draft", "requested", "ready")
 
 
-def selection_stage(sel, chip_key, creators=None):
-    """The column a selection sits in."""
+def selection_stage(sel, chip_key, creators=None, use_override=True):
+    """The column a selection sits in. A stage set by hand from the Manage drawer (item 331) wins over the rest."""
+    ov = sel["stage_override"] if use_override and "stage_override" in sel.keys() else None
+    if ov in STAGES:
+        return ov
     if chip_key in _SEL_FROM_QUOTE:
         return _SEL_FROM_QUOTE[chip_key]
     st = sel["stage"] if "stage" in sel.keys() else None
