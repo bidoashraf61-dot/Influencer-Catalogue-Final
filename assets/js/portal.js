@@ -3811,7 +3811,10 @@
         setTimeout(function () { launch.classList.remove("is-waving"); }, 1600);
         // The tip counts as seen once it has shown, so a quick page change does not repeat it.
         try { sessionStorage.setItem(tipKey, "1"); } catch (e) { /* private */ }
-        setTimeout(function () { if (!root.classList.contains("is-open")) hideNudge(true); }, 8000);
+        setTimeout(function () { if (!root.classList.contains("is-open")) hideNudge(true); }, 5000);
+        // The tip never sits over a board's controls: the first scroll or tap anywhere else dismisses it.
+        var away = function (e) { if (nudge.contains(e.target)) return; hideNudge(true); removeEventListener("scroll", away, true); document.removeEventListener("pointerdown", away, true); };
+        addEventListener("scroll", away, { capture: true, passive: true, once: true }); document.addEventListener("pointerdown", away, true);
       }, page === "campaign" ? 2800 : 1800);
     }
   }

@@ -158,15 +158,23 @@
       updated: c.updated_at, raw: c
     };
   }
+  // The button says what the link lets you do, by stage (never a bare "Open").
+  function selLabel(s, k) {
+    if (s.mine && k.review) return "Review " + k.review;
+    if (s.stage === "draft") return "Add creators";
+    if (s.stage === "shortlisting") return s.mine ? "Finish shortlist" : "Open selection";
+    if (s.stage === "live" || s.stage === "completed") return "See selection";
+    return "Open selection";
+  }
   // A selection from /api/account.
   function fromSelection(s, badge) {
     var k = s.counts || {};
     return {
       key: s.token, name: s.name, stage: s.stage, moves: s.moves || [], client: s.client || "",
       logos: (s.logos || []).map(function (u) { return u.charAt(0) === "@" ? API_BASE + u.slice(1) : u; }),
-      href: ROOT + "selection/#s=" + encodeURIComponent(s.token), open: s.mine && k.review ? "Review" : "Open selection",
+      href: ROOT + "selection/#s=" + encodeURIComponent(s.token), open: selLabel(s, k),
       key1: [String(k.creators || 0), k.creators === 1 ? "creator" : "creators"],
-      sels: [{ label: s.name, button: s.mine && k.review ? "Review" : "Open", href: ROOT + "selection/#s=" + encodeURIComponent(s.token) }],
+      sels: [{ label: s.name, button: selLabel(s, k), href: ROOT + "selection/#s=" + encodeURIComponent(s.token) }],
       dash: (s.campaigns || []).filter(function (c) { return c.live; }).map(function (c) { return ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token); })[0] || "",
       when: s.owner ? s.owner + "’s" : "", kam: s.kam || "", badge: badge || null,
       figures: [["Creators", String(k.creators || 0)], ["Approved", String(k.approved || 0)], ["To review", String(k.review || 0)]],
@@ -187,9 +195,9 @@
       key: String(st.id), name: st.title, stage: st.stage, moves: st.moves || [], client: st.client || "",
       logos: st.logos || [], href: map, open: map ? "Open study" : "",
       key1: [String(st.competitors || 0), st.competitors === 1 ? "competitor" : "competitors"],
-      sels: sel ? [{ label: sel.name, button: "Selection", href: ROOT + "selection/#s=" + encodeURIComponent(sel.token) }] : [],
+      sels: sel ? [{ label: sel.name, button: st.stage === "ready" ? "Selection · share" : "Selection", href: ROOT + "selection/#s=" + encodeURIComponent(sel.token) }] : [],
       dash: (st.campaigns || []).filter(function (c) { return c.live; }).map(function (c) { return ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token); })[0] || "",
-      when: st.manual ? "Moved by hand" : "", kam: st.kam || "", badge: st.visible ? null : h("span", { class: "lc-chip lc-chip--draft" }, h("i", { "aria-hidden": "true" }), "Staff only"),
+      when: st.manual ? "Moved by hand" : (st.posts ? big(st.posts) + " posts read" : ""), kam: st.kam || "", badge: st.visible ? null : h("span", { class: "lc-chip lc-chip--draft" }, h("i", { "aria-hidden": "true" }), "Staff only"),
       figures: [["Posts", String(st.posts || 0)], ["Creators", String(st.creators || 0)], ["On roster", String(st.matched || 0)]],
       links: (sel ? [{ label: sel.name, sub: "Selection", live: false, href: ROOT + "selection/#s=" + encodeURIComponent(sel.token) }] : [])
         .concat((st.campaigns || []).map(function (c) {
@@ -900,6 +908,23 @@
       clearTimeout(B.sayT); B.sayT = setTimeout(function () { status.className = "hvb-say"; }, 6000);
     };
     var items = opts.items.slice();
+    // Same title, client and stage: tell the copies apart by their date (and a number when the date matches too).
+    (function () {
+      var g = {};
+      items.forEach(function (it) { var k = [it.name, it.client, it.stage].join("|"); (g[k] = g[k] || []).push(it); });
+      Object.keys(g).forEach(function (k) {
+        if (g[k].length < 2) return;
+        var seen = {};
+        g[k].forEach(function (it) {
+          var d = it.updated ? dm(it.updated) : "";
+          var tag = d || "#" + (Object.keys(seen).length + 1);
+          seen[tag] = (seen[tag] || 0) + 1;
+          it.name = it.name + " · " + tag + (seen[tag] > 1 ? " #" + seen[tag] : "");
+        });
+      });
+    })();
+    function isTest(it) { return /(^|[^a-z])(test|qa)([^a-z]|$)/i.test(it.name + " " + (it.client || "")); }
+    function isStale(it) { return !!it.updated && (it.stage === "draft" || it.stage === "shortlisting") && Date.now() / 1000 - it.updated > 14 * 86400; }
     var lanes = {}, tabs = {};
 
     var root = h("div", { class: "hvb" });
@@ -912,18 +937,20 @@
       draw();
     });
     // Item 200: Group by client — one band per client across the six stages (a toggle, remembered).
-    B.group = !!remember("hvb-group-" + noun, false);
+    var gRaw = null; try { gRaw = localStorage.getItem("hvb-group-" + noun); } catch (e) { /* private mode */ }
+    // A long board with several clients opens grouped by client; the choice is then remembered.
+    B.group = gRaw === null ? (function () { var o = {}; opts.items.forEach(function (x) { if (x.client) o[x.client] = 1; }); return opts.items.length > 30 && Object.keys(o).length >= 4; })() : gRaw === "true";
     var grpBtn = h("button", { type: "button", class: "hvb-tool hvb-tool--switch", "aria-pressed": B.group ? "true" : "false" }, h("i", { "aria-hidden": "true" }), "Group by client");
     grpBtn.addEventListener("click", function () {
       B.group = !B.group; keep("hvb-group-" + noun, B.group);
       grpBtn.setAttribute("aria-pressed", B.group ? "true" : "false");
       if (opts.view === "table") table(); else draw();
     });
-    // Item 205: search and filters (this visit only): text, client, account manager, Mine, Pinned, Overdue.
-    var F = { q: "", client: "", kam: "", chips: {} };
-    try { F = JSON.parse(sessionStorage.getItem("hvb-filter-" + noun) || "null") || F; } catch (e) { /* blocked */ }
+    // Item 205: search and filters (remembered in this browser): text, client, account manager, Mine, Pinned, Overdue.
+    var F = { q: "", client: "", kam: "", chips: {}, tests: true };
+    try { F = JSON.parse(localStorage.getItem("hvb-filter-" + noun) || "null") || F; } catch (e) { /* blocked */ }
     F.chips = F.chips || {};
-    function keepF() { try { sessionStorage.setItem("hvb-filter-" + noun, JSON.stringify(F)); } catch (e) { /* blocked */ } }
+    function keepF() { try { localStorage.setItem("hvb-filter-" + noun, JSON.stringify(F)); } catch (e) { /* blocked */ } }
     function uniq(f) { var o = {}; items.forEach(function (x) { var v = f(x); if (v) o[v] = 1; }); return Object.keys(o).sort(); }
     var me = (opts.me || "").toLowerCase();
     function shown() {
@@ -935,6 +962,11 @@
         if (F.chips.mine && !(it.kamEmail && it.kamEmail === me)) return false;
         if (F.chips.pinned && !it.pinned) return false;
         if (F.chips.overdue && !(it.next && it.next.overdue)) return false;
+        if (F.chips.behind && !(it.track && it.track.grade !== "good")) return false;
+        if (F.chips.review && !/^Review/.test(it.open || "")) return false;
+        if (F.chips.stale && !isStale(it)) return false;
+        if (F.chips.golive && it.stage !== "approved") return false;
+        if (F.tests !== false && !F.q && isTest(it) && !it.demo) return false;
         return true;
       });
     }
@@ -965,7 +997,37 @@
       picker("All account managers", "kam", uniq(function (x) { return x.kam; })),
       chip("mine", "Mine", !!me && items.some(function (x) { return x.kamEmail; })),
       chip("pinned", "Pinned", !!opts.onPin),
-      chip("overdue", "Overdue", items.some(function (x) { return x.next && x.next.due; })));
+      chip("overdue", "Overdue", items.some(function (x) { return x.next && x.next.due; })),
+      items.some(isTest) ? testChip() : null);
+    function testChip() {
+      var b = h("button", { type: "button", class: "hvb-chipf", "aria-pressed": F.tests !== false ? "true" : "false", title: "Hide test, QA and sample items" }, "Hide tests");
+      b.addEventListener("click", function () { F.tests = F.tests === false; keepF(); b.setAttribute("aria-pressed", F.tests !== false ? "true" : "false"); redraw(); });
+      return b;
+    }
+    // "Needs you": one strip of what is waiting on this person, each a tap that filters the board to it.
+    var NEED = [
+      ["overdue", "overdue", function (it) { return it.next && it.next.overdue; }],
+      ["behind", "behind target", function (it) { return it.track && it.track.grade !== "good"; }],
+      ["review", "to review", function (it) { return /^Review/.test(it.open || ""); }],
+      ["golive", "to set live", function (it) { return it.stage === "approved"; }],
+      ["stale", "idle 14+ days", isStale]];
+    var need = h("div", { class: "hvb-need", role: "group", "aria-label": "Needs you" });
+    function drawNeed() {
+      need.textContent = "";
+      var any = false;
+      NEED.forEach(function (n) {
+        var c = items.filter(function (it) { return n[2](it) && (F.tests === false || !isTest(it) || it.demo); }).length;
+        if (!c && !F.chips[n[0]]) return;
+        any = true;
+        var b = h("button", { type: "button", class: "hvb-need__b", "aria-pressed": F.chips[n[0]] ? "true" : "false" }, h("b", null, String(c)), " " + n[1]);
+        b.addEventListener("click", function () {
+          F.chips[n[0]] = !F.chips[n[0]]; if (!F.chips[n[0]]) delete F.chips[n[0]]; keepF(); redraw();
+        });
+        need.appendChild(b);
+      });
+      if (any) need.insertBefore(h("span", { class: "hvb-need__t" }, "Needs you"), need.firstChild);
+      need.hidden = !any;
+    }
     var tools = h("div", { class: "hvb-tools" });
     if (opts.tools) add(tools, opts.tools);
     tools.appendChild(h("span", { class: "hvb-tools__gap" }));
@@ -1005,6 +1067,7 @@
     var tbl = h("div", { class: "hvb-table" });
     root.appendChild(status);
     root.appendChild(tools);
+    root.appendChild(need);
     root.appendChild(filters);
     root.appendChild(tabBar);
     // One scroller holds the stage heads and the client bands, so they slide sideways together.
@@ -1019,8 +1082,10 @@
       var cols = [];
       opts.stages.forEach(function (s) {
         var L = lanes[s.key], list = by[s.key] || [];
+        // The stalest shortlists first (pinned ones stay on top), so the oldest ask for attention.
+        if (s.key === "shortlisting") list.sort(function (a, b) { return (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || (a.updated || 0) - (b.updated || 0); });
         list.forEach(function (it) { L.cards.appendChild(card(it, B)); });
-        if (!list.length) L.cards.appendChild(h("p", { class: "hvb-empty" }, list0.length < items.length ? "None match" : "No " + plural(noun) + " here"));
+        if (!list.length) L.cards.appendChild(h("p", { class: "hvb-empty" }, (list0.length < items.length && (F.q || F.client || F.kam || Object.keys(F.chips).length)) ? "None match" : (opts.empty && opts.empty[s.key]) || "No " + plural(noun) + " here"));
         L.count.textContent = String(list.length);
         tabs[s.key].querySelector("b").textContent = String(list.length);
         var folded = !!FOLD[s.key];
@@ -1261,7 +1326,7 @@
       }, 80);
     }, { passive: true });
 
-    function redraw() { if (opts.view === "table") table(); else draw(); }
+    function redraw() { drawNeed(); if (opts.view === "table") table(); else draw(); }
     redraw();
     host.appendChild(root);
     dockRoom(root, tools);
@@ -1344,7 +1409,7 @@
     var counts = {}, max = 0;
     (o.items || []).forEach(function (it) { counts[it.stage] = (counts[it.stage] || 0) + 1; });
     (o.stages || []).forEach(function (st) { max = Math.max(max, counts[st.key] || 0); });
-    var pipe = h("ol", { class: "mb-pipe", role: "img", "aria-label": "By stage: " + (o.stages || []).map(function (st) { return st.label + " " + (counts[st.key] || 0); }).join(", ") });
+    var pipe = h("ol", { class: "mb-pipe" + ((o.stages || []).length <= 4 ? " mb-pipe--few" : ""), role: "img", "aria-label": "By stage: " + (o.stages || []).map(function (st) { return st.label + " " + (counts[st.key] || 0); }).join(", ") });
     (o.stages || []).forEach(function (st) {
       var n = counts[st.key] || 0;
       var bar = h("span", { class: "mb-pipe__bar" + (HOT[st.key] ? " is-hot" : "") + (n ? "" : " is-zero") });

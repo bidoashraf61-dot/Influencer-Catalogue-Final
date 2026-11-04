@@ -199,11 +199,12 @@
     if (window.HVBoard && HVBoard.cover && $("mb-cover")) {
       var views = list.reduce(function (n, c) { return n + ((c.numbers || {}).views || 0); }, 0);
       var live = list.filter(function (c) { return c.stage === "live"; }).length;
+      var overdue = list.filter(function (c) { return c.next && c.next.overdue; }).length;
       $("mx-list").classList.add("mx-list--covered");
       HVBoard.cover($("mb-cover"), {
         mod: "track", title: BOARD.role === "client" ? "My campaigns" : "Campaigns", stages: BOARD.stages, items: list,
         lede: $("mx-list-lede").textContent,
-        stats: [[list.length, list.length === 1 ? "campaign" : "campaigns"], [live, "live now"], [views, "views so far"]]
+        stats: [[list.length, list.length === 1 ? "campaign" : "campaigns"], [live, "live now"], [views, "views so far"]].concat(overdue ? [[overdue, "overdue"]] : [])
       });
     }
     if (window.HVBoard) {

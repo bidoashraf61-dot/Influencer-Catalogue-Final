@@ -788,3 +788,29 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
 /* Audit 2026-11-03: 44px controls on phones (view switch, Activity on collapsed cards). */
 @media (max-width: 640px) { .hvb-view button { min-height: 44px; } }
 @media (pointer: coarse) { .hvb-card.is-collapsed .hvb-actb { width: 44px; height: 44px; margin: -8px -6px; } }
+
+/* ---- Board review 2026-11-04: needs-you strip, phone cover, compact switcher ---- */
+.hvb-need { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; padding: 10px 12px; background: var(--linen, #f4efe9); border-radius: 16px; }
+.hvb-need[hidden] { display: none; }
+.hvb-need__t { font-family: var(--heading); font-size: 17px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); margin-right: 4px; }
+.hvb-need__b { min-height: 44px; padding: 0 16px; border: 1px solid var(--ink); border-radius: var(--r-pill); background: var(--white); color: var(--ink); font: 600 14px/1 var(--body, inherit); cursor: pointer; }
+.hvb-need__b b { font-family: var(--heading); font-size: 20px; margin-right: 4px; color: var(--vivid-red); }
+.hvb-need__b:hover { background: var(--ink); color: var(--white); }
+.hvb-need__b[aria-pressed="true"] { background: var(--ink); color: var(--lime); }
+.hvb-need__b[aria-pressed="true"] b { color: var(--lime); }
+.hvb-need__b:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+@media (max-width: 640px) {
+  /* phones: the intro line goes (the figures and the stages say it), the stat row wraps instead of scrolling,
+     and the two modules you are not on show only their face */
+  .mb-cover__lede { display: none; }
+  .mb-cover__stats { flex-wrap: wrap; }
+  .hv-mod:not([aria-current="page"]) span { display: none; }
+  .hv-mod { min-width: 48px; min-height: 48px; }
+  .hv-mod[aria-current="page"] { min-width: 72px; }
+}
+@media (max-width: 640px) {
+  /* the stage strip fits the screen (labels wrap) instead of scrolling sideways */
+  .mb-pipe { overflow: visible; grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-columns: auto; gap: 10px 6px; padding-bottom: 0; }
+  .mb-pipe__lab { font-size: 12px; line-height: 1.15; text-align: center; white-space: nowrap; }
+}
+@media (max-width: 640px) { .mb-pipe.mb-pipe--few { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
