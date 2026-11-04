@@ -2710,3 +2710,10 @@ html:not(.hv-shared) [data-page="selection"] .cat-cover__nav .cat-hero__logo { w
 html:not(.hv-shared) [data-page="selection"] .cat-cover__nav .hv-mod { min-height: 40px; padding-inline-end: 14px; gap: 7px; font-size: 16px; }
 html:not(.hv-shared) [data-page="selection"] .cat-cover__nav .hv-mod img { width: 34px; height: 34px; }
 html:not(.hv-shared) [data-page="selection"] .cat-selhead__foot .cat-back[hidden] { display: inline-flex !important; }
+
+/* Same header on the pages that share it: logo, modules right beside it, then the rest at the far end (Bido 2026-11-04). */
+@media (min-width: 900px) {
+  :is([data-page="selection"], [data-page="selections"], [data-page="intelligence"], [data-page="account"], [data-page="workspace"]) .cat-topbar:has(.hv-mods) { justify-content: flex-start; gap: 20px; }
+  :is([data-page="selection"], [data-page="selections"], [data-page="intelligence"], [data-page="account"], [data-page="workspace"]) .cat-topbar__links:has(.hv-mods) { flex: 1 1 auto; min-width: 0; }
+  :is([data-page="selection"], [data-page="selections"], [data-page="intelligence"], [data-page="account"], [data-page="workspace"]) .cat-topbar__links .hv-mods { order: -1; margin-inline-end: auto; }
+}

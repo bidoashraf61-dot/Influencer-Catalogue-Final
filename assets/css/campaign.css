@@ -1425,3 +1425,14 @@ body[data-only] #mx-report .mx-sec:not(.is-only) { display: none !important; }
   .mx-csbar .mx-cs { flex: 1 1 100%; width: 100%; }
   .mx-csbar .mx-cs > :first-child { width: 100%; justify-content: space-between; }
 }
+
+/* Header, final shape (Bido 2026-11-04): modules right beside the logo, the account stays at the far end, and the page's
+   buttons are their own linen band beneath. The floating account dock sits higher so it never meets the band. */
+.mx-top__in { justify-content: flex-start; flex-wrap: nowrap; gap: 20px; }
+.mx-top__links { flex: 1 1 auto; min-width: 0; }
+.mx-top .pt-dock--fixed, body:has(.mx-top) .pt-dock--fixed { top: 5px; }
+.mx-csbar { background: var(--linen); padding-top: 6px; padding-bottom: 6px; }
+@media (max-width: 640px) {
+  .mx-top__in { flex-wrap: wrap; gap: 10px; }
+  .mx-top__links { flex-basis: 100%; }
+}
