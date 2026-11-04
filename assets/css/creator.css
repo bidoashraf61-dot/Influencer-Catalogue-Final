@@ -636,3 +636,10 @@ html.pp-printing .pp-post__media[data-live] > .pp-post__none { visibility: visib
 .pp-id .pp-key dt { letter-spacing: .04em; line-height: 1.25; overflow-wrap: normal; word-break: normal; }
 .pp-id .pp-key dd { font-size: clamp(20px, 22cqi, 34px); min-width: 0; }
 .pp-id .pp-key dd > * { max-width: 100%; }
+
+/* Middle widths (the side panel, tablets): the three figure cards run under the photo and the details as one row,
+   so they never stack into a tall column beside an empty photo column; the photo ends where the handles end. */
+@media (min-width: 821px) and (max-width: 1180px) {
+  .pp-id .pp-photo { grid-row: 1 / span 4; }
+  .pp-id .pp-key { grid-column: 1 / 3; margin-top: 20px; }
+}
