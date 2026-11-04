@@ -628,8 +628,11 @@ html.hv-shared .pp-top { display: none; }
 html.pp-printing .pp-post__media[data-live] { animation: none !important; background-image: none !important; }
 html.pp-printing .pp-post__media[data-live] > .pp-post__none { visibility: visible !important; }
 
-/* Fix 2026-11-04: the three gold figure cards never crop their text. Each card sizes its own type from its own
-   width (container units), the label tracks tighter and may break inside a long word, and the tag drops below. */
-.pp-id .pp-key div { min-width: 0; container-type: inline-size; }
-.pp-id .pp-key dt { letter-spacing: .04em; overflow-wrap: anywhere; line-height: 1.25; }
-.pp-id .pp-key dd { font-size: clamp(20px, 22cqi, 34px); min-width: 0; overflow-wrap: anywhere; }
+/* Fix 2026-11-04 (round 2): the three gold figure cards never crop. They sit in the middle column of the hero, which
+   can be as narrow as 250px (the side panel, tablets), so the row wraps (two across, then one) instead of squeezing
+   each card to 77px; labels keep whole words, and each figure sizes itself from its own card's width. */
+.pp-id .pp-key { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.pp-id .pp-key div { min-width: 0; container-type: inline-size; padding: 12px; }
+.pp-id .pp-key dt { letter-spacing: .04em; line-height: 1.25; overflow-wrap: normal; word-break: normal; }
+.pp-id .pp-key dd { font-size: clamp(20px, 22cqi, 34px); min-width: 0; }
+.pp-id .pp-key dd > * { max-width: 100%; }
