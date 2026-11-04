@@ -1439,3 +1439,21 @@ body[data-only] #mx-report .mx-sec:not(.is-only) { display: none !important; }
 
 /* A report is one campaign's page: the three module switches stay off its header (Bido 2026-11-04). The board keeps them. */
 body:has(#mx-report:not([hidden])) .mx-top .hv-mods { display: none; }
+
+/* A report's header is one white row: logo, the way back, the switcher and the buttons (Bido 2026-11-04). .mx-top__in already
+   keeps the floating account dock's space at its end; on a narrow window the buttons wrap inside the same white block. */
+body:has(#mx-report:not([hidden])) .mx-top__links { display: none; }
+.mx-top .mx-csbar { flex: 1 1 auto; min-width: 0; background: none; padding: 0; gap: 8px 10px; }
+body:has(#mx-report:not([hidden])) .mx-top { padding-top: 12px; padding-bottom: 12px; }
+.mx-top .mx-csbar[hidden] { display: none; }
+.mx-top .mx-csbar .mx-cs { min-width: 0; order: 1; }
+.mx-top .mx-csbar .mx-csbar__acts { order: 2; }
+.mx-top .mx-csbar .mx-cs__cur { display: block; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px) {
+  .mx-top .mx-csbar { flex-basis: 100%; }
+  /* Phones: way back + switcher on one line, Share + dashboard on the next. */
+  .mx-top .mx-csbar .mx-cs { flex: 1 1 0; width: auto; }
+  .mx-top .mx-csbar .mx-cs__cur { max-width: none; }
+  .mx-top .mx-csbar .mx-csbar__acts { grid-template-columns: auto minmax(0, 1fr); }
+  .mx-top .mx-csbar .mx-csbar__acts .mx-dash { grid-column: auto; }
+}

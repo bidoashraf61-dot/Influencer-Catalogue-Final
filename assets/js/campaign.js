@@ -113,8 +113,11 @@
     $("mx-empty").hidden = which !== "empty";
     // "Back to dashboard" belongs to one campaign's report, not to the list.
     if (which !== "report") $("mx-dash").hidden = true;
-    // On a report the header holds the logo and the modules; its buttons sit on the row beneath (Bido 2026-11-04).
+    // On a report the logo, the way back and every button share one white row (Bido 2026-11-04).
+    var bar = $("mx-csbar");
+    if (bar) bar.hidden = which !== "report";
     if (which === "report") {
+      reportBar().hidden = false;
       var acts = reportActs();
       acts.appendChild($("mx-catalogue")); acts.appendChild($("mx-dash"));
       var shareBtn = document.querySelector(".mx-top__links .rs-share");
@@ -266,11 +269,10 @@
     var bar = $("mx-csbar");
     if (!bar) {
       bar = document.createElement("div");
-      bar.className = "cat-pad mx-csbar";
-      bar.innerHTML = '<div class="cat-container mx-csbar__in" id="mx-csbar"><a class="mx-csbar__back" href="#list">' + SVG.arrow + "Campaign board</a></div>";
-      var bug = document.querySelector("#mx-report .mx-bug");
-      bug.parentNode.insertBefore(bar, bug);
-      bar = $("mx-csbar");
+      bar.className = "mx-csbar mx-csbar__in"; bar.id = "mx-csbar";
+      bar.innerHTML = '<a class="mx-csbar__back" href="#list">' + SVG.arrow + "Campaign board</a>";
+      var logo = document.querySelector(".mx-top__logo");
+      logo.parentNode.insertBefore(bar, logo.nextSibling);
     }
     return bar;
   }
