@@ -80,6 +80,7 @@
       if (r.s === 403) { if (!(r.b && r.b.code)) closed("Selections are for signed-in clients", "Sign in with your work email to see every selection on one board."); else refused(r.b); return; }
       if (!r.b.ok) { closed("Something went wrong", "Your selections couldn't be loaded. Please try again shortly."); return; }
       var list = r.b.selections || [];
+      var isAdmin = !!(r.b.is_admin || r.b.admin || r.b.role === "admin");
       var studies = list.filter(function (s) { return s.study; }).length;
       var creators = list.reduce(function (n, s) { return n + ((s.counts || {}).creators || 0); }, 0);
       HVBoard.cover($("mb-cover"), {
@@ -99,6 +100,9 @@
           tools: HVBoard.viewSwitch("selections", view, function () { draw(); }),
           items: list.map(function (s) { return HVBoard.fromSelection(s, chip(s.quote)); }),
           say: say,
+          bulk: isAdmin ? { archive: function (picked) {
+            return api("POST", "/api/board/selection-archive", { tokens: picked.map(function (x) { return x.key; }) }).then(function (x) { return x.b || {}; });
+          } } : null,
           onMove: function (it, to) {
             return api("POST", "/api/board/selection-stage", { s: it.key, to: to }).then(function (x) {
               if (x.b && x.b.ok) {
@@ -141,6 +145,23 @@
           stages: B.stages, noun: "study", empty: { requested: "Nothing requested. Ask HelloVoice to study a competitor.", running: "No study is being captured." }, locked: B.can_move ? [] : B.stages.map(function (s) { return s.key; }), view: view,
           tools: HVBoard.viewSwitch("intelligence", view, function () { draw(); }, ["board", "table"]),
           items: list.map(HVBoard.fromStudy), me: B.me || "",
+          extra: B.can_move ? function (it) {
+            var st = list.filter(function (y) { return String(y.id) === it.key; })[0];
+            if (!st || !st.selection || st.stage !== "ready") return null;
+            var b = document.createElement("button");
+            b.type = "button"; b.className = "hvb-tool hvb-linkbtn"; b.textContent = "Create client link";
+            b.addEventListener("click", function () {
+              b.disabled = true; b.textContent = "Making…";
+              api("POST", "/api/report/shares", { kind: "study", ref: st.selection.token, label: "", days: 30 }).then(function (x) {
+                var u = x.b && x.b.link && x.b.link.url;
+                if (!u) { b.disabled = false; b.textContent = "Create client link"; say((x.b && x.b.message) || "Couldn’t make the link. Please try again.", true); return; }
+                var done = function () { b.textContent = "Link copied · 30 days"; say("Client link made and copied. It opens " + st.title + " for 30 days.", false); };
+                (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(done, function () { b.textContent = "Link made"; say("Client link: " + u, false); });
+                st.stage = "shared"; it.stage = "shared";
+              });
+            });
+            return b;
+          } : null,
           say: say,
           onMove: function (it, to) {
             return api("POST", "/api/evidence/board/stage", { id: Number(it.key), to: to }).then(function (x) {

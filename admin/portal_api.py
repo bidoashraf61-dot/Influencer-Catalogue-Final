@@ -695,6 +695,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/board/pin": self.api_board_pin, "/api/board/attach": self.api_board_attach,
             "/api/board/selection-stage": self.api_board_selection_stage,
             "/api/evidence/board/stage": self.api_intel_stage,
+            "/api/board/selection-archive": self.api_board_selection_archive,
             "/api/analysis/decide": self.api_analysis_decide,
             "/api/board/edit": self.api_board_edit, "/api/board/logo": self.api_board_logo,
             "/api/board/detach": self.api_board_detach, "/api/board/save": self.api_board_save, "/api/board/plan": self.api_board_plan,
@@ -1343,6 +1344,31 @@ class PortalMixin(connect_api.ConnectMixin):
         history.set_actor(board._me(self) or "client")
         ok, msg, extra = board.move_selection(self, sel, str(b.get("to") or ""))
         self._board_done(ok, msg, extra)
+
+    def api_board_selection_archive(self):
+        """{tokens: [...]}: an admin archives several selections from the Select table (up to 100). Archiving is
+        reversible (Admin > Selections > Archive, and History), so nothing is erased."""
+        import board
+        import history
+        b = self.json_body() or {}
+        role, _ = board.viewer(self)
+        if role != "admin":
+            self.send_json(403, {"ok": False, "message": "Only a HelloVoice admin archives selections."}, self.cors())
+            return
+        toks = [str(t) for t in (b.get("tokens") or []) if t][:100]
+        if not toks:
+            self.send_json(400, {"ok": False, "message": "Pick at least one selection."}, self.cors())
+            return
+        history.set_actor(board._me(self) or "admin")
+        done = 0
+        for t in toks:
+            sel = db.selection(token=t)
+            if sel is None or sel["deleted_at"] or sel["archived_at"]:
+                continue
+            with history.tracked("selection", str(sel["id"]), "Archived selection %s from the board" % sel["name"]):
+                db.set_archived("selections", int(sel["id"]), True)
+            done += 1
+        self.send_json(200, {"ok": True, "archived": done, "message": "%d selection%s archived." % (done, "" if done == 1 else "s")}, self.cors())
 
     def api_intel_stage(self):
         """{id, to}: move a competitor study on the Intelligence board (item 313). Admins only; intel_board.move checks."""

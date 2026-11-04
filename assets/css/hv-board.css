@@ -814,3 +814,16 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
   .mb-pipe__lab { font-size: 12px; line-height: 1.15; text-align: center; white-space: nowrap; }
 }
 @media (max-width: 640px) { .mb-pipe.mb-pipe--few { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* ---- Board review round 2: who to book, bulk bar, table ticks, client-link button ---- */
+.hvb-book { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 10px; padding: 10px 12px; background: var(--linen, #f4efe9); border-radius: 12px; font-size: 14px; line-height: 1.35; color: var(--ink); }
+.hvb-book svg { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--vivid-red); }
+.hvb-book small { display: block; font-size: 12px; color: rgba(18,18,18,.72); }
+.hvb-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; padding: 10px 12px; background: var(--ink); border-radius: 16px; color: var(--white); }
+.hvb-bulk[hidden] { display: none; }
+.hvb-bulk__n { font-family: var(--heading); font-size: 18px; letter-spacing: .06em; text-transform: uppercase; margin-right: 6px; color: var(--lime); }
+.hvb-bulk .hvb-tool, .hvb-bulk .hvb-move select { background: var(--white); color: var(--ink); }
+.hvb-t__pick { width: 44px; text-align: center; }
+.hvb-t__pick input { width: 22px; height: 22px; accent-color: var(--ink); cursor: pointer; }
+.hvb-linkbtn { min-height: 44px; }
+.hvb-linkbtn:disabled { opacity: .7; cursor: progress; }

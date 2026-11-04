@@ -64,7 +64,11 @@ def _rows(conn):
         "(SELECT COUNT(*) FROM evidence_posts x WHERE x.pack_id = p.id AND x.views IS NOT NULL) n_measured, "
         "(SELECT COUNT(DISTINCT x.competitor) FROM evidence_posts x WHERE x.pack_id = p.id) n_comp, "
         "(SELECT COUNT(DISTINCT x.handle) FROM evidence_posts x WHERE x.pack_id = p.id) n_creators, "
-        "(SELECT COUNT(DISTINCT x.code) FROM evidence_posts x WHERE x.pack_id = p.id AND x.code IS NOT NULL) n_matched "
+        "(SELECT COUNT(DISTINCT x.code) FROM evidence_posts x WHERE x.pack_id = p.id AND x.code IS NOT NULL) n_matched, "
+        # "Who to book": the creator whose posts for the competitors drew the most views, and how many brands they serve.
+        "(SELECT json_object('handle', x.handle, 'name', MAX(x.name), 'code', MAX(x.code), 'views', SUM(x.views), "
+        "'brands', COUNT(DISTINCT x.competitor)) FROM evidence_posts x WHERE x.pack_id = p.id AND x.views IS NOT NULL "
+        "AND x.handle IS NOT NULL AND instr(lower(x.handle), lower(replace(x.competitor, ' ', ''))) = 0 GROUP BY x.handle ORDER BY SUM(x.views) DESC LIMIT 1) top "
         "FROM evidence_packs p LEFT JOIN selections s ON s.id = p.selection_id "
         "LEFT JOIN codes c ON c.id = p.code_id LEFT JOIN users u ON u.code_id = p.code_id "
         "LEFT JOIN evidence_stage st ON st.pack_id = p.id "
@@ -107,7 +111,16 @@ def card(r, role, shared_refs, logo_dir):
     # the admin's own view of the pack.
     opens = ("/market/#s=" + r["sel_token"]) if sel_ok else (
         "/workspace/#helvi-intelligence" if role == "client" else "/admin/evidence/view?id=%d" % r["id"])
-    return {"id": r["id"], "title": r["title"], "stage": stage, "opens": opens, "auto_stage": auto, "manual": stage != auto,
+    top = None
+    if role in ("admin", "team", "kam") and r["top"]:
+        try:
+            import json
+            t = json.loads(r["top"])
+            top = {"handle": t.get("handle") or "", "name": t.get("name") or "", "views": int(t.get("views") or 0),
+                   "brands": int(t.get("brands") or 0), "on_roster": bool(t.get("code"))}
+        except (ValueError, TypeError):
+            top = None
+    return {"id": r["id"], "top": top, "title": r["title"], "stage": stage, "opens": opens, "auto_stage": auto, "manual": stage != auto,
             "moves": [s for s in STAGES if s != stage] if role == "admin" else [],
             "client": client, "logos": logos[:1], "kam": r["kam"] or "",
             "selection": {"token": r["sel_token"], "name": r["sel_name"]} if r["sel_token"] and not r["sel_deleted"] else None,

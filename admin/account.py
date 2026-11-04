@@ -351,7 +351,7 @@ def summary(user, code_id, secret=b"", logo_dir=None):
             sel = None                      # its selection was deleted: the brief no longer opens it
         briefs.append({"id": b["id"], "can_delete": code_id != db.admin_code_id(), "summary": b["summary"], "objective": b["objective"], "source": b["source"],
                        "at": b["created_at"], "selection": sel["token"] if sel else None, "selection_name": sel["name"] if sel else None})
-    return {"user": profile(user), "completion": comp, "credits": portal.balance(code_id),
+    return {"is_admin": is_admin, "user": profile(user), "completion": comp, "credits": portal.balance(code_id),
             "monthly_credits": portal.monthly_allowance(user), "next_refill": _next_month(),
             "costs": portal.costs(), "kam": kam,
             "insights": insights, "campaigns": campaigns, "selections": selections,

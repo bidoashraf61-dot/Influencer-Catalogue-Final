@@ -199,6 +199,7 @@
       dash: (st.campaigns || []).filter(function (c) { return c.live; }).map(function (c) { return ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token); })[0] || "",
       when: st.manual ? "Moved by hand" : (st.posts ? big(st.posts) + " posts read" : ""), kam: st.kam || "", badge: st.visible ? null : h("span", { class: "lc-chip lc-chip--draft" }, h("i", { "aria-hidden": "true" }), "Staff only"),
       figures: [["Posts", String(st.posts || 0)], ["Creators", String(st.creators || 0)], ["On roster", String(st.matched || 0)]],
+      book: st.top && st.top.handle ? st.top : null,
       links: (sel ? [{ label: sel.name, sub: "Selection", live: false, href: ROOT + "selection/#s=" + encodeURIComponent(sel.token) }] : [])
         .concat((st.campaigns || []).map(function (c) {
           return { label: c.name, sub: c.live ? "Live" : "Campaign", live: c.live, href: c.live ? ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token) : ROOT + "campaign/" };
@@ -844,6 +845,12 @@
         it.demo ? h("span", { class: "hvb-tag hvb-tag--demo", title: "The team’s demo campaign" }, "Demo") : null,
         it.badge, meta ? h("span", null, meta) : null));
     }
+    if (it.book) {
+      var bk = it.book;
+      put(h("p", { class: "hvb-book", title: "The creator whose competitor posts drew the most views in this study" }, svg("spark"),
+        h("span", null, h("b", null, "Who to book: "), bk.name || ("@" + bk.handle), " ",
+          h("small", null, big(bk.views) + " views" + (bk.brands > 1 ? " across " + bk.brands + " brands" : "") + (bk.on_roster ? " · on our roster" : "")))));
+    }
     if (it.next) put(nextLine(it.next));
     if (it.suggest && it.canEdit && it.suggest.key !== "overdue") put(suggestLine(it, B));
     put(figures(it));
@@ -1193,6 +1200,45 @@
       return c;
     }
     function num(it, k) { var c = (it.raw && it.raw.counts) || {}; return c[k] || 0; }
+    // Bulk actions on the table (admins): tick rows, then move them to a stage or archive them.
+    var PICK = {};
+    function bulkBar(rows) {
+      var keys = Object.keys(PICK).filter(function (k) { return rows.some(function (x) { return x.key === k; }); });
+      var bar = h("div", { class: "hvb-bulk", role: "group", "aria-label": "Actions for the ticked rows" });
+      bar.hidden = !keys.length;
+      if (!keys.length) return bar;
+      var picked = rows.filter(function (x) { return PICK[x.key]; });
+      bar.appendChild(h("b", { class: "hvb-bulk__n" }, picked.length + " selected"));
+      var to = h("select", { "aria-label": "Move the ticked rows to" }, h("option", { value: "" }, "Move to…"));
+      opts.stages.forEach(function (st) { if (picked.some(function (x) { return x.moves.indexOf(st.key) >= 0; })) to.appendChild(h("option", { value: st.key }, st.label)); });
+      to.addEventListener("change", function () {
+        if (!to.value) return;
+        var k = to.value;
+        picked.forEach(function (x) { if (x.moves.indexOf(k) >= 0) B.move(x, k); });
+        PICK = {}; redraw();
+      });
+      bar.appendChild(h("label", { class: "hvb-move" }, to, svg("chev")));
+      if (opts.bulk && opts.bulk.archive) {
+        var ab = h("button", { type: "button", class: "hvb-tool" }, "Archive");
+        ab.addEventListener("click", function () {
+          if (!confirm("Archive " + picked.length + " " + (picked.length === 1 ? noun : plural(noun)) + "? You can bring them back from the admin archive.")) return;
+          ab.disabled = true;
+          opts.bulk.archive(picked).then(function (j) {
+            if (j && j.ok) {
+              var gone = {}; picked.forEach(function (x) { gone[x.key] = 1; });
+              items = items.filter(function (x) { return !gone[x.key]; });
+              opts.items = items; PICK = {}; B.say(j.message || "Archived.");
+              redraw();
+            } else { ab.disabled = false; B.say((j && j.message) || "Couldn’t archive. Please try again.", true); }
+          });
+        });
+        bar.appendChild(ab);
+      }
+      var cl = h("button", { type: "button", class: "hvb-tool" }, "Clear");
+      cl.addEventListener("click", function () { PICK = {}; redraw(); });
+      bar.appendChild(cl);
+      return bar;
+    }
     function table() {
       grid.hidden = tabBar.hidden = true;
       bands.textContent = "";
@@ -1205,6 +1251,13 @@
       });
       var t = h("table", { class: "hvb-t" });
       var tr = h("tr");
+      var canBulk = !!(opts.bulk && rows.some(function (x) { return x.moves.length; }));
+      if (canBulk) {
+        var allOn = rows.length && rows.every(function (x) { return PICK[x.key]; });
+        var allBox = h("input", { type: "checkbox", "aria-label": "Tick every row", checked: allOn || null });
+        allBox.addEventListener("change", function () { rows.forEach(function (x) { if (x.moves.length) { if (allBox.checked) PICK[x.key] = 1; else delete PICK[x.key]; } }); table(); });
+        tr.appendChild(h("th", { scope: "col", class: "hvb-t__pick" }, allBox));
+      }
       C.forEach(function (c) {
         if (!c.v) { tr.appendChild(h("th", { scope: "col" }, h("span", { class: "hvb-sr" }, "Open"))); return; }
         var on = c.k === SORT.k;
@@ -1218,12 +1271,17 @@
       function body(list, label) {
         var tb = h("tbody");
         if (label) {
-          tb.appendChild(h("tr", { class: "hvb-t__group" }, h("th", { scope: "rowgroup", colspan: String(C.length) },
+          tb.appendChild(h("tr", { class: "hvb-t__group" }, h("th", { scope: "rowgroup", colspan: String(C.length + (canBulk ? 1 : 0)) },
             h("span", { class: "hvb-t__client" }, brand({ client: label, name: label, logos: list[0].logos || [] }), h("b", null, label)),
             h("small", null, list.length + " " + (list.length === 1 ? noun : plural(noun))))));
         }
         list.forEach(function (it) {
           var r = h("tr", { class: it.track ? "is-track-" + it.track.grade : null });
+          if (canBulk) {
+            var box = h("input", { type: "checkbox", "aria-label": "Tick " + it.name, checked: PICK[it.key] || null, disabled: it.moves.length ? null : true });
+            box.addEventListener("change", function () { if (box.checked) PICK[it.key] = 1; else delete PICK[it.key]; table(); });
+            r.appendChild(h("td", { class: "hvb-t__pick" }, box));
+          }
           C.forEach(function (c, i) { r.appendChild(h(i === 1 ? "th" : "td", { scope: i === 1 ? "row" : null, class: c.n ? "is-num" : null }, c.cell(it))); });
           tb.appendChild(r);
         });
@@ -1234,6 +1292,7 @@
         rows.forEach(function (it) { var c = it.client || "No client"; (by[c] = by[c] || []).push(it); });
         clients().forEach(function (c) { body(by[c.name], c.name); });
       } else body(rows, null);
+      if (canBulk) tbl.insertBefore(bulkBar(rows), tbl.firstChild);
       tbl.appendChild(h("div", { class: "hvb-t__wrap", tabindex: "0", role: "region", "aria-label": (noun === "campaign" ? "Campaigns" : "Selections") + " table" }, t));
     }
 
