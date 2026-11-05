@@ -1271,12 +1271,12 @@ a.hv-note:hover { background: #efede8; }
 .hv-note__when { font-size: 12px; color: var(--gray); white-space: nowrap; padding-top: 2px; display: flex; align-items: center; gap: 7px; }
 .hv-note__unread { width: 9px; height: 9px; border-radius: 50%; background: var(--vivid-red); flex: none; }
 
-/* On a white bar (the profile page) the bell is ink on white. */
-.hc-bar .hv-bell, .mx-top .hv-bell, .cat-hero:not(.cat-hero--cover):not(.cat-hero--desk) .hv-bell { color: var(--ink); background: var(--white); border: 1.5px solid rgba(18,18,18,.55); }
-.hc-bar .hv-bell:hover, .mx-top .hv-bell:hover, .cat-hero:not(.cat-hero--cover):not(.cat-hero--desk) .hv-bell:hover { border-color: var(--ink); background: #efede8; }
-.hc-bar .hv-bell[aria-expanded="true"], .mx-top .hv-bell[aria-expanded="true"], .cat-hero:not(.cat-hero--cover):not(.cat-hero--desk) .hv-bell[aria-expanded="true"] { background: var(--ink); color: var(--lime); border-color: var(--ink); }
-.hc-bar .hv-bell__dot, .mx-top .hv-bell__dot, .cat-hero:not(.cat-hero--cover):not(.cat-hero--desk) .hv-bell__dot { box-shadow: 0 0 0 2.5px var(--white); }
-.hc-bar .hv-bell[aria-expanded="true"] .hv-bell__dot, .mx-top .hv-bell[aria-expanded="true"] .hv-bell__dot, .cat-hero:not(.cat-hero--cover):not(.cat-hero--desk) .hv-bell[aria-expanded="true"] .hv-bell__dot { box-shadow: 0 0 0 2.5px var(--ink); }
+/* The bell is its own ink disc with a white icon, so it reads on a white bar and on a dark one alike. */
+.hv-bell { background: var(--ink); color: var(--white); border: 1.5px solid rgba(255,255,255,.6); box-shadow: 0 0 0 1px rgba(18,18,18,.9); }
+.hv-bell:hover { background: #2a2a2a; border-color: var(--white); }
+.hv-bell[aria-expanded="true"] { background: var(--lime); color: var(--ink); border-color: var(--ink); }
+.hv-bell__dot { box-shadow: 0 0 0 2.5px var(--ink); }
+.hv-bell[aria-expanded="true"] .hv-bell__dot { box-shadow: 0 0 0 2.5px var(--lime); }
 .hc-bar .pt-avatar:hover { background: var(--ink); color: var(--lime); border-color: var(--ink); }
 
 @media (prefers-reduced-motion: reduce) { .hv-bell, .hv-note, .hv-drop__ft a { transition: none; } }
