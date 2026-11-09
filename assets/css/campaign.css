@@ -1604,3 +1604,10 @@ html.rp-busy, html.rp-busy * { cursor: progress !important; }
 #rp .rp-cover .mx-over { margin-top: 30px; padding: 20px 24px; }
 #rp .rp-cover .mx-over__seal { width: 120px; height: 120px; } #rp .rp-cover .mx-over__seal b { font-size: 44px; }
 #rp .rp-cover .mx-over__t strong { font-size: 44px; } #rp .rp-cover .mx-over__t span { font-size: 15px; }
+/* over-achieved, clearer (Bido 2026-11-09): a solid lime card with ink type, the seal ink with lime figures */
+.mx-over { background: var(--lime) !important; border: 0 !important; }
+.mx-over__t strong { color: var(--ink) !important; }
+.mx-over__t span { color: var(--ink) !important; font-weight: 600 !important; }
+.mx-over__seal { background: var(--ink) !important; box-shadow: inset 0 0 0 5px var(--ink), inset 0 0 0 7px var(--lime), 0 10px 24px rgba(0,0,0,.3) !important; }
+.mx-over__seal b, .mx-over__seal small { color: var(--lime) !important; }
+.mx-over__seal small { font-size: 11px !important; }
