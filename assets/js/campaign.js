@@ -57,6 +57,11 @@
   }
   function icon(p) { return ICONS[p] || ICON_LINK; }
   // No brief, strategy or targets: nothing is graded, every pill reads "Not scored" (owner, 2026-10-29).
+  // Affiliate clicks count only when tracking links were set up (Bido 2026-11-09: no clicks chapter otherwise).
+  function clicksOn() { var cl = R && R.clicks; return !!(R && R.visibility && R.visibility.clicks && cl && cl.links && cl.has_destination); }
+  // HELVi Connect beside the client's logo on the report, the PDF and every PDF page (Bido 2026-11-09).
+  // "light" is the mark drawn for light grounds (dark lettering), "dark" the one for dark grounds.
+  var HVC = { onLight: "../assets/brand/helvy-connect/helvy-connect-light-640.webp?v=c6", onDark: "../assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c6" };
   function unscored() { return !!(R && R.visibility && R.visibility.scored === false); }
   // A creator with no video at all: Instagram shows no views on photo posts and carousels (owner, 2026-10-29).
   function noViews(code) {
@@ -620,9 +625,18 @@
         + (nm.ar ? '<span class="mx-cc__ar" dir="rtl" lang="ar">' + esc(nm.ar) + "</span>" : "")
         + '<span class="mx-cc__meta">' + esc((R.benchmarks.bands[c.band] || "").replace(/ \(.*/, "")) + (c.followers ? " · " + num(c.followers) + " followers" : "") + "</span>"
         + '<div class="mx-cc__live"><span class="mx-cc__pips" aria-hidden="true">' + pips + "</span><b>" + live + (plan ? " of " + plan : "") + ' live</b><span class="mx-cc__views">' + (seen ? num(seen) + " views" : "") + "</span></div>"
-        + creatorVideos(c)
         + (marks ? '<div class="mx-tc__links">' + marks + "</div>" : "") + "</div></article>";
     }).join("");
+    // The scoreboard first, the goals, then each creator's videos as one row (Bido 2026-11-09), on the screen and in the PDF.
+    var cv = $("mx-cv");
+    if (!cv) { $("mx-bench").insertAdjacentHTML("afterend", '<div class="mx-cvwrap" id="mx-cvwrap"><h3 class="mx-table-title">Videos by creator</h3><div class="mx-cv" id="mx-cv"></div></div>'); cv = $("mx-cv"); }
+    var rows = cs.map(function (c) {
+      var v = creatorVideos(c); if (!v) return "";
+      var seen = c.seen != null ? c.seen : (c.views || 0);
+      return '<article class="mx-cvr"><div class="mx-cvr__h">' + ava(c.photo) + "<div><b>" + esc(splitName(c.name).en) + "</b><span>" + (c.delivered || 0) + (c.planned ? " of " + c.planned : "")
+        + " live" + (seen ? " · " + num(seen) + " views" : "") + "</span></div></div>" + v + "</article>";
+    }).join("");
+    cv.innerHTML = rows; $("mx-cvwrap").hidden = !rows;
   }
   function slide(dir) {
     var t = $("mx-carousel"); t.scrollBy({ left: dir * Math.max(240, t.clientWidth * 0.8), behavior: "smooth" });
@@ -644,7 +658,7 @@
     renderCarousel();
     renderSay();
     renderStory();
-    $("tab-clicks").hidden = !R.visibility.clicks && !R._noLinks;
+    $("tab-clicks").hidden = !clicksOn();
     markTab(document.body.dataset.only || "all");
     $("mx-csv").href = API + "/api/campaign.csv?t=" + encodeURIComponent(t);
     $("mx-dash").href = $("mx-dash-end").href = "dashboard/#t=" + encodeURIComponent(t); $("mx-dash").hidden = false;
@@ -671,13 +685,7 @@
                           line: (!unscored() && v.label ? v.label + " · " : "") + full(t.delivered) + (t.planned ? " of " + t.planned : "") + " posts live",
                           viz: bars ? '<span class="mx-mv mx-mv--goals">' + bars + "</span>" : "", grade: gk.grade }
       : { fig: num(t.views), term: "views", line: full(t.delivered) + " posts live" };
-    var ranked = (R.creators || []).filter(function (x) { return x.rank; }).slice().sort(function (a, b) { return a.rank - b.rank; });
-    if (ranked.length) {
-      var a = ranked[0], b = ranked[1];
-      out.leaderboard = { fig: num(a.views || 0), term: "top creator's views",
-        line: splitName(a.name).en + (b && b.views ? (a.views / b.views >= 1.95 ? " · " + Math.round(a.views / b.views * 10) / 10 + "× the next creator" : " · ahead of " + splitName(b.name).en) : ""),
-        viz: a.photo ? '<span class="mx-mv mx-mv--face"><img src="' + esc(a.photo) + '" alt=""><span class="mx-mv__medal">1</span></span>' : "" };
-    }
+    // No leaderboard figure: the chapter opens on its podium (Bido 2026-11-09).
     var list = (R.posts || []).filter(function (p) { return p.section === "campaign"; }), plats = {};
     list.forEach(function (p) { plats[p.platform] = (plats[p.platform] || 0) + (p.views || 0); });
     var pieces = mergePieces(list).sort(function (x, y) { return (y.views || 0) - (x.views || 0); }), np = Object.keys(plats).length;
@@ -734,6 +742,8 @@
   });
   // The PDF footer on every page: who, when the numbers were read, page n of N (Chrome's @page margin boxes).
   function pageFooter() {
+    var old = $("mx-pagefoot"); if (old) old.remove();      // no text in the PDF's margins (Bido 2026-11-09)
+    return;
     var st = $("mx-pagefoot") || document.head.appendChild(Object.assign(document.createElement("style"), { id: "mx-pagefoot" }));
     var asof = window.HVReport && window.HVReport.asOf ? window.HVReport.asOf() : "Data as of " + new Date().toLocaleString("en-GB");
     var name = (R && R.campaign ? R.campaign.name : "Campaign report").replace(/["\\]/g, "");
@@ -741,28 +751,218 @@
       + ' @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 9px "DM Sans", Arial, sans-serif; color: #383838; margin-right: 12mm; } }';
   }
 
-  // The PDF is this page printed: print once its pictures and fonts are in (lazy pictures are made eager first, or they
-  // print blank) and the page loader has gone, never later than 10 s (2026-10-23).
+  /* ------------------------------------------------------------ the PDF (Bido 2026-11-09)
+     Laid out page by page in a hidden A4 frame, then printed from that frame:
+     - the frame is 794px wide, the width Chrome prints an A4 page at with no margins, so every width rule is the same
+       when the pages are measured and when they print;
+     - a card, chart, panel or table row never crosses a page edge: a block that does not fit goes to the next page, a
+       grid goes row by row, a table row by row with its head repeated; a heading never ends a page;
+     - no browser text in the margins (@page margin 0); every page after the cover carries the client's logo and
+       HELVi Connect, nothing else;
+     - every video and profile link stays a link; the PDF adds a page of every campaign video's link;
+     - the timeline is left out, and the PDF ends on a thank-you page. */
+  var PDF_BUSY = false;
   function printWhenReady() {
-    var imgs = [].slice.call(document.querySelectorAll("#mx-report img"));
-    imgs.forEach(function (i) { i.loading = "eager"; });
-    var waits = imgs.filter(function (i) { return !i.complete; }).map(function (i) {
-      return new Promise(function (ok) { i.addEventListener("load", ok); i.addEventListener("error", ok); });
-    });
-    if (document.fonts && document.fonts.ready) waits.push(document.fonts.ready);
-    waits.push(new Promise(function (ok) { setTimeout(ok, Math.max(900, 1700 - performance.now())); }));
-    var done = false;
-    pageFooter();
-    function go() { if (!done) { done = true; window.print(); } }
-    Promise.all(waits).then(go, go); setTimeout(go, 10000);
+    if (!R || PDF_BUSY) return;
+    PDF_BUSY = true; document.documentElement.classList.add("rp-busy");
+    var keepF = { platform: FILTER.platform, kind: FILTER.kind, section: FILTER.section };
+    FILTER.platform = ""; FILTER.kind = ""; FILTER.section = "campaign"; renderFilters(); renderWall();     // the PDF is always the whole campaign
+    var only = document.body.dataset.only; if (only) { SECS.forEach(function (k) { var x = $("sec-" + k); if (x) x.classList.remove("is-only"); }); delete document.body.dataset.only; }
+    function restore() {
+      FILTER.platform = keepF.platform; FILTER.kind = keepF.kind; FILTER.section = keepF.section; renderFilters(); renderWall();
+      if (only) showOnly(only);
+      PDF_BUSY = false; document.documentElement.classList.remove("rp-busy");
+    }
+    var old = $("rp-frame"); if (old) old.remove();
+    var fr = document.createElement("iframe");
+    fr.id = "rp-frame"; fr.title = "PDF"; fr.setAttribute("aria-hidden", "true"); fr.tabIndex = -1;
+    fr.style.cssText = "position:fixed;left:-12000px;top:0;width:794px;height:1123px;border:0;opacity:0;pointer-events:none";
+    document.body.appendChild(fr);
+    var d = fr.contentDocument, c = R.campaign;
+    var css = [].map.call(document.querySelectorAll('link[rel="stylesheet"]'), function (l) { return '<link rel="stylesheet" href="' + esc(l.href) + '">'; }).join("");
+    d.open();
+    d.write('<!doctype html><html lang="en"><head><meta charset="utf-8"><title>' + esc(c.name + " — Campaign report") + "</title>" + css
+      + "<style>@page { size: A4; margin: 0; }</style></head><body class=\"rp-doc\" data-page=\"campaign\"><div id=\"rp\"></div></body></html>");
+    d.close();
+    var gr = $("hv-ig"); if (gr) d.body.appendChild(d.importNode(gr.closest("svg"), true));      // the Instagram mark's gradient
+    var links = [].slice.call(d.querySelectorAll('link[rel="stylesheet"]'));
+    var styled = Promise.all(links.map(function (l) { return new Promise(function (ok) { if (l.sheet) return ok(); l.onload = l.onerror = ok; }); }));
+    function imgs() {
+      return Promise.all([].map.call(d.images, function (i) { return i.complete ? 0 : new Promise(function (ok) { i.onload = i.onerror = ok; }); }));
+    }
+    function within(p, ms) { return Promise.race([p, new Promise(function (ok) { setTimeout(ok, ms); })]); }
+    within(styled, 8000).then(function () {
+      try { pdfLayout(d); } catch (e) { if (window.console) console.error(e); }
+      // fonts and pictures change heights: once they are in, the pages are laid out again with their final sizes
+      return within(Promise.all([imgs(), d.fonts ? d.fonts.ready : 0]), 9000);
+    }).then(function () {
+      try { pdfLayout(d); } catch (e) { if (window.console) console.error(e); }
+      return within(imgs(), 6000);
+    }).then(function () {
+      var w = fr.contentWindow, finished = false;
+      function done() { if (finished) return; finished = true; restore(); setTimeout(function () { if (!window.__rpKeep) fr.remove(); }, 1000); }
+      w.addEventListener("afterprint", done);
+      if (window.__rpNoPrint) { restore(); return; }        // checks only: lay the pages out, do not open the dialog
+      w.focus(); w.print();
+      setTimeout(done, 1500);          // Safari does not always send afterprint from a frame
+    }, function () { restore(); });
   }
-  window.addEventListener("beforeprint", function () { if (R) pageFooter(); [].forEach.call(document.querySelectorAll("#mx-report img"), function (i) { i.loading = "eager"; }); });
+  window.__hvReportPdf = printWhenReady;
+  // Ctrl/Cmd+P gives the same PDF as the button.
+  document.addEventListener("keydown", function (e) {
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && (e.key === "p" || e.key === "P") && R && $("mx-report") && !$("mx-report").hidden) { e.preventDefault(); printWhenReady(); }
+  });
+
+  function pdfLayout(d) {
+    var c = R.campaign, root = d.getElementById("rp");
+    root.innerHTML = "";
+    // every element of the report gets a key, so a copy can always find the element it was copied from
+    var K = {}, kn = 0;
+    [].forEach.call(document.querySelectorAll("#mx-report, #mx-report *"), function (el) { el.setAttribute("data-rpk", ++kn); K[kn] = el; });
+    function origOf(n) { return n && n.getAttribute ? K[n.getAttribute("data-rpk")] : null; }
+    function copy(el) { var n = d.importNode(el, true); strip(n); return n; }
+    var DROP = ".mx-info, .mx-pop, .mx-carousel__nav, .mx-filters, .mx-end, .mx-tabs, button, [data-toc='timeline'], .cx-next";
+    function strip(n) {
+      [].slice.call(n.querySelectorAll(DROP)).forEach(function (x) { var li = x.closest("li"); (x.matches("[data-toc]") && li ? li : x).remove(); });
+      [].forEach.call(n.querySelectorAll("img"), function (i) { i.removeAttribute("loading"); });
+      return n;
+    }
+    function shown(el) { if (!el || el.hidden) return false; var cs = getComputedStyle(el); return cs.display !== "none" && cs.visibility !== "hidden"; }
+    // a block keeps the names of the elements around it (the styles need them) but none of their room
+    function wrap(parentOrig, inner) {
+      var n = inner, p = parentOrig;
+      while (p && p.nodeType === 1 && p !== document.body) {
+        var sh = d.importNode(p, false); sh.removeAttribute("hidden"); sh.classList.add("rp-a"); sh.appendChild(n); n = sh;
+        if (p.id === "mx-report") break;
+        p = p.parentElement;
+      }
+      var m = d.createElement("main"); m.className = "cat-app mx rp-a"; m.appendChild(n);
+      var w = d.createElement("div"); w.className = "rp-w"; w.appendChild(m); return w;
+    }
+    var logos = (c.logos || []).slice(0, 2);
+    function brands(onDark) {
+      return logos.map(function (u) { return '<img src="' + esc(u) + '" alt="">'; }).join("") + (logos.length ? '<span class="rp-x">×</span>' : "")
+        + '<img class="rp-hvc" src="' + (onDark ? HVC.onDark : HVC.onLight) + '" alt="HELVi Connect">';
+    }
+    var page, body;
+    function newPage(cls, run) {
+      page = d.createElement("section"); page.className = "rp-page" + (cls ? " " + cls : "");
+      if (run) { var h = d.createElement("header"); h.className = "rp-run"; h.innerHTML = brands(false); page.appendChild(h); }
+      body = d.createElement("div"); body.className = "rp-body"; page.appendChild(body); root.appendChild(page);
+    }
+    function limit() { var r = body.getBoundingClientRect(); return r.top + r.height; }
+    function fits(w) { return w.getBoundingClientRect().bottom <= limit() + 0.5; }
+    function room() { var last = body.lastElementChild; return limit() - (last ? last.getBoundingClientRect().bottom + 16 : body.getBoundingClientRect().top); }
+    var KEEP = ".mx-sec__head, .mx-table-title, .mx-carousel__head, .mx-toc__t, h2, h3";
+    function turn() {
+      var prev = body, last = prev.lastElementChild;
+      newPage("", true);
+      // a heading never ends a page: it goes over with what follows it
+      if (last && last.hasAttribute("data-keep") && prev.children.length > 1) body.appendChild(last);
+    }
+    function shrink(w) {
+      var avail = limit() - w.getBoundingClientRect().top, h = w.getBoundingClientRect().height;
+      if (h > avail) w.style.zoom = Math.max(0.45, avail / h).toFixed(3);
+    }
+    function settle(w) {                         // an unbreakable block: here, or at the top of the next page
+      if (body.contains(w) && fits(w)) return;
+      if (body.contains(w)) body.removeChild(w);
+      if (body.children.length) turn();
+      body.appendChild(w); if (!fits(w)) shrink(w);
+    }
+    var ATOM = ".mx-cc, .mx-post, .mx-cvr, .mx-kpi, .mx-kpis, .mx-panel, .mx-chart, .mx-say__top, .mx-podium, .mx-pod, .mx-sec__head, .mx-table-title, .mx-carousel__head, "
+      + ".mx-obj, .mx-next, .mx-empty-note, .mx-tcds > li, .mx-toc__t, .mx-clickheads, .mx-stat, dl, h2, h3, p, tr, svg, img";
+    function place(node, parentOrig) {
+      var orig = origOf(node), po = parentOrig !== undefined ? parentOrig : (orig ? orig.parentElement : null);
+      var w = wrap(po, node);
+      if (node.matches(KEEP)) w.setAttribute("data-keep", "1");
+      body.appendChild(w);
+      if (fits(w)) return;
+      if (node.tagName === "TABLE") { body.removeChild(w); return placeTable(node, po); }
+      var kids = [].slice.call(node.children);
+      if (!node.matches(ATOM) && kids.length) {
+        var cs = d.defaultView.getComputedStyle(node);
+        if (/grid|flex/.test(cs.display) && !/column/.test(cs.flexDirection)) {
+          // a grid or a wrapping row goes over row by row
+          var rows = [], tops = [];
+          kids.forEach(function (k) { var t = Math.round(k.getBoundingClientRect().top), i = tops.findIndex(function (x) { return Math.abs(x - t) < 6; });
+            if (i < 0) { tops.push(t); rows.push([k]); } else rows[i].push(k); });
+          body.removeChild(w);
+          if (rows.length > 1) {
+            rows.forEach(function (r) { var sh = node.cloneNode(false); r.forEach(function (k) { sh.appendChild(k); }); var rw = wrap(po, sh); body.appendChild(rw); settle(rw); });
+            return;
+          }
+          body.appendChild(w); return settle(w);
+        }
+        body.removeChild(w);
+        kids.forEach(function (k) { place(k, orig || null); });
+        return;
+      }
+      settle(w);
+    }
+    function placeTable(node, po) {
+      var head = node.tHead, rows = node.tBodies[0] ? [].slice.call(node.tBodies[0].rows) : [];
+      function shell() { var t = node.cloneNode(false); if (head) t.appendChild(head.cloneNode(true)); t.appendChild(d.createElement("tbody")); return t; }
+      var t = shell(), w = wrap(po, t); body.appendChild(w);
+      rows.forEach(function (r) {
+        t.tBodies[0].appendChild(r);
+        if (fits(w)) return;
+        t.tBodies[0].removeChild(r);
+        if (!t.tBodies[0].rows.length) body.removeChild(w);
+        turn(); t = shell(); w = wrap(po, t); body.appendChild(w); t.tBodies[0].appendChild(r);
+      });
+    }
+
+    // 1 · the cover: the report's own dark header, alone on its page
+    newPage("rp-cover", false);
+    var bug = document.querySelector("#mx-report .mx-bug");
+    if (bug) { var cw = wrap(bug.parentElement, copy(bug)); body.appendChild(cw); if (!fits(cw)) shrink(cw); }
+
+    // 2 · contents, then every chapter (no timeline; clicks only when tracking links were set up)
+    newPage("", true);
+    var toc = $("mx-toc"); if (toc && shown(toc)) place(copy(toc));
+    ["overview", "leaderboard", "content", "performance", "say", "clicks"].forEach(function (k) {
+      var sec = $("sec-" + k); if (!shown(sec)) return;
+      var box = sec.querySelector(".cat-container"); if (!box) return;
+      if (body.children.length && room() < 300) turn();            // a chapter does not start at the foot of a page
+      [].forEach.call(box.children, function (el) { if (shown(el) && !el.matches(DROP)) place(copy(el)); });
+    });
+
+    // 3 · every campaign video, with its link
+    var vids = (R.posts || []).filter(function (p) { return p.section === "campaign" && p.url; })
+      .sort(function (a, b) { return splitName(a.creator).en.localeCompare(splitName(b.creator).en) || (a.posted_at || 0) - (b.posted_at || 0); });
+    if (vids.length) {
+      if (body.children.length && room() < 300) turn();
+      var hd = d.createElement("div"); hd.className = "mx-sec__head";
+      hd.innerHTML = '<h2 class="mx-h2"><span class="mx-h2__ic">' + (IC.content || "") + "</span>Every video link</h2>";
+      var hw = wrap(null, hd); hw.setAttribute("data-keep", "1"); body.appendChild(hw); settle(hw);
+      var tb = d.createElement("table"); tb.className = "rp-links";
+      tb.innerHTML = "<thead><tr><th>Creator</th><th>Platform</th><th>Posted</th><th>Views</th><th>Open</th></tr></thead><tbody>" + vids.map(function (p) {
+        var u = String(p.url), sh = u.replace(/^https?:\/\/(www\.)?/, "").replace(/\?.*$/, ""); if (sh.length > 44) sh = sh.slice(0, 42) + "…";
+        return "<tr><td>" + esc(splitName(p.creator).en) + '</td><td><span class="mx-pt__p">' + icon(p.platform) + esc(p.platform) + "</span></td><td>" + esc(day(p.posted_at, true))
+          + "</td><td>" + (p.views_hidden || p.views == null ? "—" : num(p.views)) + '</td><td><a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(sh) + " ↗</a></td></tr>";
+      }).join("") + "</tbody>";
+      placeTable(tb, null);
+    }
+
+    // 4 · thank you
+    newPage("rp-end", false);
+    body.innerHTML = '<div class="rp-end__brands">' + logos.map(function (u) { return '<img src="' + esc(u) + '" alt="">'; }).join("") + (logos.length ? "<span>×</span>" : "")
+      + '<img src="' + HVC.onLight + '" alt="HELVi Connect"></div>'
+      + '<img class="rp-end__char" src="../assets/brand/modules/helvi-track-char-880.webp" alt="">'
+      + "<h2>Thank you</h2><p>" + esc("Thank you for running " + c.name + " with HelloVoice. Your account manager can take you through these results and plan what comes next.") + "</p>"
+      + '<p><a href="mailto:info@hellovoice.co.uk">info@hellovoice.co.uk</a> · <a href="https://hellovoice.co.uk">hellovoice.co.uk</a></p>';
+
+    // a page left empty by a heading moved over is dropped
+    [].slice.call(root.querySelectorAll(".rp-page")).forEach(function (pg) { var b = pg.querySelector(".rp-body"); if (b && !b.children.length && !pg.matches(".rp-end")) pg.remove(); });
+    [].forEach.call(document.querySelectorAll("[data-rpk]"), function (el) { el.removeAttribute("data-rpk"); });
+  }
 
   function renderBug(c) {
     var logos = (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="Brand logo">'; }).join("");
     // HelloVoice's own campaigns (e.g. the Demo Campaign, owner 2026-10-20): their logo already is ours, so no "× HelloVoice".
     var ours = /^\s*hello\s*voice\b/i.test(c.client || "");
-    $("mx-brands").innerHTML = logos ? logos + (ours ? "" : '<span class="mx-bug__x" aria-hidden="true">×</span><img class="mx-bug__hv" src="../assets/brand/logo.png" alt="HelloVoice">') : "";
+    $("mx-brands").innerHTML = (logos ? logos + '<span class="mx-bug__x" aria-hidden="true">×</span>' : "") + '<img class="mx-bug__hv mx-bug__hvc" src="' + HVC.onLight + '" alt="HELVi Connect">';
     $("mx-title").textContent = c.name;
     var who = /@/.test(c.client || "") ? "" : c.client;          // an email is a contact, not the client (item 299)
     $("mx-sub").textContent = [who, c.platform ? c.platform + " campaign" : ""].filter(Boolean).join(" · ");
@@ -777,12 +977,13 @@
     else if (c.status === "ended") bits.push("<span>Completed</span>");
     if (start && end) {
       var total = Math.max(1, Math.round((end - start) / 86400)), dn = Math.min(total, Math.max(1, Math.ceil((now - start) / 86400)));
-      if (now < start) bits.push("<span>Starts " + day(start, false) + "</span>");
+      if (c.status === "ended") bits.push("<span>" + day(start, false) + " – " + day(end, true) + "</span>");
+      else if (now < start) bits.push("<span>Starts " + day(start, false) + "</span>");
       else if (now <= end) bits.push("Day " + dn + " <span>of " + total + "</span>");
       else bits.push("<span>Ran " + total + " days</span>");
     }
     if (c.status === "live") bits.push("<span>Updated every 24 hours" + (R.updated_at ? " · last " + ago(R.updated_at) : "") + "</span>");
-    else if (R.updated_at) bits.push("<span>Numbers read " + ago(R.updated_at) + "</span>");
+    else if (R.updated_at) bits.push("<span>" + (c.status === "ended" ? "Final numbers" : "Numbers read " + ago(R.updated_at)) + "</span>");
     $("mx-ticker").innerHTML = bits.join(" · ");
     var v = unscored() ? {} : (R.verdict || {});
     $("mx-verdict").hidden = unscored();
@@ -869,7 +1070,7 @@
       + '<span class="mx-obj__pct"><b>' + Math.round(done) + "%</b> achieved " + sig(g, "Where it should be for the posts published so far: " + Math.round(due) + "%") + "</span></div>"
       + '<div class="mx-obj__track" role="img" aria-label="' + Math.round(done) + "% of the " + esc(o.label) + ' objective achieved; ' + Math.round(due) + '% expected for the posts published so far">'
       + '<i class="mx-obj__fill ' + g + '" style="width:' + done.toFixed(1) + '%"></i>'
-      + '<i class="mx-obj__due" style="left:' + due.toFixed(1) + '%"><span>today</span></i></div>'
+      + (R.campaign && R.campaign.status === "ended" ? "" : '<i class="mx-obj__due" style="left:' + due.toFixed(1) + '%"><span>today</span></i>') + "</div>"
       + '<div class="mx-obj__parts">' + mine.map(function (i) {
         return '<span><span class="mx-sw ' + i.grade + '"></span>' + KLABEL[i.key] + " <b>" + Math.round(i.pct) + "%</b></span>";
       }).join("") + "</div></div>";
@@ -1075,7 +1276,7 @@
     var tag = $("mx-objective");
     var ns = unscored();
     if (ns && info) info.setAttribute("data-info", "Not scored: no brief or targets were set for this campaign. Creators are ranked by video views, then engagement. The top three get gold, silver and bronze.");
-    if (tag) tag.textContent = ns ? "Ranked by video views · not scored" : "Scored for " + o.label;
+    if (tag) { tag.textContent = ""; tag.hidden = true; }     // no "Scored for …" line (Bido 2026-11-09)
     var ranked = cs.filter(function (c) { return c.rank; });
     $("mx-podium").innerHTML = ranked.slice(0, 3).map(function (c) {
       return '<div class="mx-pod mx-pod--' + c.rank + '" style="--medal:' + MEDAL[c.badge] + '"><svg class="mx-medal" viewBox="0 0 40 50" aria-hidden="true">'
@@ -1083,10 +1284,10 @@
         + (c.photo ? '<img class="mx-pod__photo" src="' + esc(c.photo) + '" alt="">' : '<span class="mx-pod__photo"></span>')
         + '<div class="mx-pod__name">' + creatorLink(c, "") + '</div><div class="mx-pod__score">' + (ns ? num(c.views || 0) + "<small>video views</small>" : c.score.toFixed(0)
         + "<small>score out of 100</small>") + "</div><div class=\"mx-pod__line\">" + (ns ? "" : num(c.seen != null ? c.seen : (c.views || 0)) + " views · ")
-        + num(c.engagement) + " engagements" + (vis.clicks && c.clicks ? " · " + num(c.clicks) + " clicks" : "") + "</div></div>";
+        + num(c.engagement) + " engagements" + (clicksOn() && c.clicks ? " · " + num(c.clicks) + " clicks" : "") + "</div></div>";
     }).join("");
     var head = ["#", "Creator", "Posts", "Views"].concat(vis.reach ? ["Reach"] : []).concat(["Engagement", "Eng. rate"])
-      .concat(vis.clicks ? ["Clicks"] : []).concat(ns ? [] : ["Score"]);
+      .concat(clicksOn() ? ["Clicks"] : []).concat(ns ? [] : ["Score"]);
     var rows = cs.map(function (c) {
       var rate = c.video_er != null ? c.video_er : c.er;      // reactions per view, the rate the campaign goal measures
       var tds = ['<td class="mx-rank">' + (c.badge ? medal(c.badge, c.rank) : (c.rank || "—")) + "</td>",
@@ -1095,7 +1296,7 @@
       if (vis.reach) tds.push("<td>" + full(c.reach) + "</td>");
       tds.push("<td>" + full(c.engagement) + "</td>",
         "<td>" + pct(rate) + "</td>");
-      if (vis.clicks) tds.push("<td>" + full(c.clicks) + "</td>");
+      if (clicksOn()) tds.push("<td>" + full(c.clicks) + "</td>");
       if (!ns) tds.push('<td><span class="mx-score"><i style="--w:' + c.score + '%"></i>' + c.score.toFixed(0) + "</span></td>");
       return "<tr>" + tds.join("") + "</tr>";
     }).join("");
@@ -1113,16 +1314,18 @@
     $("mx-targets-lede").textContent = p.items.length
       ? ""
       : "";
-    $("mx-bullets").innerHTML = p.items.length ? p.items.map(function (i) {
-      var isRate = i.key === "er", fill = Math.min(100, i.pct);
-      var mark = isRate || !i.goal || i.expected == null ? null : Math.min(100, i.expected / i.goal * 100);
-      return '<div class="mx-bullet"><div class="mx-bullet__name">' + (IC[i.key] || "") + TLABEL[i.key] + " " + sig(i.grade) + "</div>"
-        + '<div class="mx-bullet__track" role="img" aria-label="' + TLABEL[i.key] + " " + Math.round(i.pct) + '% of goal">'
-        + '<div class="mx-bullet__fill ' + i.grade + '" style="width:' + fill + '%"></div>'
-        + (mark == null ? "" : '<div class="mx-bullet__mark" style="left:' + mark + '%"><span>expected by now</span></div>') + "</div>"
-        + '<div class="mx-bullet__num"><b>' + (isRate ? pct(i.actual) : num(i.actual)) + "</b>of " + (isRate ? pct(i.goal, 1) : num(i.goal)) + " goal"
-        + (!isRate && i.pct >= 150 ? '<em class="mx-times">' + times(i.pct) + " the goal</em>" : "") + "</div></div>";
-    }).join("") : "";
+    // Each goal as what we aimed for beside what we got (Bido 2026-11-09): achieved, target, how far past or short of it.
+    var gi = p.items || [];
+    $("mx-bullets").className = "mx-kpis n" + gi.length; $("mx-bullets").style.setProperty("--n", gi.length);
+    $("mx-bullets").innerHTML = gi.map(function (i) {
+      var isRate = i.key === "er", over = !isRate && i.pct >= 150;
+      var got = isRate ? pct(i.actual) : num(i.actual), want = isRate ? pct(i.goal, 1) : num(i.goal);
+      var gap = !isRate && i.goal > i.actual ? " · " + num(i.goal - i.actual) + " to go" : "";
+      return '<div class="mx-kpi mx-kpi--' + esc(i.grade || "") + '"><div class="mx-kpi__h"><span class="mx-kpi__k">' + (IC[i.key] || "") + esc(TLABEL[i.key]) + "</span>" + sig(i.grade) + "</div>"
+        + '<div class="mx-kpi__vs"><div class="mx-kpi__got"><small>Achieved</small><b>' + got + '</b></div><div class="mx-kpi__tgt"><small>Target</small><b>' + want + "</b></div></div>"
+        + '<div class="mx-kpi__bar" role="img" aria-label="' + esc(TLABEL[i.key]) + ": " + Math.round(i.pct) + '% of target"><i class="' + esc(i.grade || "") + '" style="width:' + Math.min(100, i.pct).toFixed(1) + '%"></i></div>'
+        + '<p class="mx-kpi__res"><b>' + (over ? times(i.pct) : Math.round(i.pct) + "%") + "</b>" + (over ? "the target" : "of target") + gap + "</p></div>";
+    }).join("");
     var ex = [];
     // One rule: with a campaign ER goal, the card grades against it, like the score line (owner, 2026-10-19).
     var erT = (p.items || []).filter(function (i) { return i.key === "er"; })[0];
@@ -1222,6 +1425,32 @@
       + '<div class="mx-key__x">Ask how to buy<b>' + sayPct(ct.intent, ct.n) + "</b></div></div></div></div>");
     $("mx-mix").innerHTML = mix.join("");
     decorateH3("mx-mix");
+    renderTables(posts);
+  }
+
+  // Platforms and creators side by side in numbers (Bido 2026-11-09: the dashboard's platform and "what people did" views).
+  function renderTables(posts) {
+    var box = $("mx-pt");
+    if (!box) { $("mx-mix").insertAdjacentHTML("afterend", '<div class="mx-pt" id="mx-pt"></div>'); box = $("mx-pt"); }
+    var P = {}, cells = function (a) { return [num(a.likes), num(a.comments), num(a.saves), num(a.shares)]; };
+    posts.forEach(function (p) {
+      var a = P[p.platform] = P[p.platform] || { n: 0, views: 0, vv: 0, ve: 0, eng: 0, likes: 0, comments: 0, saves: 0, shares: 0 };
+      a.n++; a.views += p.views || 0; a.eng += p.engagement || 0;
+      if (p.views) { a.vv += p.views; a.ve += p.engagement || 0; }
+      ["likes", "comments", "saves", "shares"].forEach(function (k) { a[k] += p[k] || 0; });
+    });
+    var ks = Object.keys(P).sort(function (a, b) { return P[b].views - P[a].views || P[b].eng - P[a].eng; });
+    var th = function (h) { return "<thead><tr>" + h.map(function (x) { return "<th>" + x + "</th>"; }).join("") + "</tr></thead>"; };
+    var plat = ks.length ? '<h3 class="mx-table-title">Platforms</h3><div class="mx-table-wrap"><table class="mx-table">' + th(["Platform", "Posts", "Views", "Likes", "Comments", "Saves", "Shares", "Eng. rate"]) + "<tbody>"
+      + ks.map(function (k) { var a = P[k];
+        return '<tr><td><span class="mx-pt__p">' + icon(k) + esc(k) + "</span></td><td>" + a.n + "</td><td>" + (a.views ? num(a.views) : "—") + "</td><td>" + cells(a).join("</td><td>") + "</td><td>" + (a.vv ? pct(a.ve / a.vv * 100) : "—") + "</td></tr>"; }).join("")
+      + "</tbody></table></div>" : "";
+    var cs = (R.creators || []).filter(function (c) { return c.delivered; }).slice().sort(function (a, b) { return (b.engagement || 0) - (a.engagement || 0); });
+    var did = cs.length ? '<h3 class="mx-table-title">What people did, by creator</h3><div class="mx-table-wrap"><table class="mx-table">' + th(["Creator", "Videos", "Views", "Likes", "Comments", "Saves", "Shares", "Engagement"]) + "<tbody>"
+      + cs.map(function (c) {
+        return '<tr><td><div class="mx-tc">' + ava(c.photo) + "<div><b>" + esc(splitName(c.name).en) + "</b></div></div></td><td>" + (c.delivered || 0) + "</td><td>" + num(c.seen != null ? c.seen : c.views) + "</td><td>" + cells(c).join("</td><td>") + "</td><td><b>" + num(c.engagement) + "</b></td></tr>"; }).join("")
+      + "</tbody></table></div>" : "";
+    box.innerHTML = plat + did;
   }
 
   /* ------------------------------------------------------ what people say */
@@ -1279,16 +1508,66 @@
       + '<div class="mx-say__grid"><div class="mx-panel"><h3>' + IC.say + "The mood</h3><div class=\"mx-dn\">" + moodDonut(t, sayPct(t.pos, t.n), "positive") + '<div class="mx-key">' + MOOD.map(function (m) {
           return '<div><span class="mx-sw" style="background:' + m[2] + '"></span>' + m[1] + "<b>" + full(t[m[0]]) + " <small>" + sayPct(t[m[0]], t.n) + "</small></b></div>"; }).join("") + "</div></div></div>"
       + '<div class="mx-panel"><h3>What they talk about</h3>' + (topics || '<p class="mx-panel__note">Topics appear once the comments are read.</p>') + "</div></div>"
-      + "";
+      + sayMore(t, C, th);
+    decorateH3("mx-say");
     // Our reading of the comments only, never the comments themselves (owner, 2026-11-03, item 294).
+  }
+  // Item 361 (Bido 2026-11-09): Helvi's reading in sentences, the questions viewers asked most, and the mood for each
+  // creator and each platform. All from the comment buckets the report carries; no single comment is shown.
+  function sayMore(t, C, th) {
+    var byC = {}, byP = {};
+    (C.buckets || []).forEach(function (b) {
+      [[byC, b.code], [byP, b.platform]].forEach(function (x) {
+        var a = x[0][x[1]] = x[0][x[1]] || { n: 0, pos: 0, neu: 0, neg: 0, intent: 0 };
+        ["n", "pos", "neu", "neg", "intent"].forEach(function (k) { a[k] += b[k] || 0; });
+      });
+    });
+    var who = {}; (R.creators || []).forEach(function (c) { who[c.code] = c; });
+    function row(lead, name, x) {
+      var seg = MOOD.map(function (m) { return x[m[0]] ? '<i style="width:' + (x[m[0]] / x.n * 100).toFixed(1) + "%;background:" + m[2] + '"></i>' : ""; }).join("");
+      return '<div class="mx-mrow">' + lead + '<div class="mx-mrow__b"><b>' + esc(name) + '</b><span class="mx-mrow__bar" role="img" aria-label="' + esc(name) + ": " + sayPct(x.pos, x.n) + " positive, "
+        + sayPct(x.neu, x.n) + " neutral, " + sayPct(x.neg, x.n) + ' negative">' + seg + '</span></div><div class="mx-mrow__n"><b>' + sayPct(x.pos, x.n) + "</b>positive · " + sayPct(x.intent, x.n)
+        + " ask to buy<br>" + full(x.n) + " comments</div></div>";
+    }
+    var key = '<p class="mx-moodkey">' + MOOD.map(function (m) { return '<span><i style="background:' + m[2] + '"></i>' + m[1] + "</span>"; }).join("") + "</p>";
+    var cRows = Object.keys(byC).filter(function (k) { return byC[k].n; }).sort(function (a, b) { return byC[b].n - byC[a].n; }).map(function (k) {
+      var c = who[k] || {}; return row(ava(c.photo), splitName(c.name || k).en, byC[k]); }).join("");
+    var pRows = Object.keys(byP).filter(function (k) { return byP[k].n; }).sort(function (a, b) { return byP[b].n - byP[a].n; }).map(function (k) {
+      return row('<span class="mx-mrow__pl">' + icon(k) + "</span>", k, byP[k]); }).join("");
+    // the questions: the same English question under several topics counts once
+    var qs = {};
+    Object.keys(C.theme_asks || {}).forEach(function (topic) {
+      (C.theme_asks[topic] || []).forEach(function (q) { var k = String(q[1] || q[0]).trim().toLowerCase().replace(/[?？.!]+$/, "");
+        var x = qs[k] = qs[k] || { en: q[1] || q[0], ar: q[0], n: 0 }; x.n += q[2] || 0; });
+    });
+    var top = Object.keys(qs).map(function (k) { return qs[k]; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 6);
+    var qList = top.length ? '<ul class="mx-qs">' + top.map(function (q) {
+      return "<li><span><b>" + esc(q.en) + "</b>" + (q.ar && q.ar !== q.en ? '<small dir="rtl" lang="ar">' + esc(q.ar) + "</small>" : "") + "</span><em>" + full(q.n) + "</em></li>"; }).join("") + "</ul>" : "";
+    // the reading: sentences written from the numbers only
+    var lines = [], big = function (o) { return Object.keys(o).filter(function (k) { return o[k].n >= 30; }); };
+    var mood = t.neu >= t.pos && t.neu >= t.neg ? "Most comments were neutral questions rather than praise or complaints"
+      : t.pos >= t.neg ? "The mood leaned positive" : "The mood leaned negative";
+    lines.push(mood + ": " + sayPct(t.pos, t.n) + " positive, " + sayPct(t.neu, t.n) + " neutral and " + sayPct(t.neg, t.n) + " negative.");
+    if (t.intent) lines.push(sayPct(t.intent, t.n) + " of comments asked how to buy, where to find it or what it costs" + (top[0] ? "; the question asked most was “" + top[0].en + "” (" + full(top[0].n) + " times)." : "."));
+    if (th.length) lines.push("The talk centred on " + th.slice(0, 2).map(function (q) { return q.toLowerCase() + " (" + sayPct(t.themes[q], t.n) + ")"; }).join(" and ") + ".");
+    var bc = big(byC).sort(function (a, b) { return byC[b].intent / byC[b].n - byC[a].intent / byC[a].n; })[0];
+    if (bc && byC[bc].intent) lines.push("Viewers of " + splitName((who[bc] || {}).name || bc).en + " asked to buy most: " + sayPct(byC[bc].intent, byC[bc].n) + " of their comments.");
+    var bp = big(byP).sort(function (a, b) { return byP[b].pos / byP[b].n - byP[a].pos / byP[a].n; })[0];
+    if (bp && big(byP).length > 1) lines.push(bp + " had the warmest mood, " + sayPct(byP[bp].pos, byP[bp].n) + " positive.");
+    return '<div class="mx-say__more">'
+      + '<div class="mx-panel mx-read"><h3>Helvi’s reading</h3>' + lines.map(function (l) { return "<p>" + esc(l) + "</p>"; }).join("") + "</div>"
+      + (qList ? '<div class="mx-panel"><h3>What viewers asked most</h3>' + qList + "</div>" : "")
+      + (cRows ? '<div class="mx-panel"><h3>Mood by creator</h3><div class="mx-moods">' + cRows + "</div>" + key + "</div>" : "")
+      + (pRows ? '<div class="mx-panel"><h3>Mood by platform</h3><div class="mx-moods">' + pRows + "</div>" + key + "</div>" : "")
+      + "</div>";
   }
   /* ----------------------------------------------------------- clicks */
 
   function renderClicks() {
     var vis = R.visibility, cl = R.clicks;
     // One structure for every campaign (owner, 2026-10-29): with no tracking links the section stays, with one line.
-    $("sec-clicks").hidden = !vis.clicks && !R._noLinks;
-    if (!vis.clicks && !R._noLinks) return;
+    $("sec-clicks").hidden = !clicksOn();
+    if (!clicksOn()) return;
     if (R._noLinks || !cl || !cl.links || !cl.has_destination) {
       $("mx-clicks").innerHTML = '<p class="mx-empty-note"><span class="mx-na">Not part of this campaign</span> No tracking links were set up, so there are no clicks to count.</p>';
       return;
