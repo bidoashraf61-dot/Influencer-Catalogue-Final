@@ -1341,9 +1341,9 @@
       setTimeout(offerWelcome, 6000);
       if (PAGE === "campaign") {
         campaignVersus();
-        window.addEventListener("hashchange", function () { setTimeout(campaignVersus, 600); setTimeout(campaignNextTime, 700); });
+        window.addEventListener("hashchange", function () { setTimeout(campaignVersus, 600); });
         setTimeout(campaignVersus, 1500);
-        setTimeout(campaignNextTime, 1200);
+        // "Next time" panel removed from the client report (Bido 2026-11-09); campaignNextTime() kept unused.
       }
       if (PAGE === "creator") mountCreatorIdeas();
       if (window.hvSelection) mountCampaignCta();
