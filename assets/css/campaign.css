@@ -1611,3 +1611,31 @@ html.rp-busy, html.rp-busy * { cursor: progress !important; }
 .mx-over__seal { background: var(--ink) !important; box-shadow: inset 0 0 0 5px var(--ink), inset 0 0 0 7px var(--lime), 0 10px 24px rgba(0,0,0,.3) !important; }
 .mx-over__seal b, .mx-over__seal small { color: var(--lime) !important; }
 .mx-over__seal small { font-size: 11px !important; }
+
+/* ---- result badges in tiers (Bido 2026-11-09): the colour follows the tier; one badge per goal met */
+.mx-over { flex-wrap: wrap; --tb: var(--lime); --tf: var(--ink); --sb: var(--ink); --sf: var(--lime); background: var(--tb) !important; }
+.mx-over--met { --tb: #14884a; --tf: #fff; --sb: #fff; --sf: #0f6b3a; }
+.mx-over--over { --tb: var(--lime); --tf: var(--ink); --sb: var(--ink); --sf: var(--lime); }
+.mx-over--x2 { --tb: #ff691e; --tf: var(--ink); --sb: var(--ink); --sf: #ff9a5c; }
+.mx-over--x5 { --tb: #e9b949; --tf: var(--ink); --sb: var(--ink); --sf: #ffd66b; }
+.mx-over--record { --tb: #121212; --tf: #ffd66b; --sb: #ffd66b; --sf: var(--ink); border: 2px solid #ffd66b !important; }
+.mx-over__t strong, .mx-over__t span, .mx-over__k { color: var(--tf) !important; }
+.mx-over__k { font: 700 11px/1 var(--body) !important; letter-spacing: .14em; text-transform: uppercase; opacity: .75; }
+.mx-over__seal { background: var(--sb) !important; box-shadow: inset 0 0 0 5px var(--sb), inset 0 0 0 7px var(--sf), 0 10px 24px rgba(0,0,0,.3) !important; }
+.mx-over__seal b, .mx-over__seal small { color: var(--sf) !important; }
+.mx-over__t { flex: 1 1 220px; }
+.mx-gbs { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.mx-gb { display: grid; justify-items: center; align-content: center; gap: 2px; width: 82px; height: 82px; border-radius: 50%; background: rgba(255,255,255,.55); color: var(--ink);
+  box-shadow: inset 0 0 0 2px rgba(18,18,18,.18); text-align: center; }
+.mx-over--met .mx-gb, .mx-over--record .mx-gb { background: rgba(255,255,255,.14); color: var(--tf); box-shadow: inset 0 0 0 2px rgba(255,255,255,.3); }
+.mx-gb__ic .mx-ico { width: 15px; height: 15px; }
+.mx-gb b { font: 400 22px/1 var(--heading); }
+.mx-gb small { font: 700 9px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; }
+@media (max-width: 700px) { .mx-gb { width: 66px; height: 66px; } .mx-gb b { font-size: 18px; } }
+#rp .rp-cover .mx-gb { width: 76px; height: 76px; } #rp .rp-cover .mx-gb b { font-size: 21px; }
+#rp .rp-cover .mx-over__t strong { font-size: 40px; }
+.mx-gb { background: #fff !important; }
+.mx-gb, .mx-gb b, .mx-gb small, .mx-gb__ic { color: var(--ink) !important; }
+.mx-over--met .mx-gb, .mx-over--record .mx-gb { background: rgba(255,255,255,.12) !important; }
+.mx-over--met .mx-gb, .mx-over--met .mx-gb b, .mx-over--met .mx-gb small, .mx-over--met .mx-gb__ic,
+.mx-over--record .mx-gb, .mx-over--record .mx-gb b, .mx-over--record .mx-gb small, .mx-over--record .mx-gb__ic { color: var(--tf) !important; }

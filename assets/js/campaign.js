@@ -1125,15 +1125,21 @@
   }
 
 
-  // Over-achieved (Bido 2026-11-09): every target met and at least one well past its goal — a seal on the cover.
+  // Result badges (Bido 2026-11-09): about the whole campaign only. One tier seal from how far the campaign's lead goal
+  // went past its target (every target met), then one badge for each goal that met it.
+  var TIERS = [[10, "Record result", "record"], [5, "5× the goal", "x5"], [2, "Double the goal", "x2"], [1.2, "Over-achieved", "over"], [1, "Target met", "met"]];
   function overBadge(items, P) {
     if (!P.all_met || !items.length) return "";
-    var best = items.filter(function (i) { return i.key !== "er"; }).sort(function (a, b) { return b.pct - a.pct; });
-    var lead = best[0]; if (!lead || lead.pct < 120) return "";
-    var mult = function (i) { return i.pct >= 150 ? times(i.pct) : Math.round(i.pct) + "%"; };
-    var past = best.filter(function (i) { return i.pct >= 120; }).map(function (i) { return KLABEL[i.key].toLowerCase() + " " + mult(i); });
-    return '<div class="mx-over" role="note"><span class="mx-over__seal" aria-hidden="true"><b>' + mult(lead) + "</b><small>" + esc(KLABEL[lead.key]) + "</small></span>"
-      + '<div class="mx-over__t"><strong>Over-achieved</strong><span>Every target met, and well past them: ' + esc(past.join(" · ")) + " the goal.</span></div></div>";
+    var best = items.filter(function (i) { return i.key !== "er"; }).sort(function (a, b) { return b.pct - a.pct; })[0] || items[0];
+    var x = best.pct / 100, tier = TIERS.filter(function (t) { return x >= t[0]; })[0] || TIERS[TIERS.length - 1];
+    var mult = function (i) { return i.key !== "er" && i.pct >= 150 ? times(i.pct) : Math.round(i.pct) + "%"; };
+    var goals = items.slice().sort(function (a, b) { return b.pct - a.pct; }).map(function (i) {
+      return '<li class="mx-gb"><span class="mx-gb__ic">' + (IC[i.key] || "") + "</span><b>" + mult(i) + "</b><small>" + esc(KLABEL[i.key]) + "</small></li>";
+    }).join("");
+    var line = tier[2] === "met" ? "Every target met." : "Every target met, and " + KLABEL[best.key].toLowerCase() + " reached " + mult(best) + " of its goal.";
+    return '<div class="mx-over mx-over--' + tier[2] + '" role="note"><span class="mx-over__seal" aria-hidden="true"><b>' + mult(best) + "</b><small>" + esc(KLABEL[best.key]) + "</small></span>"
+      + '<div class="mx-over__t"><span class="mx-over__k">Campaign result</span><strong>' + esc(tier[1]) + "</strong><span>" + esc(line) + "</span></div>"
+      + '<ul class="mx-gbs" aria-label="Goals met">' + goals + "</ul></div>";
   }
 
   function short(a, b) {
