@@ -1639,3 +1639,8 @@ html.rp-busy, html.rp-busy * { cursor: progress !important; }
 .mx-over--met .mx-gb, .mx-over--record .mx-gb { background: rgba(255,255,255,.12) !important; }
 .mx-over--met .mx-gb, .mx-over--met .mx-gb b, .mx-over--met .mx-gb small, .mx-over--met .mx-gb__ic,
 .mx-over--record .mx-gb, .mx-over--record .mx-gb b, .mx-over--record .mx-gb small, .mx-over--record .mx-gb__ic { color: var(--tf) !important; }
+/* goal badges: the label always sits inside the circle (Bido 2026-11-09) */
+.mx-gb { width: 96px !important; height: 96px !important; padding: 0 10px; box-sizing: border-box; }
+.mx-gb small { font-size: 8px !important; letter-spacing: .03em !important; max-width: 74px; overflow-wrap: anywhere; line-height: 1.1 !important; }
+#rp .rp-cover .mx-gb { width: 92px !important; height: 92px !important; } #rp .rp-cover .mx-gb b { font-size: 22px; }
+@media (max-width: 700px) { .mx-gb { width: 80px !important; height: 80px !important; } .mx-gb small { font-size: 7.5px !important; max-width: 62px; } }
