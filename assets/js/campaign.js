@@ -1127,9 +1127,7 @@
     // One rule: with a campaign ER goal, the card grades against it, like the score line (owner, 2026-10-19).
     var erT = (p.items || []).filter(function (i) { return i.key === "er"; })[0];
     // With a goal: one card, the rate the goal measures (as on the score line and the dashboard), graded on it.
-    if (erT) ex.push(["Engagement rate", erT.actual, erT.grade, "Against the campaign goal of " + pct(erT.goal, 1) + " · industry guide " + bmf(bm.er.micro[0]) + "% (micro creators)"]);
-    else ex.push(["Engagement rate", t.er, t.er_grade, "Strong from " + bmf(bm.er.micro[0]) + "% (micro creators)"]);
-    if (t.video_er != null && !erT) ex.push(["Video engagement", t.video_er, t.video_er_grade, "Strong from " + bmf(bm.video_er[0]) + "%"]);
+    // Engagement-rate cards and Data notes removed from every report (Bido 2026-11-09).
     if (R.visibility.clicks && t.ctr != null && R.clicks && R.clicks.links) ex.push(["Click-through", t.ctr, t.ctr_grade, "Strong from " + bmf(bm.ctr[0]) + "%"]);
     if (unscored()) {
       $("mx-targets-lede").textContent = "Not scored: no brief, strategy or targets were set for this campaign, so these are the results as delivered.";
@@ -1137,7 +1135,8 @@
     }
     $("mx-bench").innerHTML = ex.map(function (x) {
       return '<div class="mx-bench__item"><h3>' + h3ic(x[0]) + x[0] + '</h3><div class="mx-bench__val">' + pct(x[1]) + " " + sig(x[2]) + "</div><p>" + x[3] + "</p></div>";
-    }).join("") + dataNotes();
+    }).join("");
+    $("mx-bench").hidden = !ex.length;
   }
   // What the numbers leave out, under the goals (owner, 2026-10-29): the campaign's own notes, then what the data shows.
   function dataNotes() {

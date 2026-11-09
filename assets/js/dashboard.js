@@ -1581,6 +1581,7 @@
       + (more.length ? '<tr><td colspan="4"><small>Videos</small></td></tr>' + more.join("") : "") + "</tbody></table>");
   }
   function dataNotes() {
+    return "";   // Data notes removed from every report (Bido 2026-11-09)
     var g = GL(), notes = R.data_notes || (g && g.notes) || []; if (!notes.length) return "";
     return sec("notes", "Data notes", "Only the things that change how to read the numbers above.", '<ul class="db-dn">' + notes.map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("") + "</ul>");
   }
