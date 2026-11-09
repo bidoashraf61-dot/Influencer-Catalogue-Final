@@ -1590,3 +1590,17 @@ html.rp-busy, html.rp-busy * { cursor: progress !important; }
 #rp .mx-mrow__bar { height: 32px !important; } #rp .mx-mrow__bar i { font-size: 12px; }
 #rp .mx-mrow__s b { font-size: 30px; } #rp .mx-mrow__s small { font-size: 9.5px; }
 #rp .mx-moods { gap: 0; }
+
+/* ---- round 4 (Bido 2026-11-09): over-achieved seal on the cover */
+.mx-over { display: flex; align-items: center; gap: 22px; margin-top: 26px; padding: 18px 22px; border-radius: 22px; border: 1px solid rgba(232,255,118,.35); background: rgba(232,255,118,.08); }
+.mx-over__seal { flex: none; display: grid; place-content: center; justify-items: center; width: 112px; height: 112px; border-radius: 50%; background: var(--lime); color: var(--ink);
+  box-shadow: inset 0 0 0 5px var(--lime), inset 0 0 0 7px var(--ink), 0 10px 24px rgba(0,0,0,.35); transform: rotate(-8deg); }
+.mx-over__seal b { font: 400 40px/.9 var(--heading); letter-spacing: .01em; }
+.mx-over__seal small { margin-top: 2px; font: 700 10px/1 var(--body); letter-spacing: .12em; text-transform: uppercase; }
+.mx-over__t { display: grid; gap: 6px; min-width: 0; }
+.mx-over__t strong { font: 400 40px/1 var(--heading); letter-spacing: .03em; color: var(--lime); }
+.mx-over__t span { font: 500 16px/1.4 var(--body); color: rgba(255,255,255,.85); }
+@media (max-width: 700px) { .mx-over { gap: 14px; padding: 14px; } .mx-over__seal { width: 84px; height: 84px; } .mx-over__seal b { font-size: 30px; } .mx-over__t strong { font-size: 30px; } .mx-over__t span { font-size: 14px; } }
+#rp .rp-cover .mx-over { margin-top: 30px; padding: 20px 24px; }
+#rp .rp-cover .mx-over__seal { width: 120px; height: 120px; } #rp .rp-cover .mx-over__seal b { font-size: 44px; }
+#rp .rp-cover .mx-over__t strong { font-size: 44px; } #rp .rp-cover .mx-over__t span { font-size: 15px; }

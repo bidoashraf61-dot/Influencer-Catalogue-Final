@@ -1121,9 +1121,20 @@
       + (R.campaign && R.campaign.status === "ended" ? "" : '<i class="mx-obj__due" style="left:' + due.toFixed(1) + '%"><span>today</span></i>') + "</div>"
       + '<div class="mx-obj__parts">' + mine.map(function (i) {
         return '<span><span class="mx-sw ' + i.grade + '"></span>' + KLABEL[i.key] + " <b>" + Math.round(i.pct) + "%</b></span>";
-      }).join("") + "</div></div>";
+      }).join("") + "</div></div>" + overBadge(mine, P);
   }
 
+
+  // Over-achieved (Bido 2026-11-09): every target met and at least one well past its goal — a seal on the cover.
+  function overBadge(items, P) {
+    if (!P.all_met || !items.length) return "";
+    var best = items.filter(function (i) { return i.key !== "er"; }).sort(function (a, b) { return b.pct - a.pct; });
+    var lead = best[0]; if (!lead || lead.pct < 120) return "";
+    var mult = function (i) { return i.pct >= 150 ? times(i.pct) : Math.round(i.pct) + "%"; };
+    var past = best.filter(function (i) { return i.pct >= 120; }).map(function (i) { return KLABEL[i.key].toLowerCase() + " " + mult(i); });
+    return '<div class="mx-over" role="note"><span class="mx-over__seal" aria-hidden="true"><b>' + mult(lead) + "</b><small>" + esc(KLABEL[lead.key]) + "</small></span>"
+      + '<div class="mx-over__t"><strong>Over-achieved</strong><span>Every target met, and well past them: ' + esc(past.join(" · ")) + " the goal.</span></div></div>";
+  }
 
   function short(a, b) {
     // "6–10 Sept" when both days share a month, else "28 Sept – 3 Oct"
