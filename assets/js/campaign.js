@@ -669,13 +669,39 @@
 
   // Overview order (Bido 2026-11-09): the goals first, achieved against target, their one-line conclusion
   // ("the views goal 9.7×"), then the creators, then each creator's videos. The same on the screen and in the PDF.
+  // The goals in one card: the lead goal's multiple, how far past (or short of) the goal the result landed on one
+  // scale, the verdict and the other goals as chips.
+  function conclusionHtml() {
+    var items = (R.progress && R.progress.items) || []; if (!items.length || unscored()) return "";
+    var g = {}; items.forEach(function (i) { g[i.key] = i; });
+    var lead = g.views || g.engagement || g.posts || items[0], isRate = lead.key === "er";
+    var f = function (v) { return isRate ? pct(v, 1) : num(v); };
+    var top = Math.max(lead.goal || 0, lead.actual || 0) || 1;
+    var fill = Math.min(100, (lead.actual || 0) / top * 100), goalAt = Math.min(100, (lead.goal || 0) / top * 100);
+    var over = !isRate && lead.pct >= 150, t = R.total || {}, v = R.verdict || {};
+    var mult = function (i) { return i.key !== "er" && i.pct >= 150 ? times(i.pct) : Math.round(i.pct) + "%"; };
+    var others = items.filter(function (i) { return i !== lead; }).map(function (i) {
+      return '<li class="mx-concl__o mx-concl__o--' + esc(i.grade || "") + '"><span>' + (IC[i.key] || "") + esc(TLABEL[i.key]) + "</span><b>" + mult(i) + "</b><small>" + (i.key !== "er" && i.pct >= 150 ? "the goal" : "of goal") + "</small></li>";
+    }).join("");
+    return '<section class="mx-concl mx-concl--' + esc(lead.grade || "") + '" aria-label="The goals in one line">'
+      + '<div class="mx-concl__fig"><small>' + esc(TLABEL[lead.key]) + "</small><b>" + mult(lead) + "</b><span>" + (over ? "the goal" : "of the goal") + "</span></div>"
+      + '<div class="mx-concl__main"><p class="mx-concl__line"><b>' + f(lead.actual) + "</b> " + esc(TLABEL[lead.key].toLowerCase()) + " against a goal of <b>" + f(lead.goal) + "</b></p>"
+      + '<div class="mx-concl__scale" role="img" aria-label="' + esc(TLABEL[lead.key]) + " " + f(lead.actual) + " against a goal of " + f(lead.goal) + '"><i style="width:' + fill.toFixed(1) + '%"></i>'
+      + '<span class="mx-concl__goal" style="left:' + goalAt.toFixed(1) + '%"><em>Goal</em></span></div>'
+      + '<div class="mx-concl__tags">' + (v.label ? '<span class="mx-concl__v">' + esc(v.label) + "</span>" : "") + "<span>" + full(t.delivered) + (t.planned ? " of " + t.planned : "") + " posts live</span></div></div>"
+      + (others ? '<ul class="mx-concl__others">' + others + "</ul>" : "") + "</section>";
+  }
   function arrangeOverview() {
     var box = document.querySelector("#sec-overview .cat-container"); if (!box) return;
     var head = box.querySelector(".mx-sec__head"), b = $("mx-bullets"), gt = b && b.previousElementSibling;
     if (!gt || !/goals/i.test(gt.textContent)) gt = null;
     var story = box.querySelector(".mx-story"); if (story) story.classList.add("mx-story--end");
+    // the goals' conclusion is drawn as its own card (Bido 2026-11-09); the plain figure stays only when there are no goals
+    var cc = $("mx-concl"); if (!cc) { cc = document.createElement("div"); cc.id = "mx-concl"; }
+    cc.innerHTML = conclusionHtml(); cc.hidden = !cc.innerHTML;
+    if (story && cc.innerHTML) story.hidden = true;
     var after = head;
-    [gt, b, story, $("mx-carousel-wrap"), $("mx-cvwrap")].forEach(function (el) { if (el) { after.insertAdjacentElement("afterend", el); after = el; } });
+    [gt, b, cc, story, $("mx-carousel-wrap"), $("mx-cvwrap")].forEach(function (el) { if (el) { after.insertAdjacentElement("afterend", el); after = el; } });
   }
 
   /* ---------------------------------------------- the magazine: story lines and contents (item 294) */
@@ -883,7 +909,7 @@
       if (body.children.length) turn();
       body.appendChild(w); if (!fits(w)) shrink(w);
     }
-    var ATOM = ".mx-cc, .mx-post, .mx-cvr, .mx-kpi, .mx-kpis, .mx-panel, .mx-chart, .mx-say__top, .mx-podium, .mx-pod, .mx-sec__head, .mx-table-title, .mx-carousel__head, "
+    var ATOM = ".mx-cc, .mx-post, .mx-cvr, .mx-kpi, .mx-kpis, .mx-concl, .mx-mrow, .mx-qbars > li, .mx-panel, .mx-chart, .mx-say__top, .mx-podium, .mx-pod, .mx-sec__head, .mx-table-title, .mx-carousel__head, "
       + ".mx-obj, .mx-next, .mx-empty-note, .mx-tcds > li, .mx-toc__t, .mx-clickheads, .mx-stat, dl, h2, h3, p, tr, svg, img";
     function place(node, parentOrig) {
       var orig = origOf(node), po = parentOrig !== undefined ? parentOrig : (orig ? orig.parentElement : null);
@@ -1545,11 +1571,15 @@
       });
     });
     var who = {}; (R.creators || []).forEach(function (c) { who[c.code] = c; });
+    // one row per creator / platform across the page: who, the mood as one bar with its shares written in, then the numbers
     function row(lead, name, x) {
-      var seg = MOOD.map(function (m) { return x[m[0]] ? '<i style="width:' + (x[m[0]] / x.n * 100).toFixed(1) + "%;background:" + m[2] + '"></i>' : ""; }).join("");
-      return '<div class="mx-mrow">' + lead + '<div class="mx-mrow__b"><b>' + esc(name) + '</b><span class="mx-mrow__bar" role="img" aria-label="' + esc(name) + ": " + sayPct(x.pos, x.n) + " positive, "
-        + sayPct(x.neu, x.n) + " neutral, " + sayPct(x.neg, x.n) + ' negative">' + seg + '</span></div><div class="mx-mrow__n"><b>' + sayPct(x.pos, x.n) + "</b>positive · " + sayPct(x.intent, x.n)
-        + " ask to buy<br>" + full(x.n) + " comments</div></div>";
+      var seg = MOOD.map(function (m) { var w = x[m[0]] / x.n * 100;
+        return w ? '<i style="width:' + w.toFixed(1) + "%;background:" + m[2] + '">' + (w >= 9 ? Math.round(w) + "%" : "") + "</i>" : ""; }).join("");
+      return '<div class="mx-mrow">' + lead + '<b class="mx-mrow__name">' + esc(name) + '</b><span class="mx-mrow__bar" role="img" aria-label="' + esc(name) + ": " + sayPct(x.pos, x.n) + " positive, "
+        + sayPct(x.neu, x.n) + " neutral, " + sayPct(x.neg, x.n) + ' negative">' + seg + "</span>"
+        + '<span class="mx-mrow__s mx-mrow__s--pos"><b>' + sayPct(x.pos, x.n) + "</b><small>positive</small></span>"
+        + '<span class="mx-mrow__s mx-mrow__s--buy"><b>' + sayPct(x.intent, x.n) + "</b><small>ask to buy</small></span>"
+        + '<span class="mx-mrow__s"><b>' + full(x.n) + "</b><small>comments</small></span></div>";
     }
     var key = '<p class="mx-moodkey">' + MOOD.map(function (m) { return '<span><i style="background:' + m[2] + '"></i>' + m[1] + "</span>"; }).join("") + "</p>";
     var cRows = Object.keys(byC).filter(function (k) { return byC[k].n; }).sort(function (a, b) { return byC[b].n - byC[a].n; }).map(function (k) {
@@ -1563,13 +1593,16 @@
         var x = qs[k] = qs[k] || { en: q[1] || q[0], ar: q[0], n: 0 }; x.n += q[2] || 0; });
     });
     var top = Object.keys(qs).map(function (k) { return qs[k]; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 6);
-    var qList = top.length ? '<ul class="mx-qs">' + top.map(function (q) {
-      return "<li><span><b>" + esc(q.en) + "</b>" + (q.ar && q.ar !== q.en ? '<small dir="rtl" lang="ar">' + esc(q.ar) + "</small>" : "") + "</span><em>" + full(q.n) + "</em></li>"; }).join("") + "</ul>" : "";
+    // the questions as a ranked bar chart (Bido 2026-11-09)
+    var qmax = top.length ? top[0].n || 1 : 1;
+    var qList = top.length ? '<ol class="mx-qbars">' + top.map(function (q, i) {
+      return '<li><span class="mx-qbars__n">' + (i + 1) + '</span><span class="mx-qbars__t"><b>' + esc(q.en) + "</b>" + (q.ar && q.ar !== q.en ? '<small dir="rtl" lang="ar">' + esc(q.ar) + "</small>" : "")
+        + '</span><span class="mx-qbars__bar"><i style="width:' + (q.n / qmax * 100).toFixed(1) + '%"></i></span><em>' + full(q.n) + "<small>times</small></em></li>"; }).join("") + "</ol>" : "";
     return '<div class="mx-say__more">'
       // no written reading (Bido 2026-11-09): the questions, then the mood by creator and by platform
       + (qList ? '<div class="mx-panel mx-panel--wide"><h3>What viewers asked most</h3>' + qList + "</div>" : "")
-      + (cRows ? '<div class="mx-panel"><h3>Mood by creator</h3><div class="mx-moods">' + cRows + "</div>" + key + "</div>" : "")
-      + (pRows ? '<div class="mx-panel"><h3>Mood by platform</h3><div class="mx-moods">' + pRows + "</div>" + key + "</div>" : "")
+      + (cRows ? '<div class="mx-panel mx-panel--wide"><h3>Mood by creator</h3><div class="mx-moods">' + cRows + "</div>" + key + "</div>" : "")
+      + (pRows ? '<div class="mx-panel mx-panel--wide"><h3>Mood by platform</h3><div class="mx-moods">' + pRows + "</div>" + key + "</div>" : "")
       + "</div>";
   }
   /* ----------------------------------------------------------- clicks */
