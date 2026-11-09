@@ -1418,3 +1418,90 @@ html.rp-busy, html.rp-busy * { cursor: progress !important; }
 /* Chrome prints the A4 page at a viewport a little under 760px: the layouts a 760px rule would stack are pinned. */
 #rp .mx-say__top { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) !important; }
 #rp .mx-say__more { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important; }
+
+/* ---- round 2 (Bido 2026-11-09): goals first, achieved and target in their own colours, bigger creator video rows */
+.mx-story--end { margin: 4px 0 30px; }
+.mx-kpi__vs { gap: 8px; }
+.mx-kpi__got, .mx-kpi__tgt { padding: 10px 12px; border-radius: 14px; }
+.mx-kpi__got { background: #e6f3eb; }
+.mx-kpi__tgt { background: #fff1e2; border-left: 0; padding-left: 12px; }
+.mx-kpi__got small, .mx-kpi__got b { color: #0f6b3a; }
+.mx-kpi__tgt small, .mx-kpi__tgt b { color: #a85507; }
+.mx-kpi__got b { font-size: 48px; }
+.mx-kpi__tgt b { font-size: 30px; }
+.mx-panel--wide { grid-column: 1 / -1; }
+.mx-panel--wide .mx-qs { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+@media (max-width: 760px) { .mx-panel--wide .mx-qs { grid-template-columns: minmax(0, 1fr); } }
+.mx-cvr { grid-template-columns: 250px minmax(0, 1fr); gap: 22px; padding: 20px 22px; }
+.mx-cvr__h { grid-template-columns: 64px minmax(0, 1fr); }
+.mx-cvr__h .mx-ava, .mx-cvr__h img { width: 64px; height: 64px; }
+.mx-cvr__h b { font-size: 27px; }
+.mx-cvr__h span { font-size: 14.5px; }
+.mx-cvr .mx-cc__vids { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.mx-cvr .mx-cc__vid { padding: 14px 16px; background: rgba(255,255,255,.7); }
+.mx-cvr .mx-cc__vh { font-size: 15px; }
+.mx-cvr .mx-cc__vh strong { font-size: 30px; }
+.mx-cvr .mx-cc__chips { gap: 6px; margin-top: 10px; }
+.mx-cvr .mx-cc__chips a { font-size: 14.5px !important; padding: 5px 11px 5px 8px; }
+.mx-cvr .mx-cc__chips svg { width: 16px; height: 16px; }
+@media (max-width: 700px) { .mx-cvr { grid-template-columns: minmax(0, 1fr); padding: 16px; } }
+/* PDF */
+#rp .mx-kpi__got b { font-size: 44px; } #rp .mx-kpi__tgt b { font-size: 28px; }
+#rp .mx-story--end { margin: 0; }
+#rp .mx-panel--wide .mx-qs { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+#rp .mx-cv { gap: 12px; }
+#rp .mx-cvr { grid-template-columns: 190px minmax(0, 1fr); gap: 14px; padding: 16px; }
+#rp .mx-cvr__h { grid-template-columns: 52px minmax(0, 1fr); }
+#rp .mx-cvr__h .mx-ava, #rp .mx-cvr__h img { width: 52px; height: 52px; }
+#rp .mx-cvr__h b { font-size: 23px; }
+#rp .mx-cvr__h span { font-size: 12.5px; }
+#rp .mx-cvr .mx-cc__vids { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+#rp .mx-cvr .mx-cc__vid { padding: 10px 12px; }
+#rp .mx-cvr .mx-cc__vh { font-size: 12.5px; }
+#rp .mx-cvr .mx-cc__vh strong { font-size: 24px; }
+#rp .mx-cvr .mx-cc__chips a { font-size: 12.5px !important; padding: 4px 8px 4px 6px; }
+#rp .mx-cvr .mx-cc__chips svg { width: 14px; height: 14px; }
+/* published content: tight cards, no stretched gaps */
+#rp .mx-wall { align-items: start !important; gap: 10px !important; }
+#rp .mx-post__media { height: 165px !important; }
+#rp .mx-post__body { gap: 8px !important; padding: 10px 12px 12px !important; }
+#rp .mx-post__links { margin-top: 0 !important; }
+#rp .mx-post .mx-nums dd { font-size: 15px !important; }
+.mx-kpi__vs { align-items: stretch; } .mx-kpi__tgt { display: flex; flex-direction: column; justify-content: flex-end; }
+#rp .rp-cover .mx-bug__title { font-size: 64px; overflow-wrap: normal !important; word-break: normal !important; hyphens: none; }
+/* PDF: each creator's row is the creator on top, the videos three across below it */
+#rp .mx-cvr { grid-template-columns: minmax(0, 1fr) !important; gap: 10px !important; padding: 14px 16px !important; }
+#rp .mx-cvr__h { grid-template-columns: 46px minmax(0, 1fr); }
+#rp .mx-cvr__h .mx-ava, #rp .mx-cvr__h img { width: 46px; height: 46px; }
+#rp .mx-cvr__h b { display: inline; font-size: 24px; } #rp .mx-cvr__h span { display: inline; margin-left: 10px; font-size: 13px; }
+#rp .mx-cvr .mx-cc__chips a { font-size: 13px !important; }
+/* PDF: goals and creators fill their own pages */
+#rp .mx-kpi { padding: 22px 22px 20px; gap: 14px; }
+#rp .mx-kpi__k { font-size: 26px; }
+#rp .mx-kpi__got b { font-size: 64px; } #rp .mx-kpi__tgt b { font-size: 38px; }
+#rp .mx-kpi__got, #rp .mx-kpi__tgt { padding: 14px 16px; }
+#rp .mx-kpi__bar { height: 14px; }
+#rp .mx-kpi__res { font-size: 15px; } #rp .mx-kpi__res b { font-size: 22px; }
+#rp .mx-kpis { gap: 16px !important; }
+#rp .mx-story--end .mx-stat dd { font-size: 120px; }
+#rp .mx-cc__photo { height: 235px !important; }
+#rp .mx-carousel__track { gap: 16px !important; }
+#rp .mx-cvr { padding: 12px 14px !important; gap: 8px !important; }
+#rp .mx-cvr__h { grid-template-columns: 40px minmax(0, 1fr); } #rp .mx-cvr__h .mx-ava, #rp .mx-cvr__h img { width: 40px; height: 40px; }
+#rp .mx-cvr .mx-cc__vid { padding: 8px 10px !important; }
+#rp .mx-cvr .mx-cc__chips { margin-top: 6px; gap: 4px; }
+#rp .mx-cvr .mx-cc__chips a { padding: 3px 8px 3px 5px !important; }
+.mx-post__ic:hover .mx-post__icb, .mx-post__ic:focus-visible .mx-post__icb { box-shadow: 0 0 0 2px var(--ink); }
+/* PDF: published content cards, compact — two rows a page under the chapter head, three on the next */
+#rp .mx-post__media { height: 150px !important; }
+#rp .mx-post .mx-who b { font-size: 12px; } #rp .mx-post .mx-who span { font-size: 10.5px; }
+#rp .mx-post .mx-nums { gap: 4px 8px !important; }
+#rp .mx-post .mx-nums dt { font-size: 8.5px !important; letter-spacing: .06em; }
+#rp .mx-post .mx-nums dd { font-size: 13px !important; margin-top: 1px; }
+#rp .mx-post__links--ic { gap: 4px; }
+#rp .mx-post__lbl { font-size: 8.5px !important; }
+#rp .mx-post__ics { gap: 4px 4px !important; flex-wrap: nowrap; }
+#rp .mx-post__ic { min-width: 0 !important; gap: 2px; font-size: 9px; }
+#rp .mx-post__ic b { font-size: 9px; }
+#rp .mx-post__icb { width: 28px !important; height: 28px !important; }
+#rp .mx-post__icb svg { width: 14px; height: 14px; }

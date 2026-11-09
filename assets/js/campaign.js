@@ -658,12 +658,24 @@
     renderCarousel();
     renderSay();
     renderStory();
+    arrangeOverview();
     $("tab-clicks").hidden = !clicksOn();
     markTab(document.body.dataset.only || "all");
     $("mx-csv").href = API + "/api/campaign.csv?t=" + encodeURIComponent(t);
     $("mx-dash").href = $("mx-dash-end").href = "dashboard/#t=" + encodeURIComponent(t); $("mx-dash").hidden = false;
     // Arriving from the dashboard's "Download PDF": open the print dialog.
     try { if (sessionStorage.getItem("hv_print")) { sessionStorage.removeItem("hv_print"); printWhenReady(); } } catch (e) {}
+  }
+
+  // Overview order (Bido 2026-11-09): the goals first, achieved against target, their one-line conclusion
+  // ("the views goal 9.7×"), then the creators, then each creator's videos. The same on the screen and in the PDF.
+  function arrangeOverview() {
+    var box = document.querySelector("#sec-overview .cat-container"); if (!box) return;
+    var head = box.querySelector(".mx-sec__head"), b = $("mx-bullets"), gt = b && b.previousElementSibling;
+    if (!gt || !/goals/i.test(gt.textContent)) gt = null;
+    var story = box.querySelector(".mx-story"); if (story) story.classList.add("mx-story--end");
+    var after = head;
+    [gt, b, story, $("mx-carousel-wrap"), $("mx-cvwrap")].forEach(function (el) { if (el) { after.insertAdjacentElement("afterend", el); after = el; } });
   }
 
   /* ---------------------------------------------- the magazine: story lines and contents (item 294) */
@@ -717,7 +729,7 @@
     CHAPTERS.forEach(function (ch) {
       var sec = $("sec-" + ch[0]), head = sec && sec.querySelector(".mx-sec__head");
       if (!head) return;
-      var p = head.querySelector(".mx-story");
+      var p = sec.querySelector(".mx-story");
       if (!p) { p = document.createElement("div"); p.className = "mx-story"; head.querySelector(".mx-h2").insertAdjacentElement("afterend", p); }
       p.innerHTML = S[ch[0]] ? statHtml(S[ch[0]]) : ""; p.hidden = !S[ch[0]];
     });
@@ -853,6 +865,7 @@
     function limit() { var r = body.getBoundingClientRect(); return r.top + r.height; }
     function fits(w) { return w.getBoundingClientRect().bottom <= limit() + 0.5; }
     function room() { var last = body.lastElementChild; return limit() - (last ? last.getBoundingClientRect().bottom + 16 : body.getBoundingClientRect().top); }
+    var PART = "#mx-carousel-wrap, #mx-cvwrap";
     var KEEP = ".mx-sec__head, .mx-table-title, .mx-carousel__head, .mx-toc__t, h2, h3";
     function turn() {
       var prev = body, last = prev.lastElementChild;
@@ -903,6 +916,11 @@
     function placeTable(node, po) {
       var head = node.tHead, rows = node.tBodies[0] ? [].slice.call(node.tBodies[0].rows) : [];
       function shell() { var t = node.cloneNode(false); if (head) t.appendChild(head.cloneNode(true)); t.appendChild(d.createElement("tbody")); return t; }
+      // a table that only just misses the page is drawn a little smaller rather than leave a row or two alone overleaf
+      var whole = node.cloneNode(true), ww = wrap(po, whole); body.appendChild(ww);
+      var avail = limit() - ww.getBoundingClientRect().top, hh = ww.getBoundingClientRect().height;
+      if (hh > avail && avail / hh >= 0.8) { ww.style.zoom = (avail / hh - 0.005).toFixed(3); if (fits(ww)) return; }
+      body.removeChild(ww);
       var t = shell(), w = wrap(po, t); body.appendChild(w);
       rows.forEach(function (r) {
         t.tBodies[0].appendChild(r);
@@ -924,15 +942,19 @@
     ["overview", "leaderboard", "content", "performance", "say", "clicks"].forEach(function (k) {
       var sec = $("sec-" + k); if (!shown(sec)) return;
       var box = sec.querySelector(".cat-container"); if (!box) return;
-      if (body.children.length && room() < 300) turn();            // a chapter does not start at the foot of a page
-      [].forEach.call(box.children, function (el) { if (shown(el) && !el.matches(DROP)) place(copy(el)); });
+      if (body.children.length) turn();            // every chapter opens a page (Bido 2026-11-09)
+      [].forEach.call(box.children, function (el) {
+        if (!shown(el) || el.matches(DROP)) return;
+        if (el.matches(PART) && body.children.length) turn();      // and so does each part of the overview
+        place(copy(el));
+      });
     });
 
     // 3 · every campaign video, with its link
     var vids = (R.posts || []).filter(function (p) { return p.section === "campaign" && p.url; })
       .sort(function (a, b) { return splitName(a.creator).en.localeCompare(splitName(b.creator).en) || (a.posted_at || 0) - (b.posted_at || 0); });
     if (vids.length) {
-      if (body.children.length && room() < 300) turn();
+      if (body.children.length) turn();
       var hd = d.createElement("div"); hd.className = "mx-sec__head";
       hd.innerHTML = '<h2 class="mx-h2"><span class="mx-h2__ic">' + (IC.content || "") + "</span>Every video link</h2>";
       var hw = wrap(null, hd); hw.setAttribute("data-keep", "1"); body.appendChild(hw); settle(hw);
@@ -1512,7 +1534,7 @@
     decorateH3("mx-say");
     // Our reading of the comments only, never the comments themselves (owner, 2026-11-03, item 294).
   }
-  // Item 361 (Bido 2026-11-09): Helvi's reading in sentences, the questions viewers asked most, and the mood for each
+  // Item 361 (Bido 2026-11-09): the questions viewers asked most, and the mood for each
   // creator and each platform. All from the comment buckets the report carries; no single comment is shown.
   function sayMore(t, C, th) {
     var byC = {}, byP = {};
@@ -1543,20 +1565,9 @@
     var top = Object.keys(qs).map(function (k) { return qs[k]; }).sort(function (a, b) { return b.n - a.n; }).slice(0, 6);
     var qList = top.length ? '<ul class="mx-qs">' + top.map(function (q) {
       return "<li><span><b>" + esc(q.en) + "</b>" + (q.ar && q.ar !== q.en ? '<small dir="rtl" lang="ar">' + esc(q.ar) + "</small>" : "") + "</span><em>" + full(q.n) + "</em></li>"; }).join("") + "</ul>" : "";
-    // the reading: sentences written from the numbers only
-    var lines = [], big = function (o) { return Object.keys(o).filter(function (k) { return o[k].n >= 30; }); };
-    var mood = t.neu >= t.pos && t.neu >= t.neg ? "Most comments were neutral questions rather than praise or complaints"
-      : t.pos >= t.neg ? "The mood leaned positive" : "The mood leaned negative";
-    lines.push(mood + ": " + sayPct(t.pos, t.n) + " positive, " + sayPct(t.neu, t.n) + " neutral and " + sayPct(t.neg, t.n) + " negative.");
-    if (t.intent) lines.push(sayPct(t.intent, t.n) + " of comments asked how to buy, where to find it or what it costs" + (top[0] ? "; the question asked most was “" + top[0].en + "” (" + full(top[0].n) + " times)." : "."));
-    if (th.length) lines.push("The talk centred on " + th.slice(0, 2).map(function (q) { return q.toLowerCase() + " (" + sayPct(t.themes[q], t.n) + ")"; }).join(" and ") + ".");
-    var bc = big(byC).sort(function (a, b) { return byC[b].intent / byC[b].n - byC[a].intent / byC[a].n; })[0];
-    if (bc && byC[bc].intent) lines.push("Viewers of " + splitName((who[bc] || {}).name || bc).en + " asked to buy most: " + sayPct(byC[bc].intent, byC[bc].n) + " of their comments.");
-    var bp = big(byP).sort(function (a, b) { return byP[b].pos / byP[b].n - byP[a].pos / byP[a].n; })[0];
-    if (bp && big(byP).length > 1) lines.push(bp + " had the warmest mood, " + sayPct(byP[bp].pos, byP[bp].n) + " positive.");
     return '<div class="mx-say__more">'
-      + '<div class="mx-panel mx-read"><h3>Helvi’s reading</h3>' + lines.map(function (l) { return "<p>" + esc(l) + "</p>"; }).join("") + "</div>"
-      + (qList ? '<div class="mx-panel"><h3>What viewers asked most</h3>' + qList + "</div>" : "")
+      // no written reading (Bido 2026-11-09): the questions, then the mood by creator and by platform
+      + (qList ? '<div class="mx-panel mx-panel--wide"><h3>What viewers asked most</h3>' + qList + "</div>" : "")
       + (cRows ? '<div class="mx-panel"><h3>Mood by creator</h3><div class="mx-moods">' + cRows + "</div>" + key + "</div>" : "")
       + (pRows ? '<div class="mx-panel"><h3>Mood by platform</h3><div class="mx-moods">' + pRows + "</div>" + key + "</div>" : "")
       + "</div>";
