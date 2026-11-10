@@ -1049,6 +1049,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             import access_api
             st, payload = access_api.state(self, query)
             return self.send_json(st, payload, self.cors() + [("Cache-Control", "no-store")])
+        if path.startswith("/r/"):
+            return self.share_preview(path[len("/r/"):])
         if path.startswith("/go/"):
             return self.go(path[len("/go/"):])
         if path.startswith("/insights/"):
@@ -1617,7 +1619,17 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send(405, b"", "text/plain")
         if path.startswith("/go/"):
             return self.go(path[len("/go/"):])
+        if path.startswith("/r/"):
+            return self.share_preview(path[len("/r/"):])
         return self.send(405, b"", "text/plain")
+
+    def share_preview(self, token):
+        """/r/<token>: a client link's chat preview (its own title and picture), then on to the report."""
+        import report_shares
+        body = report_shares.preview_html(token, mailer.SITE)
+        if self.command == "HEAD":
+            return self.send(200, b"", headers=[("Cache-Control", "no-store")])
+        return self.send(200, body, headers=[("Cache-Control", "no-store"), ("Referrer-Policy", "no-referrer")])
 
     def go(self, slug):
         """A tracking link: record the tap, send the visitor on.

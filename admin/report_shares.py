@@ -7,7 +7,9 @@ The data is live (the page reads the portal as it is now), stamped "Data as of" 
 * A link is a row in ``report_shares``: kind + ref (the campaign or selection token, or the creator code),
   who it is for (label), when it ends (expires_at) and whether it was revoked. Owner/admin accounts and the
   account's KAM make them; every make and revoke is in History (entity "share", so Undo works).
-* The link is ``/report/#r=<token>``. That page asks ``/api/report`` what the token opens; the answer sets the
+* The link is ``/r/<token>`` (Bido 2026-11-10: chat apps never see a ``#`` part, so every old ``/report/#r=``
+  link previewed as "Report"). ``/r/`` answers with this link's own title and picture for the preview, then sends
+  the browser on to ``/report/#r=<token>``, which still works on its own. That page asks ``/api/report`` what the token opens; the answer sets the
   ``hv_report`` cookie (the tokens this browser holds) and the page moves to the report itself with ``&r=``.
 * The server lets a share in exactly where a public read-only link (``public_links``) is let in: the client's
   view with money taken out, every write refused. Two exceptions: a selection link may show prices when the
@@ -232,7 +234,70 @@ def page(r):
 
 
 def link(r, site):
-    return site.rstrip("/") + "/report/#r=" + r["token"]
+    return site.rstrip("/") + "/r/" + r["token"]
+
+
+# The preview a chat app shows for a link: what it is and its name, never a number or a price.
+PREVIEW = {
+    "selection": ("Creator selection", "A shortlist of creators picked for you by HelloVoice. Open it to approve, reject or comment.",
+                  "helvi-selection-mark-v4.png"),
+    "campaign": ("Campaign report", "Live results of your campaign, from HelloVoice.", "helvi-track-mark-v4.png"),
+    "creator": ("Creator analysis", "A creator's full analysis, from HelloVoice.", "helvi-intelligence-mark-v5.png"),
+    "study": ("Competitor study", "Who your competitors book, and who to book next, from HelloVoice.",
+              "helvi-intelligence-mark-v5.png"),
+}
+
+
+def _live_name(r):
+    """The report's name as it is now (a renamed selection previews by its new name), else as it was shared."""
+    try:
+        if r["kind"] in ("selection", "study"):
+            sel = db.selection(token=r["ref"])
+            if sel is not None and not sel["deleted_at"] and sel["name"]:
+                return sel["name"]
+        elif r["kind"] == "creator":
+            with db.connect() as c:
+                row = c.execute("SELECT name FROM creators WHERE code = ?", (r["ref"],)).fetchone()
+            if row is not None and row["name"]:
+                return row["name"]
+    except Exception:
+        pass
+    return r["title"] or ""
+
+
+def preview_html(token, site):
+    """``/r/<token>``: the page a chat app reads for its link preview, and a browser leaves at once for the report.
+    Opens are not counted here (crawlers fetch it too); the report page counts them as before."""
+    import html as _h
+    token = str(token or "").strip().strip("/")
+    site = site.rstrip("/")
+    r = get(token=token) if token and len(token) <= 64 and re.fullmatch(r"[A-Za-z0-9_-]+", token) else None
+    dest = "/report/#r=" + token if r is not None else "/report/"
+    if r is None:
+        title, desc, img = "Shared from HelloVoice", "This link is not recognised.", "helvi-selection-mark-v4.png"
+    elif not is_open(r):
+        kind, _, img = PREVIEW.get(r["kind"], PREVIEW["selection"])
+        title, desc = kind + " · link ended", "This link has ended. Ask HelloVoice for a new one."
+    else:
+        kind, desc, img = PREVIEW.get(r["kind"], PREVIEW["selection"])
+        name = _live_name(r)
+        title = (kind + " · " + name) if name else kind
+    esc = lambda x: _h.escape(str(x), quote=True)
+    img_url = site + "/assets/brand/modules/" + img
+    url = site + "/r/" + token
+    return ("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+            "<title>%(t)s</title><meta name=\"description\" content=\"%(d)s\">"
+            "<meta property=\"og:type\" content=\"website\"><meta property=\"og:site_name\" content=\"HELVi Connect · HelloVoice\">"
+            "<meta property=\"og:title\" content=\"%(t)s\"><meta property=\"og:description\" content=\"%(d)s\">"
+            "<meta property=\"og:url\" content=\"%(u)s\"><meta property=\"og:image\" content=\"%(i)s\">"
+            "<meta property=\"og:image:width\" content=\"256\"><meta property=\"og:image:height\" content=\"256\">"
+            "<meta name=\"twitter:card\" content=\"summary\"><meta name=\"robots\" content=\"noindex,nofollow\">"
+            "<meta http-equiv=\"refresh\" content=\"0;url=%(g)s\">"
+            "<script>location.replace(%(j)s)</script></head>"
+            "<body style=\"font:16px system-ui,sans-serif;padding:24px\"><a href=\"%(g)s\">Open %(t)s</a></body></html>"
+            ) % {"t": esc(title), "d": esc(desc), "u": esc(url), "i": esc(img_url), "g": esc(dest),
+                 "j": __import__("json").dumps(dest)}
 
 
 def public(r, site, with_link=True):
