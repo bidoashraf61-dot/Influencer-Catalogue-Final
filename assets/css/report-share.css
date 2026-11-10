@@ -45,8 +45,9 @@
 .hv-shared .hv-voice, .hv-shared #hv-voice, .hv-shared .pp-unlock, .hv-shared .pp-req, .hv-shared .cat-top-right,
 .hv-shared .db-head__actions #db-pdf, .hv-shared .db-upd { display: none !important; }
 /* Selection: the client decides (Approve / Reject / Change, with a note) and nothing else: no editing the list,
-   no tags, no AI, no quote request, no re-sharing. */
-.hv-shared .sel-share, .hv-shared .cat-card__mark, .hv-shared .cat-card__remove, .hv-shared .cat-tag--add, .hv-shared [data-tag-x],
+   no tags, no AI, no quote request, no re-sharing. The platform icons stay: they open the creator's
+   own profile (Bido 2026-11-10). */
+.hv-shared .sel-share, .hv-shared .cat-card__remove, .hv-shared .cat-tag--add, .hv-shared [data-tag-x],
 .hv-shared .cat-card__analysis, .hv-shared .sel-alike, .hv-shared .sel-ideas, .hv-shared #cat-copy-link,
 .hv-shared .cat-close, .hv-shared .cat-add-more, .hv-shared #cat-modal, .hv-shared .cat-hero__lead,
 .hv-shared .sel-rename, .hv-shared .cx-rename, .hv-shared .sel-repl { display: none !important; }
