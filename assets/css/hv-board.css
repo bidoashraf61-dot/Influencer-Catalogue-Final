@@ -274,7 +274,7 @@
   background: var(--white); color: var(--ink); text-decoration: none; font: 400 16px/1 var(--heading); letter-spacing: .05em; cursor: pointer; list-style: none; }
 .hvb-go::-webkit-details-marker { display: none; }
 .hvb-go:hover { background: var(--ink); color: var(--lime); border-color: var(--ink); }
-.hvb-go--dash { background: var(--lime); border-color: var(--lime); }
+.hvb-go--dash, .hvb-go--mkt { background: var(--lime); border-color: var(--lime); }
 .hvb-go b { font-weight: 400; padding: 1px 7px; border-radius: var(--r-pill); background: var(--linen); color: var(--ink); font-size: 13px; }
 .hvb-pick { position: relative; }
 .hvb-pick__list { position: absolute; z-index: 5; left: 0; top: calc(100% + 6px); min-width: 220px; max-width: 280px; margin: 0; padding: 6px; list-style: none;

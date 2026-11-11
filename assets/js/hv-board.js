@@ -176,6 +176,7 @@
       key1: [String(k.creators || 0), k.creators === 1 ? "creator" : "creators"],
       sels: [{ label: s.name, button: selLabel(s, k), href: ROOT + "selection/#s=" + encodeURIComponent(s.token) }],
       dash: (s.campaigns || []).filter(function (c) { return c.live; }).map(function (c) { return ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token); })[0] || "",
+      mkt: s.study ? ROOT + "market/#s=" + encodeURIComponent(s.token) : "",
       when: s.owner ? s.owner + "’s" : "", owner: s.owner || "", size: k.creators || 0, kam: s.kam || "",
       badge: s.hidden ? h("span", { class: "lc-chip lc-chip--draft" }, h("i", { "aria-hidden": "true" }), "Hidden from client") : (badge || null),
       next: s.next || null, manage: !!s.manage, options: !!s.options,
@@ -199,6 +200,7 @@
       key1: [String(st.competitors || 0), st.competitors === 1 ? "competitor" : "competitors"],
       sels: sel ? [{ label: sel.name, button: st.stage === "ready" ? "Selection · share" : "Selection", href: ROOT + "selection/#s=" + encodeURIComponent(sel.token) }] : [],
       dash: (st.campaigns || []).filter(function (c) { return c.live; }).map(function (c) { return ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token); })[0] || "",
+      mkt: sel ? map : "",
       when: st.manual ? "Moved by hand" : (st.posts ? big(st.posts) + " posts read" : ""), kam: st.kam || "", badge: st.visible ? null : h("span", { class: "lc-chip lc-chip--draft" }, h("i", { "aria-hidden": "true" }), "Staff only"),
       figures: [["Posts", String(st.posts || 0)], ["Creators", String(st.creators || 0)], ["On roster", String(st.matched || 0)]],
       book: st.top && st.top.handle ? st.top : null, next: st.next || null, manage: !!st.manage,
@@ -278,6 +280,8 @@
   // Item 203: "Open selection" (a short list when the campaign holds several) and "Open dashboard".
   function goButtons(it, B) {
     var out = [];
+    // Straight to the Market Intelligence board, without opening the selection first.
+    if (it.mkt) out.push(h("a", { class: "hvb-go hvb-go--mkt", href: it.mkt }, svg("search"), "Market intelligence", h("span", { class: "hvb-sr" }, ": " + it.name)));
     if (it.sels && it.sels.length === 1) {
       out.push(h("a", { class: "hvb-go", href: it.sels[0].href }, svg("list"), it.sels[0].button || "Selection",
         h("span", { class: "hvb-sr" }, ": " + it.name)));
