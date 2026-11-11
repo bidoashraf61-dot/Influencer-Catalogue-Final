@@ -704,7 +704,12 @@
     function done(b) {
       if (b.step === "profile") { st.ticket = b.ticket; st.company = b.suggested_company || ""; show("details"); }
       else if (b.step === "pending") show("pending", { message: b.message });
-      else if (b.step === "done") { setSay("details"); location.reload(); }
+      else if (b.step === "done") {
+        setSay("details");
+        // Signing in opens the catalogue home (hero + creators), not whatever page the browser
+        // restored. Shared selection/report links keep their page so the client sees what was sent.
+        if (/^\/(selection|report|r)\//.test(location.pathname)) location.reload(); else location.href = ROOT;
+      }
     }
 
     function paneDetails() {
