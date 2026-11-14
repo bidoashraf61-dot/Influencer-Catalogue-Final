@@ -158,6 +158,10 @@ def assign_selection(sel_id, code_id, move_campaigns=True, tell=True, confirmed=
         keep_name = "" if (not shown or shown in old_labels) else shown
         with history.tracked("selection", sel["id"], 'Assigned selection "%s" to %s%s' % (sel["name"], out["to"], via)):
             db.set_selection_client(sel["id"], code["id"], keep_name)
+        with db.connect() as conn:
+            kam = db.default_kam_email(conn, code["id"])
+        if kam:                                  # follows the new company KAM (owner, 2026-10-29)
+            db.kam_assign("selection", sel["id"], kam, by="auto: company KAM")
         moved_sel = db.selection(sel["id"])
     for k in todo:
         _move_campaign(k, code["id"], old_labels, new_label, "" if sel_moves else via)

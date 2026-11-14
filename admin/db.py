@@ -1983,7 +1983,78 @@ def zero_prices(codes):
     return {c: [0, 0] for c in codes}
 
 
+def default_kam_for_selection(sid, by="auto: company KAM"):
+    """A selection filed under a company that has a KAM goes to that KAM too, unless it already has one
+    (owner, 2026-10-29). The KAM is the one named on the owning account, else on the company's main account."""
+    try:
+        with connect() as conn:
+            sel = conn.execute("SELECT code_id FROM selections WHERE id = ?", (int(sid),)).fetchone()
+            if sel is None or sel["code_id"] is None:
+                return None
+            if conn.execute("SELECT 1 FROM item_kam WHERE kind = 'selection' AND item_id = ?", (int(sid),)).fetchone():
+                return None
+            u = conn.execute("SELECT kam, company_code_id FROM users WHERE code_id = ? AND deleted_at IS NULL",
+                             (sel["code_id"],)).fetchone()
+            kam = (u["kam"] or "").strip() if u is not None else ""
+            if not kam and u is not None and u["company_code_id"]:
+                m = conn.execute("SELECT kam FROM users WHERE code_id = ? AND deleted_at IS NULL",
+                                 (u["company_code_id"],)).fetchone()
+                kam = (m["kam"] or "").strip() if m is not None else ""
+        if not kam:
+            return None
+        if "<" in kam and ">" in kam:
+            email = kam[kam.rfind("<") + 1:kam.find(">", kam.rfind("<") + 1)]
+        else:
+            email = kam
+        if "@" not in email:
+            import notify
+            email = next((m for n, m in notify.kams() if (n or "").strip().lower() == kam.lower()), "")
+        email = (email or "").strip().lower()
+        if "@" not in email:
+            return None
+        kam_assign("selection", int(sid), email, by)
+        return email
+    except Exception:
+        return None
+
+
+def default_kam_email(conn, code_id):
+    """The KAM set on the account that owns this code (users.kam), else on its company account; None when there is none."""
+    import re
+    if code_id is None:
+        return None
+    u = conn.execute("SELECT kam, company_code_id FROM users WHERE code_id = ? AND deleted_at IS NULL", (int(code_id),)).fetchone()
+    for _ in range(2):
+        if u is None:
+            return None
+        m = re.search(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+", u["kam"] or "")
+        if m:
+            return m.group(0).lower()
+        if not u["company_code_id"]:
+            return None
+        u = conn.execute("SELECT kam, company_code_id FROM users WHERE code_id = ? AND deleted_at IS NULL", (int(u["company_code_id"]),)).fetchone()
+    return None
+
+
+def _default_kam(conn, sel_id, code_id):
+    """A new selection goes to the same KAM as the company it is filed under (owner, 2026-10-29)."""
+    email = default_kam_email(conn, code_id)
+    if email:
+        conn.execute("INSERT OR IGNORE INTO item_kam (kind, item_id, kam_email, assigned_by, assigned_at) VALUES (?,?,?,?,?)",
+                     ("selection", int(sel_id), email, "auto: company KAM", now()))
+
+
 def _save_selection_raw(sid, name, codes, prices, total_from, total_to, request_id=None,
+                        code_id=None, platform=None, margin=None, costs=None, margin_max=False,
+                        tags=None, verdicts=None, platforms=None, segments=None, origin="admin"):
+    new = _save_selection_raw0(sid, name, codes, prices, total_from, total_to, request_id, code_id, platform,
+                               margin, costs, margin_max, tags, verdicts, platforms, segments, origin)
+    if sid is None and code_id is not None:
+        default_kam_for_selection(new)
+    return new
+
+
+def _save_selection_raw0(sid, name, codes, prices, total_from, total_to, request_id=None,
                    code_id=None, platform=None, margin=None, costs=None, margin_max=False,
                    tags=None, verdicts=None, platforms=None, segments=None, origin="admin"):
     """Create (sid None) or update one priced selection. Returns its id.
@@ -2004,6 +2075,7 @@ def _save_selection_raw(sid, name, codes, prices, total_from, total_to, request_
                  margin if margin is not None else last_margin(conn),
                  json.dumps(costs or {}), now(), now(),
                  None if margin_max is False else margin_max, "client" if origin == "client" else "admin"))
+            _default_kam(conn, cur.lastrowid, code_id)
             return cur.lastrowid
         if zero_priced(sid):
             prices, total_from, total_to = zero_prices(codes), 0, 0
@@ -2067,6 +2139,7 @@ def set_selection_client(sid, code_id, client_name):
         conn.execute("UPDATE selections SET code_id = ?, client_name = ? WHERE id = ?", (code_id, client_name or None, sid))
     if old is not None and old["code_id"] != code_id:
         clear_selection_sharing(sid)
+    default_kam_for_selection(sid)
 
 
 def set_selection_target(sid, target):

@@ -45,8 +45,11 @@ WEEKLY_KEY = "comments_weekly"   # setting {campaign id: "YYYY-MM-DD"}: re-read 
 # TikTok has no date filter, so the full thread is read with a 4x cheaper actor. maxItems there is the run total.
 # Tested on Jamjoom 2026-10-21: comment ids match the old actors' ids, so nothing is stored twice.
 ACTORS = {
-    "Instagram": ("scrapesmith~instagram-comments-scraper", 0.0005,
-                  lambda urls, n, since: {"postUrls": urls, "maxCommentsPerPost": n, "sortOrder": "recent"}),
+    # Instagram (owner, 2026-11-02): scrapesmith refuses free Apify accounts ("FREE USER detected: hard capped at 0"), so
+    # automly~instagram-comments-scraper (works on free, newest first, $0.0004 a comment; tested on Penduline: same
+    # comment ids, text, ISO createdAt, likes, postUrl). Was scrapesmith~instagram-comments-scraper at 0.0005.
+    "Instagram": ("automly~instagram-comments-scraper", 0.0004,
+                  lambda urls, n, since: {"postUrls": urls, "resultsPerPost": n}),
     "TikTok": ("apidojo~tiktok-comments-scraper", 0.0003,
                lambda urls, n, since: {"startUrls": urls, "includeReplies": False, "maxItems": n * len(urls)}),
     # Facebook (owner, 2026-10-27): dami_studio takes the same input and returns the same comment ids as
@@ -320,7 +323,8 @@ def _plan(conn, platform, content_ids):
         new = [max(0, exp - got) for exp, got, _ in needs]
         if platform == "Instagram":
             n = max(new) + MARGIN
-            return n, None, n * len(needs) * each
+            # Apify bills the comments it returns, not the cap: each post's own new comments (+1 each), as for Facebook / YouTube
+            return n, None, (sum(new) + len(needs)) * each
         # Facebook and YouTube ask only for comments newer than the last read, which never sees an older comment a
         # past read missed (owner, 2026-10-27: Jamjoom Facebook 494 and 512 were 110 and YouTube 495 24 top-level
         # comments short, found by a full re-read). While a post still holds fewer than the platform reports it is
