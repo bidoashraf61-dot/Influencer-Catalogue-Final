@@ -864,3 +864,22 @@ body[data-board="intelligence"] .mb-mark__logo { width: 176px; }
 .hvb-mg__pick { width: 100%; min-height: 44px; padding: 8px 14px; border: 1px solid rgba(18,18,18,.2); border-radius: var(--r-sm); background: var(--white); color: var(--ink); font: 400 15px/1.3 var(--body); text-align: start; cursor: pointer; }
 .hvb-mg__pick:hover { background: var(--linen); }
 .hvb-mg__pick:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+
+/* Track bar = the Select / Intelligence bar: white, 84px, hairline, the account circle inline (Bido 2026-11-04) */
+body[data-page="campaign"] .mx-top.hc-bar { padding: 0; }
+body[data-page="campaign"] .mx-top__in.cat-topbar, body[data-page="campaign"] .mx-top__in.cat-topbar:has(.hv-mods) { padding: 0; gap: 12px; flex-wrap: nowrap; justify-content: flex-start; }
+body[data-page="campaign"] .mx-top .hc-mark { flex: none; margin-right: 0; }
+body[data-page="campaign"] .mx-top .mx-top__links { flex-wrap: nowrap; justify-content: flex-end; }
+body[data-page="campaign"] .mx-top .hv-mods { order: -1; margin-right: auto; flex: 0 0 auto; }
+/* account.css is not loaded on this page, so the white bar's own rules come with it */
+body[data-page="campaign"] .mx-top.hc-bar { background: var(--white); border-bottom: 1px solid rgba(18,18,18,.12); position: relative; z-index: 40; }
+body[data-page="campaign"] .mx-top__in.cat-topbar { min-height: 84px; }
+body[data-page="campaign"] .mx-top .mb-mark__logo { width: 150px; height: auto; display: block; flex: none; }
+body[data-page="campaign"] .mx-top .hc-link { display: inline-flex; align-items: center; gap: 9px; min-height: 48px; padding: 0 22px; border-radius: 999px; white-space: nowrap; font-family: var(--heading); font-size: 20px; letter-spacing: .06em; text-decoration: none; text-transform: uppercase; border: 1px solid rgba(18,18,18,.12); color: var(--ink); background: var(--white); }
+body[data-page="campaign"] .mx-top .hc-link:hover { border-color: var(--ink); }
+@media (max-width: 640px) { body[data-page="campaign"] .mx-top__in.cat-topbar { min-height: 68px; } body[data-page="campaign"] .mx-top .mb-mark__logo { width: 112px; } }
+body[data-page="campaign"] .mx-top__in.cat-topbar { margin: 0; }
+@media (max-width: 640px) { body[data-page="campaign"] .mx-top__in.cat-topbar, body[data-page="campaign"] .mx-top__in.cat-topbar:has(.hv-mods) { flex-wrap: wrap; row-gap: 4px; padding: 8px 0; } body[data-page="campaign"] .mx-top .mx-top__links.cat-topbar__links { flex: 1 1 100%; gap: 8px; justify-content: flex-start; } }
+@media (min-width: 901px) { body[data-page="campaign"] .mx-top #mx-catalogue { display: inline-flex !important; } }
+@media (max-width: 900px) { body[data-page="campaign"] .mx-top #mx-catalogue { display: none !important; } }
+@media (min-width: 641px) { html body[data-page="campaign"] .mx-top .hv-mod { min-height: 46px; padding-inline-end: 18px; gap: 9px; font-size: 19px; } html body[data-page="campaign"] .mx-top .hv-mod img { width: 40px; height: 40px; } }
