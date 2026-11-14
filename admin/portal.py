@@ -309,6 +309,13 @@ def domain_lists():
 
 def check_email(raw):
     """(email, None) when this address may sign up, else ('', reason)."""
+    import staff_lock
+    if staff_lock.on():
+        # Staff-only portal (item 382): staff domains sign in or up; nobody else, whatever their account.
+        plain = guard.normalise_email(raw)
+        if not plain:
+            return "", "invalid"
+        return (plain, None) if staff_lock.is_staff_email(plain) else ("", "invite_only")
     allow, block = domain_lists()
     # Someone HelloVoice gave access to (Tenants -> Share access) may use any address, a personal one too:
     # an active account that is a company's colleague signs in whatever its domain. A blocked domain still wins.

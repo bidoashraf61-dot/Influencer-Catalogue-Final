@@ -98,6 +98,7 @@ import evidence
 import access_rules
 import modules
 import reference_view
+import staff_lock
 import trial
 import report_shares
 import views  # noqa: E402
@@ -900,7 +901,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         with db.connect() as conn:
             row = conn.execute("SELECT * FROM codes WHERE id = ?", (code_id,)).fetchone()
         ok, _ = db.code_state(row)
-        return int(code_id) if ok else None
+        if not ok:
+            return None
+        # Staff-only portal (item 382): an outside account's pass stops counting while the lock is on.
+        # The admin previewing a client keeps working. Nothing is deleted; switching the lock off lets them back.
+        if not staff_lock.code_allowed(int(code_id)) and not self.preview_mode():
+            self._locked_out = int(code_id)
+            return None
+        return int(code_id)
 
     # ------------------------------------------------------------ routing --
 
@@ -923,6 +931,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     def _unlock_begin(self):
         self._kam_memo = None
+        self._locked_out = None
         kam_scope.end()
         sc = self.kam_clients()
         if sc is None:
@@ -1483,6 +1492,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/access-requests":
             import access
             return self.send(200, access.page(query.get("ok"), query.get("e"), can=self.admin_like_for))
+        if path == "/portal-access":
+            if team.role_of(who) not in ("owner", "admin"):
+                return self.send(403, team_views.forbidden_page(team.role_of(who)))
+            return self.send(200, staff_lock.admin_html(query, can_switch=team.role_of(who) == "owner"))
         if path == "/evidence":
             return self.send(200, evidence.list_page(kam_scope.clients(who), db.list_codes(), db.list_selections(),
                                                      query.get("ok"), query.get("e")))
@@ -1965,6 +1978,20 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.redirect(back + "&ok=" + urllib.parse.quote(
                 "%s can now open and edit this selection." % f.get("email").strip() if state == "granted"
                 else "Invited. This selection opens for %s when they sign in with that email." % f.get("email").strip()) + "#st=share")
+        if path in ("/portal-access/decide", "/portal-access/switch"):
+            role_ = team.role_of(who)
+            if role_ not in ("owner", "admin") or (path.endswith("/switch") and role_ != "owner"):
+                return self.send(403, team_views.forbidden_page(role_))
+            f = self.form_body()
+            by_ = who["email"] if "email" in who.keys() else ""
+            if path.endswith("/switch"):
+                flag = str(f.get("on") or "") == "1"
+                staff_lock.set_on(flag, by_)
+                return self.redirect("/portal-access?ok=" + urllib.parse.quote(
+                    "The portal is now staff only." if flag else "The portal is open to every work email again."))
+            rid = int(f.get("id") or 0) if str(f.get("id") or "").isdigit() else 0
+            ok, said = staff_lock.decide(rid, f.get("status") or "", f.get("note") or "", by_)
+            return self.redirect("/portal-access?" + ("ok=" if ok else "e=") + urllib.parse.quote(said))
         if path == "/access-requests":
             import access
             f = self.form_body()

@@ -440,6 +440,53 @@
 .hv-chips.cx-stagger .hv-chip { animation: cx-chip-in .28s var(--cx-ease) both; animation-delay: calc(var(--i, 0) * 60ms); }
 @keyframes cx-chip-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
+/* ======================================================= INVITE-ONLY DOOR (item 382)
+   The staff-only portal: "How HELVi works" in the pitch's place, the request form in the card. */
+.cx-gate--inv .cx-scene__in { grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 40px 64px; align-items: end; }
+.cx-film { min-width: 0; }
+.cx-film__title { margin: 0; font-family: var(--heading); font-weight: 400; font-size: clamp(52px, 2.4rem + 3vw, 96px); line-height: .88;
+  letter-spacing: .005em; text-transform: uppercase; color: var(--white); text-wrap: balance; }
+.cx-film__lede { margin: 14px 0 0; max-width: 52ch; font-size: clamp(16px, .95rem + .25vw, 18px); line-height: 1.5; color: rgba(255,255,255,.82); }
+.cx-film__frame { position: relative; margin-top: 26px; aspect-ratio: 16 / 9; border-radius: 22px; overflow: hidden; background: #000;
+  box-shadow: 0 24px 60px rgba(0,0,0,.5); }
+.cx-film__video { display: block; width: 100%; height: 100%; object-fit: cover; background: #000; }
+.cx-film__play { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  border: 0; padding: 0; background: transparent; color: var(--ink); cursor: pointer; border-radius: inherit; }
+.cx-film__dot { display: grid; place-items: center; width: 96px; height: 96px; border-radius: 50%; background: var(--lime);
+  box-shadow: 0 14px 34px rgba(0,0,0,.35); transition: transform .3s var(--cx-ease); }
+.cx-film__dot svg { width: 38px; height: 38px; margin-left: 5px; }
+.cx-film__cta { font-family: var(--heading); font-size: 24px; letter-spacing: .04em; line-height: 1; padding: 10px 18px 8px; border-radius: 999px;
+  background: var(--ink); color: var(--white); }
+.cx-film__play:hover .cx-film__dot { transform: scale(1.06); }
+.cx-film__play:focus-visible { outline: 3px solid var(--lime); outline-offset: -3px; }
+.cx-film__frame.is-on .cx-film__play { display: none; }
+.cx-film__err { margin: 10px 0 0; font-size: 14px; color: var(--lime); }
+.cx-req .cx-fld:first-child { margin-top: 20px; }
+.cx-req .cx-fld { margin-top: 14px; }
+.cx-trap { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.cx-door__title:focus { outline: none; }
+@media (prefers-reduced-motion: reduce) { .cx-film__dot { transition: none; } }
+@media (max-width: 1100px) {
+  .cx-gate--inv .cx-scene__in { grid-template-columns: minmax(0, 1fr); justify-items: stretch; }
+  .cx-gate--inv .cx-film { max-width: 760px; width: 100%; margin: 0 auto; }
+}
+@media (max-width: 700px) {
+  .cx-film__frame { margin-top: 18px; border-radius: 16px; }
+  .cx-film__dot { width: 64px; height: 64px; }
+  .cx-film__dot svg { width: 26px; height: 26px; }
+  .cx-film__cta { font-size: 17px; padding: 8px 14px 6px; }
+}
+
+/* A share link opened while the portal is staff only (item 382): the shared page, nothing around it. */
+.hv-share-only .cat-topbar__links, .hv-share-only .cat-back, .hv-share-only .pp-top__links, .hv-share-only .cat-tray,
+.hv-share-only .hca-nav, .hv-share-only .cx-dock, .hv-share-only .hv-voice, .hv-share-only #hv-voice, .hv-share-only .cat-top-right,
+.hv-share-only #db-all, .hv-share-only .db-share, .hv-share-only #db-share, .hv-share-only .ev-mi-btn,
+.hv-share-only .cat-card__analysis,
+/* beats catalogue.css html:not(.hv-shared) ... .cat-back[hidden] (inline-flex !important) */
+html.hv-share-only[class] [data-page="selection"] .cat-selhead__foot .cat-back.cat-back { display: none !important; }
+.hv-share-only .db-head__logo, .hv-share-only .pp-top a:first-child, .hv-share-only .cat-hero__logo,
+.hv-share-only .cat-brand a { pointer-events: none; }
+
 /* ============================================================== RESPONSIVE */
 @media (max-width: 1100px) {
   .cx-scene__in { grid-template-columns: minmax(0, 1fr); gap: 28px; padding-top: 28px; justify-items: center; }

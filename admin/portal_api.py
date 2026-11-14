@@ -56,6 +56,7 @@ import powerups
 import kam_scope
 import portal_views
 import rewards
+import staff_lock
 
 _score_cache = {}          # brief id -> (time, scores) for the catalogue's fit badges
 
@@ -109,6 +110,7 @@ REASON_TEXT = {
     "blocked": "That email domain can't be used here. Contact us if you think this is a mistake.",
     "closed": "New sign-ups are closed right now. Please contact the HelloVoice team.",
     "not_invited": "Your company hasn't been invited yet. Please contact the HelloVoice team to get access.",
+    "invite_only": "HELVi Connect is open by invitation. Leave your details and the HelloVoice team will contact you.",
 }
 OTP_FAIL_TEXT = {
     "invalid": "That code isn't right.",
@@ -277,10 +279,18 @@ class PortalMixin(connect_api.ConnectMixin):
             if cid is None:
                 # email_signin: whether mail can be sent. Pages no longer wait for it: the gate is
                 # always the email sign-in, never an access-code form (item 181, 2026-10-20).
-                self.send_json(200, {"ok": True, "signed_in": False, "ai": gemini.configured(),
-                                     "signup": portal.signup_mode(),
-                                     "email_signin": mailer.configured(),
-                                     "passcodes": not self.passcodes_off()}, self.cors())
+                out = {"ok": True, "signed_in": False, "ai": gemini.configured(),
+                       "signup": portal.signup_mode(),
+                       "email_signin": mailer.configured(),
+                       "passcodes": not self.passcodes_off()}
+                if staff_lock.on():
+                    # Item 382: the gate becomes the request-access page. An outside account the lock just
+                    # shut out gets its own details back, to send the request in one click.
+                    out["staff_only"] = True
+                    gone = getattr(self, "_locked_out", None)
+                    if gone:
+                        out["locked_out"] = staff_lock.locked_profile(gone)
+                self.send_json(200, out, self.cors() + [("Cache-Control", "no-store")])
             else:
                 self.send_json(200, dict(self._me_payload(cid, user, kind), ok=True), self.cors())
             return True
@@ -720,6 +730,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/crm/set": self.api_crm_set, "/api/crm/note": self.api_crm_note, "/api/crm/person": self.api_crm_person,
             "/api/crm/quote": self.api_crm_quote, "/api/crm/prospect": self.api_crm_prospect,
             "/api/stepup/send": self.api_stepup_send, "/api/stepup/verify": self.api_stepup_verify,
+            "/api/invite/request": self.api_invite_request,
         }
         fn = routes.get(path)
         if not fn:
@@ -787,8 +798,31 @@ class PortalMixin(connect_api.ConnectMixin):
                                     "ticket": portal.sign_ticket(self._srv().SECRET, email),
                                     "suggested_company": domain.split(".")[0].replace("-", " ").title()}, self.cors())
 
+    def api_invite_request(self):
+        """POST {name, email, company, website (honeypot)}: the closed portal's request-access form (item 382).
+        Files a lead for the team; never creates an account."""
+        b = self.json_body()
+        ip = self.client_ip()
+        if str(b.get("website") or "").strip():                 # a bot filled the hidden field: say thanks, keep nothing
+            return self.send_json(200, {"ok": True}, self.cors())
+        if self._throttled("invite:ip:" + ip, 5, 3600) or self._throttled("invite:all", 60, 3600):
+            return
+        gone = None
+        if staff_lock.on():
+            self.viewer_cookie_id()                             # sets _locked_out for a shut-out account
+            gone = getattr(self, "_locked_out", None)
+        rid, why = staff_lock.file_request(b.get("name"), b.get("email"), b.get("company"), ip, self._ua(), gone)
+        if why and why != "duplicate":
+            msg = {"name": "Please enter your name.", "email": "Please enter a valid email address.",
+                   "company": "Please enter your company."}.get(why, "Please check your details.")
+            return self.send_json(400, {"ok": False, "reason": why, "field": why, "message": msg}, self.cors())
+        db.log("invite_request", gone, ip, self._ua(), (guard.normalise_email(b.get("email")) or "").rsplit("@", 1)[-1][:60])
+        return self.send_json(200, {"ok": True}, self.cors())
+
     def _enter(self, user):
         """Sign an existing account in, or say why it can't be."""
+        if staff_lock.on() and not staff_lock.is_staff_email(user["email"]):
+            return self.send_json(403, {"ok": False, "reason": "invite_only", "message": REASON_TEXT["invite_only"]}, self.cors())
         if user["status"] == "suspended":
             return self.send_json(403, {"ok": False, "reason": "suspended",
                                         "message": "This account is suspended. Please contact the HelloVoice team."}, self.cors())

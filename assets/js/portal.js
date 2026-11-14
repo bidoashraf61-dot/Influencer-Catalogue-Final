@@ -530,14 +530,21 @@
     scene.appendChild(h("div", { class: "cx-wall", "aria-hidden": "true" }));
     var wrap = h("div", { class: "cx-wrap cx-scene__in" });
 
-    /* -- the name and one line -- */
-    var pitch = h("section", { class: "cx-pitch", "aria-label": "About HELVi Connect" });
-    pitch.appendChild(h("h1", { class: "cx-vh" }, "HELVi Connect"));
-    pitch.appendChild(h("img", { class: "cx-pitch__logo", src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c6", alt: "HELVi Connect", width: "440", height: "220", fetchpriority: "high" }));
-    pitch.appendChild(h("p", { class: "cx-pitch__tag" }, "Connecting Brands with the Right Voices"));
+    // Staff-only portal (item 382): the door asks for a request, not a sign-in, and the film
+    // "How HELVi works" takes the pitch's place. Staff still sign in through a small link.
+    var INV = !!info.staff_only, GONE = info.locked_out || null;
+    if (INV) gate.classList.add("cx-gate--inv");
+
+    /* -- the name and one line (or, invite-only, the film) -- */
+    var pitch = INV ? filmPitch() : h("section", { class: "cx-pitch", "aria-label": "About HELVi Connect" });
+    if (!INV) {
+      pitch.appendChild(h("h1", { class: "cx-vh" }, "HELVi Connect"));
+      pitch.appendChild(h("img", { class: "cx-pitch__logo", src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c6", alt: "HELVi Connect", width: "440", height: "220", fetchpriority: "high" }));
+      pitch.appendChild(h("p", { class: "cx-pitch__tag" }, "Connecting Brands with the Right Voices"));
+    }
 
     /* -- the card, Helvi standing on it -- */
-    var door = h("section", { class: "cx-door", "aria-label": "Sign in" });
+    var door = h("section", { class: "cx-door", "aria-label": INV ? "Request access" : "Sign in" });
     var helvy = h("div", { class: "cx-door__helvy" }, clip("hello", "cx-hd--edge", { once: true, then: "idle" }));
     var bubble = h("span", { class: "cx-door__say", "aria-hidden": "true" }, "Hi, I’m Helvi");
     var pane = h("div", { id: "cx-pane", "aria-live": "polite" });
@@ -572,7 +579,8 @@
     /* -- the steps -- */
     var st = { step: "email", email: "", ticket: "", expires: 0, resendAt: 0, timer: null, company: "" };
     var SAY = { email: "Hi, I’m Helvi", blocked: "Work email, please", code: "It’s on its way",
-                details: "Nice to meet you", pending: "Almost there" };
+                details: "Nice to meet you", pending: "Almost there", request: "Hi, I’m Helvi", sent: "Talk soon" };
+    if (INV) SAY.email = "Team door";
     function setSay(k) { bubble.textContent = SAY[k] || SAY.email; }
     function errLine(text) { return h("p", { class: "cx-err", role: "alert", html: icon("info", "cx-i") }, h("span", null, text)); }
     function goBtn(label, ink) {
@@ -588,18 +596,24 @@
       st.step = step;
       setSay(opts.blocked ? "blocked" : step);
       pane.textContent = "";
-      ({ email: paneEmail, code: paneCode, details: paneDetails, pending: panePending }[step] || paneEmail)(opts);
+      ({ email: paneEmail, code: paneCode, details: paneDetails, pending: panePending, request: paneRequest, sent: paneSent }[step] || paneEmail)(opts);
     }
 
     function paneEmail(opts) {
-      pane.appendChild(h("h2", { class: "cx-vh" }, "Sign in or join"));
+      if (INV) {
+        pane.appendChild(h("h2", { class: "cx-door__title" }, "Staff sign-in"));
+        pane.appendChild(h("p", { class: "cx-door__lead" }, "For BlueHolding and HelloVoice email addresses."));
+      } else pane.appendChild(h("h2", { class: "cx-vh" }, "Sign in or join"));
       var input = h("input", { type: "email", name: "email", autocomplete: "email", inputmode: "email", spellcheck: "false", required: true,
         placeholder: "name@yourcompany.com", value: st.email || "", "aria-describedby": "cx-email-err" });
       var fld = h("label", { class: "cx-fld" }, h("span", null, "Work email"), input);
       var err = h("div", { id: "cx-email-err" });
       var btn = label(goBtn(), "Email me a code");
       var form = h("form", { novalidate: true }, fld, err, btn);
-      var fine = h("p", { class: "cx-fine" }, "We email you a one-time code. No password, and new accounts are made in the same step.");
+      var fine = INV
+        ? h("p", { class: "cx-fine" }, "We email you a one-time code. Not on the team? ",
+            h("button", { type: "button", class: "cx-link", onclick: function () { show("request"); } }, "Request access"))
+        : h("p", { class: "cx-fine" }, "We email you a one-time code. No password, and new accounts are made in the same step.");
       pane.appendChild(form); pane.appendChild(fine);
       function bad(text, personal) {
         fld.classList.add("cx-fld--err"); input.setAttribute("aria-invalid", "true");
@@ -613,6 +627,7 @@
         e.preventDefault();
         var v = input.value.trim().toLowerCase();
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(v)) { bad("Enter your work email, like name@yourcompany.com."); return; }
+        if (INV && !STAFF_RX.test(v)) { bad("Only BlueHolding and HelloVoice addresses sign in here. Request access instead."); return; }
         if (PERSONAL.test(v)) { bad("That’s a personal address. Use your work email so we can link you to your company’s selections and campaigns.", true); return; }
         st.email = v;
         wait(btn, true, "Email me a code");
@@ -749,7 +764,97 @@
       pane.appendChild(h("p", { class: "cx-door__lead" }, opts.message || "Your account is waiting for approval by the HelloVoice team. We’ll email you as soon as it’s ready."));
     }
 
-    show("email", { keepFocus: true });
+    /* -- invite-only: the request form, and its thank-you -- */
+    function paneRequest(opts) {
+      pane.appendChild(h("h2", { class: "cx-door__title" }, GONE ? "Access is now by invitation" : "Request access"));
+      pane.appendChild(h("p", { class: "cx-door__lead" }, GONE
+        ? "HELVi Connect is now open to the HelloVoice team only. Send your details and your account manager will be in touch."
+        : "HELVi Connect is open by invitation. Leave your details and the HelloVoice team will contact you."));
+      var pre = GONE || {};
+      var name = h("input", { type: "text", name: "name", autocomplete: "name", required: true, value: opts.name || pre.name || "" });
+      var email = h("input", { type: "email", name: "email", autocomplete: "email", inputmode: "email", spellcheck: "false", required: true,
+        placeholder: "name@yourcompany.com", value: opts.email || pre.email || "" });
+      var company = h("input", { type: "text", name: "company", autocomplete: "organization", required: true, value: opts.company || pre.company || "" });
+      // A field people never see: a bot that fills it is thanked and nothing is kept.
+      var trap = h("input", { type: "text", name: "website", tabindex: "-1", autocomplete: "off" });
+      var err = h("div", { id: "cx-req-err" });
+      var btn = label(goBtn(), "Request access");
+      var fName = h("label", { class: "cx-fld" }, h("span", null, "Full name"), name);
+      var fEmail = h("label", { class: "cx-fld" }, h("span", null, "Work email"), email);
+      var fCo = h("label", { class: "cx-fld" }, h("span", null, "Company"), company);
+      var form = h("form", { novalidate: true, class: "cx-req" }, fName, fEmail, fCo,
+        h("div", { class: "cx-trap", "aria-hidden": "true" }, h("label", null, "Website", trap)), err, btn);
+      pane.appendChild(form);
+      pane.appendChild(h("p", { class: "cx-fine" }, "On the HelloVoice team? ",
+        h("button", { type: "button", class: "cx-link", onclick: function () { show("email"); } }, "Staff sign-in")));
+      function clear() { [fName, fEmail, fCo].forEach(function (f) { f.classList.remove("cx-fld--err"); f.querySelector("input").removeAttribute("aria-invalid"); }); err.textContent = ""; }
+      function bad(fld, text) {
+        fld.classList.add("cx-fld--err"); var i = fld.querySelector("input"); i.setAttribute("aria-invalid", "true");
+        err.textContent = ""; err.appendChild(errLine(text)); i.focus();
+      }
+      [name, email, company].forEach(function (i) { i.addEventListener("input", clear); });
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        if (btn.getAttribute("data-busy")) return;
+        clear();
+        if (name.value.trim().length < 2) { bad(fName, "Please enter your name."); return; }
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email.value.trim())) { bad(fEmail, "Enter your email, like name@yourcompany.com."); return; }
+        if (company.value.trim().length < 2) { bad(fCo, "Please enter your company."); return; }
+        btn.setAttribute("data-busy", "1"); wait(btn, true, "Request access");
+        var sent = { name: name.value.trim(), email: email.value.trim(), company: company.value.trim(), website: trap.value };
+        api("POST", "/api/invite/request", sent).then(function (r) {
+          btn.removeAttribute("data-busy"); wait(btn, false, "Request access");
+          if (r.s === 429) { err.appendChild(errLine("Too many requests from this network. Please try again in an hour.")); return; }
+          if (!r.b.ok) {
+            var f = { name: fName, email: fEmail, company: fCo }[r.b.field];
+            if (f) bad(f, r.b.message || "Please check this field."); else err.appendChild(errLine(r.b.message || "We couldn’t send that. Please try again."));
+            return;
+          }
+          show("sent", sent);
+        });
+      });
+      if (!opts.keepFocus) setTimeout(function () { (name.value ? (email.value ? (company.value ? btn : company) : email) : name).focus({ preventScroll: true }); }, 30);
+    }
+
+    function paneSent(opts) {
+      var first = String(opts.name || "").split(" ")[0];
+      pane.appendChild(h("h2", { class: "cx-door__title", tabindex: "-1" }, first ? "Thanks, " + first : "Thanks"));
+      pane.appendChild(h("p", { class: "cx-door__lead" }, "We have your request. The HelloVoice team will contact you at ", h("b", null, opts.email || "your email"), "."));
+      pane.appendChild(h("div", { class: "cx-who", html: icon("check", "cx-i") }, h("span", null, "Request sent for " + (opts.company || "your company"))));
+      pane.appendChild(h("p", { class: "cx-fine" }, "While you wait, the film on this page shows what HELVi Connect does."));
+      setTimeout(function () { var t = pane.querySelector(".cx-door__title"); if (t) t.focus({ preventScroll: true }); }, 30);
+    }
+
+    show(INV ? "request" : "email", { keepFocus: true });
+  }
+
+  var STAFF_RX = /@(.+\.)?(blueholding\.co\.uk|hellovoice\.co\.uk)$/i;
+
+  // "How HELVi works" for the invite-only door (item 382): the onboarding film from /welcome/,
+  // lazy like there (no src until play). No chapter list here (Bido 2026-11-15): the film alone.
+  function filmPitch() {
+    var sec = h("section", { class: "cx-film", "aria-labelledby": "cx-film-h" });
+    sec.appendChild(h("h1", { class: "cx-film__title", id: "cx-film-h" }, "How HELVi works"));
+    sec.appendChild(h("p", { class: "cx-film__lede" }, "One short film, from your brief to live results."));
+    var video = h("video", { class: "cx-film__video", preload: "none", playsinline: "", poster: ROOT + "assets/welcome/onboarding-poster.jpg",
+      "aria-label": "How HELVi works, the film" });
+    var play = h("button", { type: "button", class: "cx-film__play", "aria-label": "Play the film",
+      // Same cue as /welcome/: the lime play button and "Play the film"; the whole frame is the control.
+      html: '<span class="cx-film__dot" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg></span>' +
+            '<span class="cx-film__cta">Play the film</span>' });
+    var frame = h("div", { class: "cx-film__frame" }, video, play);
+    var oops = h("p", { class: "cx-film__err", role: "status", hidden: "" }, "The film didn’t load. Check your connection and try again.");
+    sec.appendChild(frame); sec.appendChild(oops);
+    var loaded = false;
+    function start(t) {
+      oops.hidden = true;
+      if (!loaded) { loaded = true; video.src = ROOT + "assets/welcome/onboarding-film.mp4"; video.controls = true; frame.classList.add("is-on"); }
+      var go = function () { try { video.currentTime = t || 0; } catch (e) { /* not seekable yet */ } var p = video.play(); if (p && p.catch) p.catch(function () { /* the controls are there */ }); };
+      if (video.readyState >= 1) go(); else video.addEventListener("loadedmetadata", go, { once: true });
+    }
+    play.addEventListener("click", function () { start(0); });
+    video.addEventListener("error", function () { oops.hidden = false; frame.classList.remove("is-on"); loaded = false; video.removeAttribute("src"); video.controls = false; });
+    return sec;
   }
 
   // A colleague's invite link (?invite=...) is kept for this visit and sent with the new
@@ -5074,9 +5179,29 @@
     }
   }
 
+  function shareOnly() {
+    document.documentElement.classList.add("hv-share-only");
+    document.body.setAttribute("data-no-appnav", "");
+    document.addEventListener("click", function (ev) {
+      var a = ev.target && ev.target.closest ? ev.target.closest("a[href]") : null;
+      if (!a || a.closest("#cat-gate")) return;                         // the request page's own links (privacy, terms)
+      var u;
+      try { u = new URL(a.getAttribute("href"), location.href); } catch (e) { return; }
+      if (u.origin !== location.origin) return;                         // the creator's own profile, the post itself
+      if (u.pathname === location.pathname) return;                     // a tab or an anchor on this page
+      if (/\/(privacy|terms)\/?$/.test(u.pathname)) return;             // the legal pages stay open
+      ev.preventDefault(); ev.stopPropagation();
+    }, true);
+  }
+
+  // One /api/me per page load: the boot and an early 401 (cat:locked) share the answer, so the gate is drawn
+  // once, and drawn knowing whether the portal is staff only (item 382).
+  var meOnce = null;
+  function meShared() { if (!meOnce) meOnce = me(6); return meOnce; }
+
   function boot() {
     if (window.HV_SHARED) return;            // a client report link: no dock, Helvy, edit mode or gate (item 291)
-    me(6).then(function (r) {
+    meShared().then(function (r) {
       if (r.b && r.b.signed_in) {
         ME = r.b; HV.me = ME; mountEditMode(); mountDock(); mountVoice(); mountAiCard(); mountLicences(); mountPreviewBar(); mountAdminStillNote();
         try { document.dispatchEvent(new CustomEvent("hv:me", { detail: ME })); } catch (e) { /* old browser */ }
@@ -5088,6 +5213,15 @@
         }, 1600);
         return;
       }
+      // Staff-only portal (item 382): a signed-out visitor who still sees a page got there by a share link
+      // (a public selection or campaign link). That page is all they get: no way into the rest of the portal.
+      if (r.b && r.b.staff_only) {
+        // A signed-in-only page (profile, workspace, boards) has nothing for this visitor: go to the request page.
+        if (!document.getElementById("cat-gate") && /\/(account|workspace|selections|intelligence)\/?$/.test(location.pathname)) {
+          location.replace(ROOT); return;
+        }
+        shareOnly();
+      }
       // Not signed in (or the server never answered): the gate is the email sign-in, always. It used to
       // wait for "email_signin" (mail key saved) and otherwise leave the access-code form up (item 181).
       enhanceGate(r.b || {});
@@ -5097,9 +5231,11 @@
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
   // A passcode typed into the gate unlocks without a reload, so look again
   // then: the account circle and the assistant appear straight away.
-  document.addEventListener("cat:unlocked", function () { if (!ME) boot(); });
+  document.addEventListener("cat:unlocked", function () { if (!ME) { meOnce = null; boot(); } });
   // A page script found this browser has no valid pass (401) and showed the gate. Draw the sign-in
   // there even when /api/me said "signed in" (a pass that just expired, a stale guest pass): signing
   // in again mends it. Never leave the bare gate up (item 181).
-  document.addEventListener("cat:locked", function () { enhanceGate({}); });
+  document.addEventListener("cat:locked", function () {
+    meShared().then(function (r) { enhanceGate(r.b && !r.b.signed_in ? r.b : {}); }, function () { enhanceGate({}); });
+  });
 })();
