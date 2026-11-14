@@ -999,6 +999,7 @@
       }
       menu.hidden = !open;
       btn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) { var bl = document.getElementById("hv-bell"); if (bl && bl.getAttribute("aria-expanded") === "true") bl.click(); }
       if (open) { var first = menu.querySelector(".pt-menu__item"); if (first) first.focus(); }
     }
     window.addEventListener("resize", function () { if (!menu.hidden) place(); });
