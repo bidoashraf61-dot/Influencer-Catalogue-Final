@@ -442,20 +442,19 @@
 
 /* ======================================================= INVITE-ONLY DOOR (item 382)
    The staff-only portal: "How HELVi works" in the pitch's place, the request form in the card. */
-/* Both sides share one top and one bottom (Bido 2026-11-15: no empty band above the title). The film column
-   starts level with Helvi above the card and its media row ends level with the card's foot. */
+/* Both sides share one top and one bottom (Bido 2026-11-15). The film takes the column's full width and its five
+   stops sit in one row under it (icon, headline, start time); the title sits between brand and film. */
 .cx-gate--inv .cx-scene__in { grid-template-columns: minmax(0, 1fr) minmax(0, 384px); gap: 40px 44px; align-items: stretch; align-content: center; }
 .cx-film { min-width: 0; display: flex; flex-direction: column; }
-.cx-film__brand { display: flex; align-items: center; gap: 22px; }
-.cx-film__logo { display: block; width: 212px; height: auto; margin-left: -6px; flex: none; }
-.cx-film__tag { margin: 0; padding-left: 22px; border-left: 1px solid rgba(255,255,255,.22); max-width: 17ch;
-  font-size: 17px; line-height: 1.35; color: rgba(255,255,255,.88); text-wrap: balance; }
-/* Brand at the top, film at the foot, the title centred in what is left. */
-.cx-film__title { margin: auto 0 0; padding-top: 24px; font-family: var(--heading); font-weight: 400; font-size: clamp(48px, 2.2rem + 3vw, 96px); line-height: .9;
+.cx-film__brand { display: flex; align-items: center; gap: 20px; }
+.cx-film__logo { display: block; width: 184px; height: auto; margin-left: -6px; flex: none; }
+.cx-film__tag { margin: 0; padding-left: 20px; border-left: 1px solid rgba(255,255,255,.22); max-width: 17ch;
+  font-size: 16px; line-height: 1.35; color: rgba(255,255,255,.88); text-wrap: balance; }
+.cx-film__title { margin: auto 0 0; padding-top: 18px; font-family: var(--heading); font-weight: 400; font-size: clamp(42px, 2rem + 1.8vw, 64px); line-height: .92;
   letter-spacing: .005em; text-transform: uppercase; color: var(--white); text-wrap: balance; }
-.cx-film__lede { margin: 12px 0 auto; max-width: 52ch; font-size: clamp(16px, .95rem + .25vw, 18px); line-height: 1.5; color: rgba(255,255,255,.8); }
-.cx-film__media { padding-top: 26px; display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 12px; align-items: stretch; }
-.cx-film__frame { position: relative; aspect-ratio: 16 / 9; align-self: center; border-radius: 22px; overflow: hidden; background: #000;
+.cx-film__lede { margin: 8px 0 auto; max-width: 52ch; font-size: 16.5px; line-height: 1.5; color: rgba(255,255,255,.8); }
+.cx-film__media { padding-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+.cx-film__frame { position: relative; aspect-ratio: 16 / 9; border-radius: 22px; overflow: hidden; background: #000;
   box-shadow: 0 24px 60px rgba(0,0,0,.5); }
 .cx-film__video { display: block; width: 100%; height: 100%; object-fit: cover; background: #000; }
 .cx-film__play { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
@@ -468,20 +467,21 @@
 .cx-film__play:hover .cx-film__dot { transform: scale(1.06); }
 .cx-film__play:focus-visible { outline: 3px solid var(--lime); outline-offset: -3px; }
 .cx-film__frame.is-on .cx-film__play { display: none; }
-/* The film's main stops, beside it: icon in the poster's style, headline, one line. */
-.cx-film__stops { list-style: none; margin: 0; padding: 0; display: grid; grid-template-rows: repeat(5, minmax(0, 1fr)); gap: 6px; }
-.cx-stop { width: 100%; height: 100%; display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 6px; border-radius: 16px; border: 1px solid transparent;
+/* The film's main stops, one row under it: icon in the poster's style, headline, start time. */
+.cx-film__stops { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.cx-stop { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 7px; padding: 10px 6px 9px; border-radius: 16px; border: 1px solid rgba(255,255,255,.1);
   background: transparent; color: var(--white); font: inherit; text-align: left; cursor: pointer;
   transition: background .25s var(--cx-ease), border-color .25s var(--cx-ease); }
-.cx-stop__ic { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: rgba(232,255,118,.12); color: var(--lime);
+.cx-stop__ic { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: rgba(232,255,118,.12); color: var(--lime);
   transition: background .25s var(--cx-ease), color .25s var(--cx-ease); }
-.cx-stop__ic svg { width: 19px; height: 19px; }
-.cx-stop__txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.cx-stop__h { font-family: var(--heading); font-weight: 400; font-size: 19px; line-height: 1.02; letter-spacing: .03em; text-transform: uppercase; }
+.cx-stop__ic svg { width: 17px; height: 17px; }
+.cx-stop__txt { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.cx-stop__h { font-family: var(--heading); font-weight: 400; font-size: 16px; line-height: 1.02; letter-spacing: .03em; text-transform: uppercase; }
+.cx-stop__t { font-size: 12px; font-weight: 600; line-height: 1; color: rgba(255,255,255,.6); font-variant-numeric: tabular-nums; letter-spacing: .02em; }
 .cx-stop:hover { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.12); }
 .cx-stop[aria-current="true"] { background: rgba(232,255,118,.08); border-color: rgba(232,255,118,.45); }
 .cx-stop[aria-current="true"] .cx-stop__ic { background: var(--lime); color: var(--ink); }
-.cx-stop[aria-current="true"] .cx-stop__h { color: var(--lime); }
+.cx-stop[aria-current="true"] .cx-stop__h, .cx-stop[aria-current="true"] .cx-stop__t { color: var(--lime); }
 .cx-opt { font-style: normal; font-weight: 500; color: var(--gray); margin-left: 4px; }
 .cx-wa-in { position: relative; display: block; }
 .cx-wa-pre { position: absolute; left: 20px; top: 50%; transform: translateY(-50%); display: grid; color: #1da851; pointer-events: none; }
@@ -494,14 +494,6 @@
 .cx-trap { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 .cx-door__title:focus { outline: none; }
 @media (prefers-reduced-motion: reduce) { .cx-film__dot, .cx-stop, .cx-stop__ic { transition: none; } }
-/* Narrower: the film takes the full width and the stops sit under it as five small tiles (headline only). */
-@media (max-width: 1280px) {
-  .cx-film__media { grid-template-columns: minmax(0, 1fr); gap: 12px; }
-  .cx-film__stops { grid-template-columns: repeat(5, minmax(0, 1fr)); grid-template-rows: none; gap: 8px; }
-  .cx-stop { flex-direction: column; align-items: center; text-align: center; gap: 8px; padding: 10px 6px; border-color: rgba(255,255,255,.1); }
-  .cx-stop__txt { align-items: center; }
-  .cx-stop__h { font-size: 16px; line-height: 1.05; }
-}
 @media (max-width: 1100px) {
   .cx-gate--inv .cx-scene__in { grid-template-columns: minmax(0, 1fr); justify-items: stretch; }
   .cx-gate--inv .cx-film { max-width: 760px; width: 100%; margin: 0 auto; }
@@ -512,10 +504,10 @@
   .cx-film__brand { gap: 14px; }
   .cx-film__logo { width: 140px; }
   .cx-film__tag { padding-left: 14px; font-size: 14px; }
-  .cx-film__title { margin-top: 20px; }
+  .cx-film__title { margin-top: 20px; font-size: 44px; }
   .cx-film__stops { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cx-film__stops li:last-child { grid-column: 1 / -1; }
-  .cx-stop { flex-direction: row; text-align: left; justify-content: flex-start; padding: 8px 10px 8px 8px; }
+  .cx-stop { flex-direction: row; text-align: left; justify-content: flex-start; gap: 9px; padding: 8px 10px 8px 8px; }
   .cx-stop__txt { align-items: flex-start; }
   .cx-film__dot { width: 64px; height: 64px; }
   .cx-film__dot svg { width: 26px; height: 26px; }

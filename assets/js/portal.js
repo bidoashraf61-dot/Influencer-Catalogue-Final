@@ -841,7 +841,7 @@
 
   // "How HELVi works" for the invite-only door (item 382): the onboarding film from /welcome/,
   // lazy like there (no src until play). No chapter list here (Bido 2026-11-15): the film alone.
-  // The film's main stops beside it (Bido 2026-11-15: main headlines only, no timings). Each jumps to its
+  // The film's main stops under it, each with the time it starts (Bido 2026-11-15). Each jumps to its
   // moment; the one playing lights up. Icons follow the poster's own five steps.
   var FILM_STOPS = [
     [66, "Browse creators", "Filter by platform, city and more.", '<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>'],
@@ -870,7 +870,8 @@
     var btns = FILM_STOPS.map(function (c) {
       var b = h("button", { type: "button", class: "cx-stop" },
         h("span", { class: "cx-stop__ic", "aria-hidden": "true", html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false">' + c[3] + "</svg>" }),
-        h("span", { class: "cx-stop__txt" }, h("b", { class: "cx-stop__h" }, c[1])));
+        h("span", { class: "cx-stop__txt" }, h("b", { class: "cx-stop__h" }, c[1]),
+          h("span", { class: "cx-stop__t" }, Math.floor(c[0] / 60) + ":" + ("0" + (c[0] % 60)).slice(-2))));
       b.setAttribute("aria-label", c[1] + ": " + c[2] + " Plays this part of the film.");
       b.title = c[2];
       b.addEventListener("click", function () { start(c[0]); });
