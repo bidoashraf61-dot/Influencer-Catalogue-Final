@@ -799,7 +799,7 @@ class PortalMixin(connect_api.ConnectMixin):
                                     "suggested_company": domain.split(".")[0].replace("-", " ").title()}, self.cors())
 
     def api_invite_request(self):
-        """POST {name, email, company, website (honeypot)}: the closed portal's request-access form (item 382).
+        """POST {name, email, phone (WhatsApp, optional), website (honeypot)}: the closed portal's request-access form (item 382).
         Files a lead for the team; never creates an account."""
         b = self.json_body()
         ip = self.client_ip()
@@ -811,10 +811,11 @@ class PortalMixin(connect_api.ConnectMixin):
         if staff_lock.on():
             self.viewer_cookie_id()                             # sets _locked_out for a shut-out account
             gone = getattr(self, "_locked_out", None)
-        rid, why = staff_lock.file_request(b.get("name"), b.get("email"), b.get("company"), ip, self._ua(), gone)
+        rid, why = staff_lock.file_request(b.get("name"), b.get("email"), b.get("phone"), ip, self._ua(), gone,
+                                           company=b.get("company"))
         if why and why != "duplicate":
             msg = {"name": "Please enter your name.", "email": "Please enter a valid email address.",
-                   "company": "Please enter your company."}.get(why, "Please check your details.")
+                   "phone": "That WhatsApp number doesn't look right. Include the country code, or leave it empty."}.get(why, "Please check your details.")
             return self.send_json(400, {"ok": False, "reason": why, "field": why, "message": msg}, self.cors())
         db.log("invite_request", gone, ip, self._ua(), (guard.normalise_email(b.get("email")) or "").rsplit("@", 1)[-1][:60])
         return self.send_json(200, {"ok": True}, self.cors())

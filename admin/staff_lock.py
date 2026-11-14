@@ -15,6 +15,7 @@ The request form files a row in ``invite_requests``. A request is a lead, never 
 and sends share links by hand. On each request: an email to the owner and info@, and a push to the
 owner and admins.
 """
+import re
 import threading
 import time
 
@@ -31,6 +32,7 @@ CREATE TABLE IF NOT EXISTS invite_requests (
     name        TEXT NOT NULL,
     email       TEXT NOT NULL,
     company     TEXT NOT NULL,
+    phone       TEXT,
     ip          TEXT,
     user_agent  TEXT,
     from_code_id INTEGER,              -- a locked outside account that asked to come back
@@ -51,6 +53,9 @@ def ensure():
         return
     with db.connect() as conn:
         conn.executescript(SCHEMA)
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(invite_requests)")}
+        if "phone" not in cols:                       # added 2026-11-15: the form asks for a phone, company dropped
+            conn.execute("ALTER TABLE invite_requests ADD COLUMN phone TEXT")
     _ready = True
 
 
@@ -118,11 +123,11 @@ def locked_profile(code_id):
     if code_id is None:
         return None
     with db.connect() as conn:
-        u = conn.execute("SELECT name, email, company FROM users WHERE code_id = ? AND deleted_at IS NULL",
+        u = conn.execute("SELECT name, email, company, phone FROM users WHERE code_id = ? AND deleted_at IS NULL",
                          (int(code_id),)).fetchone()
     if u is None:
         return None
-    return {"name": u["name"] or "", "email": u["email"] or "", "company": u["company"] or ""}
+    return {"name": u["name"] or "", "email": u["email"] or "", "company": u["company"] or "", "phone": u["phone"] or ""}
 
 
 # ------------------------------------------------------------------- requests --
@@ -131,8 +136,20 @@ def _clean(v, n):
     return " ".join(str(v or "").split())[:n]
 
 
-def file_request(name, email, company, ip=None, ua=None, from_code_id=None):
-    """(row id, None) or (None, reason). Same email asking again within a day updates nothing new."""
+def clean_phone(raw):
+    """'' (none given), the number as typed but tidied, or None when it cannot be a phone number."""
+    v = _clean(raw, 40)
+    if not v:
+        return ""
+    digits = re.sub(r"\D", "", v)
+    if not 7 <= len(digits) <= 15 or not re.fullmatch(r"[+()\d .\-]+", v):
+        return None
+    return v
+
+
+def file_request(name, email, phone=None, ip=None, ua=None, from_code_id=None, company=None):
+    """(row id, None) or (None, reason). Name and email are required, the phone is optional (Bido 2026-11-15:
+    WhatsApp number instead of company; stored in the phone column). Same email asking again within a day files nothing new."""
     ensure()
     name, company = _clean(name, 80), _clean(company, 120)
     email = guard.normalise_email(email)
@@ -140,18 +157,22 @@ def file_request(name, email, company, ip=None, ua=None, from_code_id=None):
         return None, "name"
     if not email:
         return None, "email"
-    if len(company) < 2:
-        return None, "company"
+    phone = clean_phone(phone)
+    if phone is None:
+        return None, "phone"
     t = db.now()
     with db.connect() as conn:
         dup = conn.execute("SELECT id FROM invite_requests WHERE email = ? AND at > ? ORDER BY id DESC LIMIT 1",
                            (email, t - 86400)).fetchone()
         if dup is not None:
             return dup["id"], "duplicate"
-        cur = conn.execute("INSERT INTO invite_requests (at, name, email, company, ip, user_agent, from_code_id) "
-                           "VALUES (?,?,?,?,?,?,?)", (t, name, email, company, ip, (ua or "")[:200], from_code_id))
+        if not company and from_code_id:                 # a locked client: their account still names the company
+            u = conn.execute("SELECT company FROM users WHERE code_id = ?", (int(from_code_id),)).fetchone()
+            company = (u["company"] or "") if u is not None else ""
+        cur = conn.execute("INSERT INTO invite_requests (at, name, email, company, phone, ip, user_agent, from_code_id) "
+                           "VALUES (?,?,?,?,?,?,?,?)", (t, name, email, company or "", phone, ip, (ua or "")[:200], from_code_id))
         rid = cur.lastrowid
-    _alert(rid, name, email, company, from_code_id)
+    _alert(rid, name, email, company, phone, from_code_id)
     return rid, None
 
 
@@ -198,8 +219,9 @@ def _people():
     return list(dict.fromkeys(mail)), list(dict.fromkeys(admins))
 
 
-def _alert(rid, name, email, company, from_code_id):
-    lines = ["%s (%s) from %s asked for access to HELVi Connect." % (name, email, company),
+def _alert(rid, name, email, company, phone, from_code_id):
+    lines = ["%s (%s)%s asked for access to HELVi Connect." % (name, email, (" from " + company) if company else ""),
+             ("WhatsApp: " + phone) if phone else "No WhatsApp number given.",
              "They had an account before the portal closed." if from_code_id else "New visitor, no account.",
              "Nothing is granted automatically: contact them and send a share link."]
     link = None
@@ -220,7 +242,7 @@ def _alert(rid, name, email, company, from_code_id):
             import mailer
             if not mailer.configured():
                 return
-            subject = "HELVi Connect · Access requested: %s (%s)" % (name, company)
+            subject = "HELVi Connect · Access requested: %s%s" % (name, (" (%s)" % company) if company else "")
             text = "\n".join(lines) + ("\n\nOpen: " + link if link else "")
             for addr in mail_to[:10]:
                 try:
@@ -272,12 +294,15 @@ def admin_html(query, can_switch):
                 ctl = "<span class='pill %s'>%s</span> <span class='muted'>%s · %s</span>%s" % (
                     "live" if r["status"] == "contacted" else "dead", e(r["status"]), e(r["decided_by"] or ""),
                     e(views.ts(r["decided_at"])), ("<div class='muted'>" + e(r["note"]) + "</div>") if r["note"] else "")
-            out += ("<tr><td><b>%s</b>%s</td><td><a href='mailto:%s'>%s</a></td><td>%s</td><td class='muted'>%s</td><td>%s</td></tr>"
+            ph = (r["phone"] if "phone" in r.keys() else "") or ""
+            tel = ("<a href='https://wa.me/%s' target='_blank' rel='noopener'>%s</a>" % (e(re.sub(r"\D", "", ph)), e(ph))) if ph else "<span class='muted'>—</span>"
+            out += ("<tr><td><b>%s</b>%s%s</td><td><a href='mailto:%s'>%s</a></td><td>%s</td><td class='muted'>%s</td><td>%s</td></tr>"
                     % (e(r["name"]), " <span class='pill'>had an account</span>" if r["from_code_id"] else "",
-                       e(r["email"]), e(r["email"]), e(r["company"]), e(views.ts(r["at"])), ctl))
+                       ("<div class='muted'>%s</div>" % e(r["company"])) if r["company"] else "",
+                       e(r["email"]), e(r["email"]), tel, e(views.ts(r["at"])), ctl))
         return out
 
-    head = "<thead><tr><th>Name</th><th>Email</th><th>Company</th><th>When</th><th></th></tr></thead>"
+    head = "<thead><tr><th>Name</th><th>Email</th><th>WhatsApp</th><th>When</th><th></th></tr></thead>"
     new, done = listing("new"), [r for r in listing() if r["status"] != "new"][:60]
     body = (
         "<div class='card'><div class='hd'><h2>Portal access</h2>" + sw + "</div>" + note + status + "</div>"

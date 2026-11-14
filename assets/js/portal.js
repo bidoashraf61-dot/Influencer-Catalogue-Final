@@ -774,53 +774,59 @@
       var name = h("input", { type: "text", name: "name", autocomplete: "name", required: true, value: opts.name || pre.name || "" });
       var email = h("input", { type: "email", name: "email", autocomplete: "email", inputmode: "email", spellcheck: "false", required: true,
         placeholder: "name@yourcompany.com", value: opts.email || pre.email || "" });
-      var company = h("input", { type: "text", name: "company", autocomplete: "organization", required: true, value: opts.company || pre.company || "" });
+      var phone = h("input", { type: "tel", name: "whatsapp", autocomplete: "tel", inputmode: "tel", placeholder: "+966 5x xxx xxxx",
+        "aria-describedby": "cx-wa-note", value: opts.phone || pre.phone || "" });
       // A field people never see: a bot that fills it is thanked and nothing is kept.
       var trap = h("input", { type: "text", name: "website", tabindex: "-1", autocomplete: "off" });
       var err = h("div", { id: "cx-req-err" });
       var btn = label(goBtn(), "Request access");
       var fName = h("label", { class: "cx-fld" }, h("span", null, "Full name"), name);
       var fEmail = h("label", { class: "cx-fld" }, h("span", null, "Work email"), email);
-      var fCo = h("label", { class: "cx-fld" }, h("span", null, "Company"), company);
-      var form = h("form", { novalidate: true, class: "cx-req" }, fName, fEmail, fCo,
+      // WhatsApp, optional (Bido 2026-11-15): the number the team messages back on, if the visitor wants that.
+      var fPh = h("label", { class: "cx-fld cx-fld--wa" },
+        h("span", null, "WhatsApp ", h("i", { class: "cx-opt" }, "optional")),
+        h("span", { class: "cx-wa-in" }, h("span", { class: "cx-wa-pre", "aria-hidden": "true", html: WA_ICON }), phone),
+        h("small", { class: "cx-wa-note", id: "cx-wa-note" }, "Add it if you’d like us to contact you on WhatsApp."));
+      var form = h("form", { novalidate: true, class: "cx-req" }, fName, fEmail, fPh,
         h("div", { class: "cx-trap", "aria-hidden": "true" }, h("label", null, "Website", trap)), err, btn);
       pane.appendChild(form);
       pane.appendChild(h("p", { class: "cx-fine" }, "On the HelloVoice team? ",
         h("button", { type: "button", class: "cx-link", onclick: function () { show("email"); } }, "Staff sign-in")));
-      function clear() { [fName, fEmail, fCo].forEach(function (f) { f.classList.remove("cx-fld--err"); f.querySelector("input").removeAttribute("aria-invalid"); }); err.textContent = ""; }
+      function clear() { [fName, fEmail, fPh].forEach(function (f) { f.classList.remove("cx-fld--err"); f.querySelector("input").removeAttribute("aria-invalid"); }); err.textContent = ""; }
       function bad(fld, text) {
         fld.classList.add("cx-fld--err"); var i = fld.querySelector("input"); i.setAttribute("aria-invalid", "true");
         err.textContent = ""; err.appendChild(errLine(text)); i.focus();
       }
-      [name, email, company].forEach(function (i) { i.addEventListener("input", clear); });
+      [name, email, phone].forEach(function (i) { i.addEventListener("input", clear); });
       form.addEventListener("submit", function (e) {
         e.preventDefault();
         if (btn.getAttribute("data-busy")) return;
         clear();
         if (name.value.trim().length < 2) { bad(fName, "Please enter your name."); return; }
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(email.value.trim())) { bad(fEmail, "Enter your email, like name@yourcompany.com."); return; }
-        if (company.value.trim().length < 2) { bad(fCo, "Please enter your company."); return; }
+        var pd = phone.value.replace(/\D/g, "");
+        if (phone.value.trim() && (pd.length < 7 || pd.length > 15)) { bad(fPh, "That WhatsApp number doesn’t look right. Include the country code, or leave it empty."); return; }
         btn.setAttribute("data-busy", "1"); wait(btn, true, "Request access");
-        var sent = { name: name.value.trim(), email: email.value.trim(), company: company.value.trim(), website: trap.value };
+        var sent = { name: name.value.trim(), email: email.value.trim(), phone: phone.value.trim(), website: trap.value };
         api("POST", "/api/invite/request", sent).then(function (r) {
           btn.removeAttribute("data-busy"); wait(btn, false, "Request access");
           if (r.s === 429) { err.appendChild(errLine("Too many requests from this network. Please try again in an hour.")); return; }
           if (!r.b.ok) {
-            var f = { name: fName, email: fEmail, company: fCo }[r.b.field];
+            var f = { name: fName, email: fEmail, phone: fPh }[r.b.field];
             if (f) bad(f, r.b.message || "Please check this field."); else err.appendChild(errLine(r.b.message || "We couldn’t send that. Please try again."));
             return;
           }
           show("sent", sent);
         });
       });
-      if (!opts.keepFocus) setTimeout(function () { (name.value ? (email.value ? (company.value ? btn : company) : email) : name).focus({ preventScroll: true }); }, 30);
+      if (!opts.keepFocus) setTimeout(function () { (name.value ? (email.value ? btn : email) : name).focus({ preventScroll: true }); }, 30);
     }
 
     function paneSent(opts) {
       var first = String(opts.name || "").split(" ")[0];
       pane.appendChild(h("h2", { class: "cx-door__title", tabindex: "-1" }, first ? "Thanks, " + first : "Thanks"));
       pane.appendChild(h("p", { class: "cx-door__lead" }, "We have your request. The HelloVoice team will contact you at ", h("b", null, opts.email || "your email"), "."));
-      pane.appendChild(h("div", { class: "cx-who", html: icon("check", "cx-i") }, h("span", null, "Request sent for " + (opts.company || "your company"))));
+      pane.appendChild(h("div", { class: "cx-who", html: icon("check", "cx-i") }, h("span", null, opts.phone ? "Request sent · we’ll message you on WhatsApp" : "Request sent")));
       pane.appendChild(h("p", { class: "cx-fine" }, "While you wait, the film on this page shows what HELVi Connect does."));
       setTimeout(function () { var t = pane.querySelector(".cx-door__title"); if (t) t.focus({ preventScroll: true }); }, 30);
     }
@@ -828,12 +834,29 @@
     show(INV ? "request" : "email", { keepFocus: true });
   }
 
+  // WhatsApp's mark, drawn as one path (filled), used beside the optional WhatsApp field.
+  var WA_ICON = '<svg viewBox="0 0 24 24" focusable="false" aria-hidden="true"><path fill="currentColor" d="M12.04 2C6.58 2 2.15 6.43 2.15 11.88c0 1.75.46 3.45 1.33 4.95L2.05 22l5.3-1.39a9.86 9.86 0 0 0 4.69 1.19h.01c5.45 0 9.89-4.43 9.89-9.88 0-2.64-1.03-5.12-2.9-6.99A9.82 9.82 0 0 0 12.04 2zm0 18.13h-.01a8.2 8.2 0 0 1-4.18-1.15l-.3-.18-3.14.83.84-3.06-.2-.31a8.2 8.2 0 0 1-1.26-4.38c0-4.53 3.69-8.22 8.23-8.22a8.17 8.17 0 0 1 5.82 2.41 8.17 8.17 0 0 1 2.4 5.82c0 4.54-3.69 8.24-8.2 8.24zm4.51-6.16c-.25-.12-1.46-.72-1.69-.8-.23-.08-.39-.12-.56.12-.16.25-.64.8-.78.97-.14.16-.29.18-.54.06-.25-.12-1.04-.38-1.98-1.22-.73-.65-1.23-1.46-1.37-1.71-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.16.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.42h-.48a.92.92 0 0 0-.66.31c-.23.25-.87.85-.87 2.07 0 1.22.89 2.4 1.01 2.57.12.16 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.46-.6 1.67-1.18.21-.58.21-1.07.14-1.18-.06-.1-.22-.16-.47-.29z"/></svg>';
+
   var STAFF_RX = /@(.+\.)?(blueholding\.co\.uk|hellovoice\.co\.uk)$/i;
 
   // "How HELVi works" for the invite-only door (item 382): the onboarding film from /welcome/,
   // lazy like there (no src until play). No chapter list here (Bido 2026-11-15): the film alone.
+  // The film's main stops beside it (Bido 2026-11-15: main headlines only, no timings). Each jumps to its
+  // moment; the one playing lights up. Icons follow the poster's own five steps.
+  var FILM_STOPS = [
+    [66, "Browse creators", "Filter by platform, city and more.", '<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>'],
+    [132, "Shortlist with AI", "Helvi picks creators for your brief.", '<path d="M4 6.5l1.6 1.6L8.6 5"/><path d="M4 12.5l1.6 1.6 3-3.1"/><path d="M4 18.5l1.6 1.6 3-3.1"/><path d="M11.5 7h8.5M11.5 13h8.5M11.5 19h8.5"/>'],
+    [204, "See the competition", "Who works with your competitors.", '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r=".9" fill="currentColor"/>'],
+    [240, "One clear quote", "Send your picks, get one price.", '<path d="M7 3.5h7l4 4V20a.5.5 0 0 1-.5.5h-10.5a.5.5 0 0 1-.5-.5V4a.5.5 0 0 1 .5-.5z"/><path d="M14 3.5V8h4"/><path d="M9.5 12.5h5M9.5 16h5"/>'],
+    [252, "Track live results", "Posts, views and what people say.", '<path d="M3.5 17.5l5.5-5.5 4 4 7.5-8"/><path d="M15.5 8h5v5"/>']];
+
   function filmPitch() {
     var sec = h("section", { class: "cx-film", "aria-labelledby": "cx-film-h" });
+    // The brand first (Bido 2026-11-15): HELVi Connect and its line, then the film.
+    sec.appendChild(h("div", { class: "cx-film__brand" },
+      h("img", { class: "cx-film__logo", src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c6", alt: "HELVi Connect",
+        width: "440", height: "220", fetchpriority: "high" }),
+      h("p", { class: "cx-film__tag" }, "Connecting Brands with the Right Voices")));
     sec.appendChild(h("h1", { class: "cx-film__title", id: "cx-film-h" }, "How HELVi works"));
     sec.appendChild(h("p", { class: "cx-film__lede" }, "One short film, from your brief to live results."));
     var video = h("video", { class: "cx-film__video", preload: "none", playsinline: "", poster: ROOT + "assets/welcome/onboarding-poster.jpg",
@@ -843,8 +866,20 @@
       html: '<span class="cx-film__dot" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/></svg></span>' +
             '<span class="cx-film__cta">Play the film</span>' });
     var frame = h("div", { class: "cx-film__frame" }, video, play);
+    var list = h("ol", { class: "cx-film__stops", "aria-label": "In the film" });
+    var btns = FILM_STOPS.map(function (c) {
+      var b = h("button", { type: "button", class: "cx-stop" },
+        h("span", { class: "cx-stop__ic", "aria-hidden": "true", html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" focusable="false">' + c[3] + "</svg>" }),
+        h("span", { class: "cx-stop__txt" }, h("b", { class: "cx-stop__h" }, c[1])));
+      b.setAttribute("aria-label", c[1] + ": " + c[2] + " Plays this part of the film.");
+      b.title = c[2];
+      b.addEventListener("click", function () { start(c[0]); });
+      list.appendChild(h("li", null, b));
+      return b;
+    });
+    var media = h("div", { class: "cx-film__media" }, frame, list);
     var oops = h("p", { class: "cx-film__err", role: "status", hidden: "" }, "The film didn’t load. Check your connection and try again.");
-    sec.appendChild(frame); sec.appendChild(oops);
+    sec.appendChild(media); sec.appendChild(oops);
     var loaded = false;
     function start(t) {
       oops.hidden = true;
@@ -853,6 +888,10 @@
       if (video.readyState >= 1) go(); else video.addEventListener("loadedmetadata", go, { once: true });
     }
     play.addEventListener("click", function () { start(0); });
+    video.addEventListener("timeupdate", function () {
+      var cur = -1; FILM_STOPS.forEach(function (c, i) { if (video.currentTime >= c[0]) cur = i; });
+      btns.forEach(function (b, i) { if (i === cur) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current"); });
+    });
     video.addEventListener("error", function () { oops.hidden = false; frame.classList.remove("is-on"); loaded = false; video.removeAttribute("src"); video.controls = false; });
     return sec;
   }
