@@ -1972,9 +1972,13 @@ def selection(sid=None, token=None, deleted=False):
 
 def zero_priced(sid):
     """True for a selection the owner priced at zero (setting selections_zero_price: a list
-    of selection ids, 2026-10-11). Every creator in it, including ones added later, is 0."""
+    of selection ids, 2026-10-11). Every creator in it, including ones added later, is 0.
+    "all" = Bido's hard rule (2026-11-16): every selection is 0, new and old, and hand prices are ignored."""
     try:
-        return sid is not None and int(sid) in set(int(x) for x in (setting("selections_zero_price") or []))
+        v = setting("selections_zero_price") or []
+        if v == "all":
+            return True
+        return sid is not None and int(sid) in set(int(x) for x in v)
     except (TypeError, ValueError):
         return False
 
@@ -3932,6 +3936,8 @@ def _auto_kam(kind, item_id):
 
 def unzero_selection(sid):
     """Prices entered by hand in the admin: this selection is no longer held at zero."""
+    if setting("selections_zero_price") == "all":   # hard rule 2026-11-16: never un-zero
+        return
     cur = [int(x) for x in (setting("selections_zero_price") or [])]
     if int(sid) in cur:
         set_setting("selections_zero_price", [x for x in cur if x != int(sid)])
@@ -3940,8 +3946,9 @@ def unzero_selection(sid):
 def _zero_new_selection(sid):
     """Every new selection starts at zero until prices are entered by hand in the admin (owner, 2026-10-18)."""
     try:
-        cur = [int(x) for x in (setting("selections_zero_price") or [])]
-        if int(sid) not in cur:
+        v = setting("selections_zero_price") or []
+        cur = [] if v == "all" else [int(x) for x in v]
+        if v != "all" and int(sid) not in cur:
             set_setting("selections_zero_price", cur + [int(sid)])
         with connect() as conn:
             row = conn.execute("SELECT codes FROM selections WHERE id = ?", (int(sid),)).fetchone()
