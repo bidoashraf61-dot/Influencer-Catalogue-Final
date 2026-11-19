@@ -167,6 +167,7 @@
 .cx-sent__ic--wa { color: #128c7e; }
 .cx-sent__sub { display: block; margin-top: 2px; font-size: 13px; color: var(--gray); }
 .cx-sent__sub b { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+.cx-sent__mail { display: block; margin-bottom: 1px; }
 .cx-who button { margin-left: auto; font-size: 13px; min-height: 28px; text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .cx-ok { margin: 14px 0 0; padding: 12px 16px; border-radius: 16px; background: var(--go-soft); color: #0e6b39; font-size: 14px; line-height: 1.5; }
 

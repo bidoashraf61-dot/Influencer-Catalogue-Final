@@ -829,7 +829,7 @@
       // What happens next: email always comes first; WhatsApp only as a follow-up when a number was given.
       var steps = h("ol", { class: "cx-sent__steps" },
         h("li", { class: "cx-sent__step" }, h("span", { class: "cx-sent__ic", html: icon("mail", "cx-i") }),
-          h("span", null, h("b", null, "We’ll email you first"), h("span", { class: "cx-sent__sub" }, "At ", h("b", null, opts.email || "your email"), " · usually within one working day"))));
+          h("span", null, h("b", null, "We’ll email you first"), h("span", { class: "cx-sent__sub" }, h("b", { class: "cx-sent__mail" }, opts.email || "your email"), "Usually within one working day"))));
       if (opts.phone) steps.appendChild(h("li", { class: "cx-sent__step" }, h("span", { class: "cx-sent__ic cx-sent__ic--wa", html: WA_ICON }),
         h("span", null, h("b", null, "Then WhatsApp, if needed"), h("span", { class: "cx-sent__sub" }, "Follow-up on ", h("b", { dir: "ltr" }, opts.phone)))));
       pane.appendChild(h("div", { class: "cx-sent", role: "status" },
