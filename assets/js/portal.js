@@ -823,13 +823,15 @@
     }
 
     function paneSent(opts) {
+      // Long addresses break before the "@", never mid-word, on narrow phones.
+      function mailParts(m) { var i = m.indexOf("@"); return i > 0 ? h("span", null, m.slice(0, i), h("wbr"), m.slice(i)) : m; }
       var first = String(opts.name || "").split(" ")[0];
       pane.appendChild(h("h2", { class: "cx-door__title", tabindex: "-1" }, first ? "Thanks, " + first : "Thanks"));
       pane.appendChild(h("p", { class: "cx-door__lead" }, "Your request is with the HelloVoice team."));
       // What happens next: email always comes first; WhatsApp only as a follow-up when a number was given.
       var steps = h("ol", { class: "cx-sent__steps" },
         h("li", { class: "cx-sent__step" }, h("span", { class: "cx-sent__ic", html: icon("mail", "cx-i") }),
-          h("span", null, h("b", null, "We’ll email you first"), h("span", { class: "cx-sent__sub" }, h("b", { class: "cx-sent__mail" }, opts.email || "your email"), "Usually within one working day"))));
+          h("span", null, h("b", null, "We’ll email you first"), h("span", { class: "cx-sent__sub" }, h("b", { class: "cx-sent__mail" }, mailParts(opts.email || "your email")), "Usually within one working day"))));
       if (opts.phone) steps.appendChild(h("li", { class: "cx-sent__step" }, h("span", { class: "cx-sent__ic cx-sent__ic--wa", html: WA_ICON }),
         h("span", null, h("b", null, "Then WhatsApp, if needed"), h("span", { class: "cx-sent__sub" }, "Follow-up on ", h("b", { dir: "ltr" }, opts.phone)))));
       pane.appendChild(h("div", { class: "cx-sent", role: "status" },
