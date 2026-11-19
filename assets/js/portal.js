@@ -827,13 +827,13 @@
       pane.appendChild(h("h2", { class: "cx-door__title", tabindex: "-1" }, first ? "Thanks, " + first : "Thanks"));
       pane.appendChild(h("p", { class: "cx-door__lead" }, "Your request is with the HelloVoice team."));
       // What happens next: email always comes first; WhatsApp only as a follow-up when a number was given.
-      var steps = h("ol", { class: "cx-next__steps" },
-        h("li", { class: "cx-next__step" }, h("span", { class: "cx-next__ic", html: icon("mail", "cx-i") }),
-          h("span", null, h("b", null, "We’ll email you first"), h("span", { class: "cx-next__sub" }, "At ", h("b", null, opts.email || "your email"), " · usually within one working day"))));
-      if (opts.phone) steps.appendChild(h("li", { class: "cx-next__step" }, h("span", { class: "cx-next__ic cx-next__ic--wa", html: WA_ICON }),
-        h("span", null, h("b", null, "Then WhatsApp, if needed"), h("span", { class: "cx-next__sub" }, "Follow-up on ", h("b", { dir: "ltr" }, opts.phone)))));
-      pane.appendChild(h("div", { class: "cx-next", role: "status" },
-        h("div", { class: "cx-next__head" }, h("span", { class: "cx-next__ok", html: icon("check", "cx-i") }), h("span", null, "Request sent")),
+      var steps = h("ol", { class: "cx-sent__steps" },
+        h("li", { class: "cx-sent__step" }, h("span", { class: "cx-sent__ic", html: icon("mail", "cx-i") }),
+          h("span", null, h("b", null, "We’ll email you first"), h("span", { class: "cx-sent__sub" }, "At ", h("b", null, opts.email || "your email"), " · usually within one working day"))));
+      if (opts.phone) steps.appendChild(h("li", { class: "cx-sent__step" }, h("span", { class: "cx-sent__ic cx-sent__ic--wa", html: WA_ICON }),
+        h("span", null, h("b", null, "Then WhatsApp, if needed"), h("span", { class: "cx-sent__sub" }, "Follow-up on ", h("b", { dir: "ltr" }, opts.phone)))));
+      pane.appendChild(h("div", { class: "cx-sent", role: "status" },
+        h("div", { class: "cx-sent__head" }, h("span", { class: "cx-sent__ok", html: icon("check", "cx-i") }), h("span", null, "Request sent")),
         steps));
       pane.appendChild(h("p", { class: "cx-fine" }, "While you wait, the film on this page shows what HELVi Connect does."));
       setTimeout(function () { var t = pane.querySelector(".cx-door__title"); if (t) t.focus({ preventScroll: true }); }, 30);
