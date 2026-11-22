@@ -561,6 +561,10 @@ def migrate(conn):
     if "group_by" not in sel_cols:
         # How the client page opens: "" (one grid) or a grouping such as "segment" or "tier".
         conn.execute("ALTER TABLE selections ADD COLUMN group_by TEXT")
+    if "group_order" not in sel_cols:
+        # {grouping: [section name, ...]} (Bido, 2026-11-22): the order HelloVoice set for the sections of
+        # each grouping on the selection page (Segment, Tags, ...). Names not listed keep the default order after.
+        conn.execute("ALTER TABLE selections ADD COLUMN group_order TEXT")
     if "analysis_published" not in sel_cols:
         # Profile analysis gate (owner, 2026-10-15): 1 = everyone who may open this selection sees the full
         # analysis of its creators. Off by default; one-by-one grants (analysis_grants) still count.

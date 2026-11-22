@@ -2443,6 +2443,8 @@
                         noPrices: (document.documentElement.classList.toggle("sel-noprices", !!b.public && !Object.keys(b.prices || {}).length), !!b.public && !Object.keys(b.prices || {}).length),
                         tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {}, scores: b.scores || {}, brief: b.brief || null, clientPlatforms: b.client_platforms || {},
                         segments: b.segments || {}, groupBy: b.group_by || "", reach: b.reach || {},
+                        // Section order HelloVoice set per grouping (Bido, 2026-11-22): {dim: [name, ...]}.
+                        groupOrder: b.group_order || {},
                         // Item 3c (Bido, 25 Oct 2026): tags marked as sub-tags in the admin.
                         tagSubs: b.tag_subs || [],
                         // Views for awareness, likes + comments for engagement / conversion (owner, 2026-10-15).
@@ -2721,7 +2723,14 @@
         : dim === "kind" ? ["Influencers", "Doctors"]
         : dim === "country" ? COUNTRY_ORDER
         : XORDER[dim] ? XORDER[dim]() : null;
+      var own = (CURATED && CURATED.groupOrder && CURATED.groupOrder[dim]) || null;
       return names.sort(function (a, b) {
+        // The order HelloVoice set with the section handles comes first (Bido, 2026-11-22);
+        // sections it does not name (new segments) follow in the usual order.
+        if (own) {
+          var oa = own.indexOf(a), ob = own.indexOf(b);
+          if (oa !== ob) return (oa === -1 ? 999 : oa) - (ob === -1 ? 999 : ob);
+        }
         var na = a === NONE_LABEL[dim] || a === "Not rejected", nb = b === NONE_LABEL[dim] || b === "Not rejected";
         if (na !== nb) return na ? 1 : -1;
         if (fixed) {
@@ -2759,7 +2768,14 @@
       var sub = dim === "status" && ST_SUB[ST_KEY[k]] ? '<p class="cat-group__sub">' + esc(ST_SUB[ST_KEY[k]]()) + "</p>" : "";
       var open = !collapsed[id];
       // Item 250: a clear Collapse / Expand control on every header; the count stays while collapsed.
-      return '<header class="cat-group__head' + (lvl ? " cat-group__head--sub" : "") + '">' + flag + mark +
+      // Section order handles (Bido, 2026-11-22): top-level sections, HelloVoice owners/admins only.
+      var mv = !lvl && id !== "rejected-bottom" && CURATED && CURATED.canArrange && CFG.api
+        ? '<span class="cat-group__mv" role="group" aria-label="Move ' + esc(name) + '">' +
+          '<button type="button" class="cat-group__grip" draggable="true" title="Drag to reorder" aria-label="Drag to reorder"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></button>' +
+          '<button type="button" class="cat-group__up" data-move="-1" title="Move up" aria-label="Move ' + esc(name) + ' up"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>' +
+          '<button type="button" class="cat-group__down" data-move="1" title="Move down" aria-label="Move ' + esc(name) + ' down">' + CHEVRON + "</button></span>"
+        : "";
+      return '<header class="cat-group__head' + (lvl ? " cat-group__head--sub" : "") + (mv ? " cat-group__head--mv" : "") + '">' + mv + flag + mark +
         '<h' + (lvl ? 3 : 2) + ' class="cat-group__name"><button type="button" class="cat-group__tog" data-group-id="' + esc(id) +
         '" aria-expanded="' + open + '">' + esc(name) + CHEVRON + "</button></h" + (lvl ? 3 : 2) + ">" +
         '<span class="cat-group__n">' + n + (n === 1 ? " creator" : " creators") + "</span>" +
@@ -2812,6 +2828,7 @@
         var id = groupBy + ":" + k;
         var sec = document.createElement("section");
         sec.className = "cat-group" + (groupBy === "status" ? " cat-group--status cat-group--st-" + (ST_KEY[k] || "x") : "");
+        sec.setAttribute("data-key", k);
         sec.innerHTML = groupHead(groupBy, k, top.count[k], total ? Math.round(100 * top.count[k] / total) : 0, 0, id);
         var body = document.createElement("div");
         body.className = "cat-group__body";
@@ -2843,7 +2860,72 @@
         grid.appendChild(sec);
       });
       rejectedSection(grid, rejected, put);
+      mvSync();
     }
+    // ---- Section order (Bido, 2026-11-22): ⋮⋮ drag (desktop) and ↑ ↓ (everywhere) on each top section,
+    // HelloVoice owners/admins only. Every move saves straight away into selections.group_order[groupBy],
+    // so clients, reports and PDFs open the sections in this order.
+    function mvSecs() { return all(":scope > .cat-group[data-key]", $("cat-grid")); }
+    function mvSync() {
+      var secs = mvSecs();
+      secs.forEach(function (sec, i) {
+        var up = sec.querySelector(":scope > .cat-group__head .cat-group__up"), dn = sec.querySelector(":scope > .cat-group__head .cat-group__down");
+        if (up) up.disabled = i === 0;
+        if (dn) dn.disabled = i === secs.length - 1;
+      });
+    }
+    var mvSeq = 0;
+    function mvSave() {
+      mvSync();
+      if (!CURATED || !groupBy) return;
+      var names = mvSecs().map(function (sec) { return sec.getAttribute("data-key"); });
+      CURATED.groupOrder = CURATED.groupOrder || {};
+      CURATED.groupOrder[groupBy] = names;
+      var seq = ++mvSeq, grid = $("cat-grid");
+      grid.setAttribute("data-mv", "saving");
+      fetch(CFG.api + "/api/selection/group-order", { method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: CURATED.token, dim: groupBy, names: names }) })
+        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (b) {
+          if (seq !== mvSeq) return;
+          if (b && b.ok) { grid.setAttribute("data-mv", "saved"); setTimeout(function () { if (seq === mvSeq) grid.removeAttribute("data-mv"); }, 1600); }
+          else { grid.removeAttribute("data-mv"); window.alert((b && b.message) || "Could not save the section order. Try again."); }
+        }, function () { if (seq === mvSeq) { grid.removeAttribute("data-mv"); window.alert("Could not save the section order. Try again."); } });
+    }
+    $("cat-grid").addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest(".cat-group__up, .cat-group__down");
+      if (!b || b.disabled) return;
+      var sec = b.closest(".cat-group[data-key]"), secs = mvSecs(), i = secs.indexOf(sec), j = i + Number(b.getAttribute("data-move"));
+      if (i < 0 || j < 0 || j >= secs.length) return;
+      sec.parentNode.insertBefore(sec, j < i ? secs[j] : secs[j].nextSibling);
+      b.focus({ preventScroll: true });
+      sec.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      mvSave();
+    });
+    var mvDrag = null;
+    $("cat-grid").addEventListener("dragstart", function (e) {
+      var g = e.target.closest && e.target.closest(".cat-group__grip");
+      if (!g) return;
+      mvDrag = g.closest(".cat-group[data-key]");
+      if (!mvDrag) return;
+      mvDrag.classList.add("is-moving");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", mvDrag.getAttribute("data-key")); e.dataTransfer.setDragImage(mvDrag.querySelector(".cat-group__head"), 24, 24); } catch (err) {}
+    });
+    $("cat-grid").addEventListener("dragover", function (e) {
+      if (!mvDrag) return;
+      var over = e.target.closest && e.target.closest(".cat-group[data-key]");
+      e.preventDefault();
+      if (!over || over === mvDrag || over.parentNode !== mvDrag.parentNode) return;
+      var r = over.getBoundingClientRect(), after = e.clientY > r.top + Math.min(r.height, 120) / 2;
+      over.parentNode.insertBefore(mvDrag, after ? over.nextSibling : over);
+    });
+    $("cat-grid").addEventListener("drop", function (e) { if (mvDrag) e.preventDefault(); });
+    $("cat-grid").addEventListener("dragend", function () {
+      if (!mvDrag) return;
+      mvDrag.classList.remove("is-moving"); mvDrag = null;
+      mvSave();
+    });
     function setFold(sec, id, closed) {
       collapsed[id] = closed;
       if (!closed) delete collapsed[id];
@@ -5270,6 +5352,7 @@
       // While HelloVoice arranges the cards (item 3b) the drag has to be allowed to start,
       // or this deterrence cancels it the moment the arrange handler has set it up.
       if (evt === "dragstart" && e.target.closest && e.target.closest(".is-arranging .cat-card")) return;
+      if (e.target.closest && e.target.closest(".cat-group__grip")) return;   // section order handle (2026-11-22)
       if (e.target.closest && e.target.closest(".cat-form, .cat-gate__form, .cat-range, .cat-search, [data-noselect]")) return;
       e.preventDefault();
     });

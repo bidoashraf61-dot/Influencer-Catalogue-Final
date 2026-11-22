@@ -1569,6 +1569,21 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 .cat-group__n { font-family: var(--heading); font-size: 18px; letter-spacing: .04em; background: var(--ink); color: var(--lime);
   padding: 5px 12px 4px; border-radius: var(--r-pill); }
 .cat-group__pct { font-size: 13px; color: var(--gray); margin-left: auto; }
+/* Section order handles (Bido, 2026-11-22): ⋮⋮ drag + up/down, HelloVoice owners/admins only. */
+.cat-group__mv { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 999px; background: rgba(18,18,18,.06); flex: none; }
+.cat-group__mv button { display: inline-grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; color: var(--ink); cursor: pointer; padding: 0; }
+.cat-group__mv button:hover:not(:disabled) { background: var(--white); }
+.cat-group__mv button:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.cat-group__mv button:disabled { opacity: .3; cursor: default; }
+.cat-group__grip { cursor: grab !important; color: var(--gray) !important; }
+.cat-group__grip:active { cursor: grabbing !important; }
+.cat-group.is-moving { opacity: .45; }
+.cat-group.is-moving > .cat-group__head { outline: 2px dashed rgba(18,18,18,.35); outline-offset: 6px; border-radius: 6px; }
+#cat-grid[data-mv]::after { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 60; padding: 10px 16px; border-radius: 999px;
+  background: var(--ink); color: var(--lime); font-size: 13px; font-weight: 600; pointer-events: none; }
+#cat-grid[data-mv="saving"]::after { content: "Saving section order…"; }
+#cat-grid[data-mv="saved"]::after { content: "Section order saved"; }
+@media (hover: none) { .cat-group__grip { display: none !important; } }
 .cat-group__head .cat-flag { width: 36px; height: 24px; }
 @media screen and (max-width: 767px) {
   .cat-group__name { font-size: 30px; }

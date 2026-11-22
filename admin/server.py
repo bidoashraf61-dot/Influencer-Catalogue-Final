@@ -1780,6 +1780,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return selfilters.api_views(self)
         if path == "/api/selection/order":          # item 3b (Bido, 25 Oct 2026): card order, set on the selection page
             return self.api_selection_order()
+        if path == "/api/selection/group-order":    # Bido, 2026-11-22: section order, set on the selection page
+            return self.api_selection_group_order()
         if path == "/api/selection/status":
             return self.api_selection_status()
         if path == "/api/report/shares":
@@ -5803,6 +5805,38 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         db.log("shortlist", reader, self.client_ip(), self.headers.get("User-Agent"), "order:%s:%d" % (sel["id"], len(order)))
         return self.send_json(200, {"ok": True, "codes": order, "changed": True}, self.cors())
 
+    def api_selection_group_order(self):
+        """Bido, 2026-11-22: save the order of the sections (segments, tags, ...) of one grouping, set with the
+        drag handle / arrows on the selection page. Same gate as Arrange cards: HelloVoice owners and admins."""
+        b = self.json_body()
+        sel = db.selection(token=str(b.get("token") or ""))
+        if sel is None:
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        reader = self.selection_viewer(sel["token"])
+        import selfilters as _sf
+        if (self.kam_clients() is not None or not (self.admin_like_for(sel["code_id"], sel["id"])
+                                                   or self.selection_role(sel, reader) == "admin")
+                or not _sf.can_publish(self)):
+            return self.send_json(403, {"ok": False, "reason": "hv_admin_only",
+                                        "message": "Only HelloVoice owners and admins change the section order."}, self.cors())
+        dim = str(b.get("dim") or "").strip()[:40]
+        if not dim or not all(ch.isalnum() or ch in "_-" for ch in dim):
+            return self.send_json(400, {"ok": False, "reason": "dim"}, self.cors())
+        names, seen = [], set()
+        for n in (b.get("names") or [])[:200]:
+            n = str(n).strip()[:120]
+            if n and n not in seen:
+                seen.add(n); names.append(n)
+        cur = json.loads((sel["group_order"] if "group_order" in sel.keys() else None) or "{}")
+        if names:
+            cur[dim] = names
+        else:
+            cur.pop(dim, None)
+        with db.connect() as conn:
+            conn.execute("UPDATE selections SET group_order = ? WHERE id = ?", (json.dumps(cur) if cur else None, sel["id"]))
+        db.log("shortlist", reader, self.client_ip(), self.headers.get("User-Agent"), "group-order:%s:%s:%d" % (sel["id"], dim, len(names)))
+        return self.send_json(200, {"ok": True, "group_order": cur}, self.cors())
+
     def selection_scoring_off(self, sel):
         """True when a selection shows no scores (setting selections_unscored: a list of
         selection ids, or "all" while the scoring logic is being reworked, 2026-10-11)."""
@@ -6719,6 +6753,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                     "tags": {k: v for k, v in json.loads((sel["tags"] if "tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "segments": {k: v for k, v in json.loads((sel["segments"] if "segments" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "group_by": (sel["group_by"] if "group_by" in sel.keys() else None) or "",
+                                    "group_order": json.loads((sel["group_order"] if "group_order" in sel.keys() else None) or "{}"),
                                     "tag_subs": db.setting("tag_subs") or [],
                                     "brief": {"objective": self.selection_objective(sel), "target": self.selection_target(sel),
                                               "client": self.selection_client(sel)},
