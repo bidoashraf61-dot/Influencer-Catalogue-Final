@@ -1226,13 +1226,17 @@
     // Sort by a table column too: the toolbar's choice picks the matching column.
     var SORT_COL = { updated: ["when", -1], idle: ["when", 1], name: ["name", 1], client: ["client", 1], kam: ["kam", 1], size: ["creators", -1] };
     function shown(skipStage) {
-      var q = (F.q || "").trim().toLowerCase();
+      // Every typed word, any order, punctuation ignored ("avotrene gym" finds "AvoTrene - Gym").
+      var qw = (F.q || "").toLowerCase().split(/[^0-9a-z\u0600-\u06ff]+/).filter(Boolean);
       var cutoff = F.age ? Date.now() / 1000 - Number(F.age) * 86400 : 0;
       var out = items.filter(function (it) {
         if (!skipStage && F.stage && it.stage !== F.stage) return false;
         if (F.owner && (it.owner || "") !== F.owner) return false;
         if (cutoff && !((it.updated || 0) >= cutoff)) return false;
-        if (q && (it.name + " " + (it.client || "") + " " + (it.kam || "")).toLowerCase().indexOf(q) < 0) return false;
+        if (qw.length) {
+          var hay = (it.name + " " + (it.client || "") + " " + (it.kam || "")).toLowerCase();
+          for (var wi = 0; wi < qw.length; wi++) if (hay.indexOf(qw[wi]) < 0) return false;
+        }
         if (F.client && (it.client || "") !== F.client) return false;
         if (F.kam && (it.kam || "") !== F.kam) return false;
         if (F.chips.mine && !(it.kamEmail && it.kamEmail === me)) return false;

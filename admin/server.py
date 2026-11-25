@@ -7297,20 +7297,29 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         campaigns and clients matching what was typed."""
         out = {"creators": [], "selections": [], "campaigns": [], "clients": []}
         if len(q) >= 2:
-            ql = q.lower()
+            words = re.findall(r"\w+", q.lower())
+
+            def hit(*texts):
+                # Every typed word, in any order, ignoring punctuation:
+                # "avotrene gym" finds "Avalon AvoTrene - Gym, Sports & Gamers".
+                hay = " ".join(t or "" for t in texts).lower()
+                return bool(words) and all(w in hay for w in words)
             for c in db.list_creators(search=q)[:6]:
                 out["creators"].append({"label": c["name"], "hint": "%s · %s" % (c["code"], c["tier"]),
                                         "href": views.u("/roster") + "?q=" + urllib.parse.quote(c["code"])})
+            live, gone = [], []
             for s in db.list_selections():
-                if ql in (s["name"] or "").lower() and not (s["archived_at"] if "archived_at" in s.keys() else None):
-                    out["selections"].append({"label": s["name"], "hint": "Selection",
-                                              "href": views.u("/selections/edit") + "?id=%d" % s["id"]})
+                if hit(s["name"], s["client_name"] if "client_name" in s.keys() else ""):
+                    arch = s["archived_at"] if "archived_at" in s.keys() else None
+                    (gone if arch else live).append({"label": s["name"], "hint": "Archived selection" if arch else "Selection",
+                                                     "href": views.u("/selections/edit") + "?id=%d" % s["id"]})
+            out["selections"] = live + gone
             for k in db.list_campaigns():
-                if ql in (k["name"] or "").lower() or ql in (k["client"] or "").lower():
+                if hit(k["name"], k["client"]):
                     out["campaigns"].append({"label": k["name"], "hint": k["status"],
                                              "href": views.u("/campaigns/edit") + "?id=%d" % k["id"]})
             for c in db.list_codes():
-                if ql in (c["label"] or "").lower():
+                if hit(c["label"]):
                     out["clients"].append({"label": c["label"], "hint": "Client",
                                            "href": views.u("/clients")})
             for k in out:
