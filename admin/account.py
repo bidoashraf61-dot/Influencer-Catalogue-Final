@@ -247,9 +247,16 @@ def summary(user, code_id, secret=b"", logo_dir=None):
             "u.name owner, u.company company, u.kam kam, c.label code_label FROM selections s "
             "LEFT JOIN users u ON u.code_id = s.code_id LEFT JOIN codes c ON c.id = s.code_id "
             "LEFT JOIN selection_meta m ON m.sel_id = s.id "
-            "WHERE (s.code_id IN (%s) OR s.id IN (%s)) AND s.archived_at IS NULL%s ORDER BY s.updated_at DESC LIMIT 60"
-            % (",".join("?" * len(team)), gq,
-               "" if (is_admin or kam_sc is not None) else " AND COALESCE(m.hidden, 0) = 0"), team + granted).fetchall()
+            # An admin's board holds every live selection, the same set as the admin's Selections page (owner,
+            # 2026-11-25): any client, no client, no 60-row cut. Deleted ones never show, for anyone.
+            + ("WHERE s.archived_at IS NULL AND s.deleted_at IS NULL ORDER BY s.updated_at DESC" if is_admin else
+               "WHERE (s.code_id IN (%s) OR s.id IN (%s)) AND s.archived_at IS NULL AND s.deleted_at IS NULL%s "
+               "ORDER BY s.updated_at DESC LIMIT 60"
+               % (",".join("?" * len(team)), gq, "" if kam_sc is not None else " AND COALESCE(m.hidden, 0) = 0")),
+            [] if is_admin else team + granted).fetchall()
+        # A company with several people joins once per person: keep each selection once.
+        _seen = set()
+        sels = [r for r in sels if not (r["id"] in _seen or _seen.add(r["id"]))]
         camps = conn.execute(
             "SELECT * FROM campaigns WHERE (code_id IN (%s) OR selection_id IN (%s)) AND status != 'draft' "
             "ORDER BY CASE status WHEN 'live' THEN 0 ELSE 1 END, starts_at DESC LIMIT 30" % (",".join("?" * len(team)), gq),
